@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+dist/
+build/
+
+# Local config and secrets
+.env
+.env.*
+!.env.example
+secrets/
+.sandbox/
+
+# Node (Phase 9)
+node_modules/
+.next/
+
+# Foundry (Phase 6)
+contracts/out/
+contracts/cache/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

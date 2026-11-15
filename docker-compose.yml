@@ -1,0 +1,26 @@
+name: agw
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: agw
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      AGW_MIGRATOR_PASSWORD: ${AGW_MIGRATOR_PASSWORD:?set AGW_MIGRATOR_PASSWORD in .env}
+      AGW_APP_PASSWORD: ${AGW_APP_PASSWORD:?set AGW_APP_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${AGW_PG_HOST_PORT:-54329}:5432"
+    volumes:
+      - ./infra/docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./infra/docker/postgres/roles.sql:/agw/roles.sql:ro
+      - agw-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Healthy only once the init script has created the runtime role.
+      test: ["CMD-SHELL", "psql -U postgres -d agw -tAc \"SELECT 1 FROM pg_roles WHERE rolname='agw_app'\" | grep -q 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  agw-pgdata:

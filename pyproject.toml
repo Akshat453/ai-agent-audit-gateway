@@ -1,0 +1,128 @@
+# uv workspace root (no code). Members: apps/*, packages/*.
+[project]
+name = "agw-workspace"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["agw-gateway", "agw-worker", "agw-sdk", "agw-schemas", "agw-verifier"]
+
+[tool.uv]
+package = false
+dev-dependencies = [
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "hypothesis>=6.115",
+    "testcontainers[postgres]>=4.8",
+    "import-linter>=2.1",
+]
+
+[tool.uv.workspace]
+members = ["apps/gateway", "apps/worker", "packages/gateway-sdk", "packages/schemas", "packages/verifier"]
+
+[tool.uv.sources]
+agw-gateway = { workspace = true }
+agw-worker = { workspace = true }
+agw-sdk = { workspace = true }
+agw-schemas = { workspace = true }
+agw-verifier = { workspace = true }
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "PL", "RUF"]
+ignore = ["PLR0913", "PLR0917", "PLR2004", "PLR0911", "PLR0912"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106", "S608", "PLR0915", "PLC0415"]
+"apps/gateway/migrations/**" = ["S608"]
+"examples/**" = ["S101", "T201", "PLC0415"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agw_gateway", "agw_worker", "agw_sdk", "agw_schemas", "agw_verifier"]
+
+# ---------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+warn_unused_configs = false
+ignore_missing_imports = false
+explicit_package_bases = true
+mypy_path = [
+    "apps/gateway/src", "apps/worker/src", "packages/gateway-sdk/src",
+    "packages/schemas/src", "packages/verifier/src",
+]
+
+[[tool.mypy.overrides]]
+module = ["agw_gateway", "agw_gateway.*", "agw_schemas", "agw_schemas.*", "agw_verifier", "agw_verifier.*"]
+strict = true
+
+[[tool.mypy.overrides]]
+module = ["testcontainers.*", "anthropic", "anthropic.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+testpaths = ["apps/gateway/tests", "apps/worker/tests"]
+addopts = "-ra --strict-markers -m 'not slow'"
+markers = [
+    "unit: pure functions, no I/O",
+    "property: Hypothesis properties",
+    "integration: Testcontainers Postgres",
+    "e2e: HTTP -> DB -> adapter",
+    "slow: excluded from make test",
+]
+filterwarnings = [
+    "error::pytest.PytestUnraisableExceptionWarning",
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["agw_gateway"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+# ---------------------------------------------------------------- import-linter (00 §3, ADR-0002, ADR-0016)
+[tool.importlinter]
+root_packages = ["agw_gateway", "agw_worker", "agw_sdk", "agw_schemas", "agw_verifier"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "verifier is independent of the live system"
+type = "forbidden"
+source_modules = ["agw_verifier"]
+forbidden_modules = ["agw_gateway", "agw_worker", "agw_sdk"]
+
+[[tool.importlinter.contracts]]
+name = "schemas is a leaf"
+type = "forbidden"
+source_modules = ["agw_schemas"]
+forbidden_modules = ["agw_gateway", "agw_worker", "agw_sdk", "agw_verifier"]
+
+[[tool.importlinter.contracts]]
+name = "sdk has no server internals"
+type = "forbidden"
+source_modules = ["agw_sdk"]
+forbidden_modules = ["agw_gateway", "agw_worker", "agw_verifier"]
+
+[[tool.importlinter.contracts]]
+name = "gateway does not import worker or verifier"
+type = "forbidden"
+source_modules = ["agw_gateway"]
+forbidden_modules = ["agw_worker", "agw_verifier"]
+
+[[tool.importlinter.contracts]]
+name = "policy and risk are pure: no I/O, no LLM (ADR-0002)"
+type = "forbidden"
+source_modules = ["agw_gateway.policies", "agw_gateway.risk"]
+forbidden_modules = [
+    "sqlalchemy", "psycopg", "httpx", "fastapi", "anthropic", "openai",
+    "agw_gateway.db", "agw_gateway.api", "agw_gateway.execution", "agw_gateway.evidence",
+]
