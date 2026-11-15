@@ -26,6 +26,7 @@ from agw_gateway.execution.runner import BackgroundRunner
 from agw_gateway.execution.service import ActionService
 from agw_gateway.ids import uuid7
 from agw_gateway.logs import configure_logging, log
+from agw_gateway.provenance import resolve_build_commit
 from agw_gateway.tools.demo import demo_tool_specs
 from agw_gateway.tools.registry import ToolRegistry
 
@@ -46,6 +47,7 @@ def build_state(
     registry = registry or ToolRegistry(demo_tool_specs())
     crash = crash or CrashPoints(settings.env)
     writer = EvidenceWriter()
+    build_commit = resolve_build_commit(settings.build_commit)
     executor = Executor(
         engine=engine,
         registry=registry,
@@ -74,6 +76,7 @@ def build_state(
         tx1_statement_timeout_ms=settings.tx1_statement_timeout_ms,
         idempotency_ttl=timedelta(hours=settings.idempotency_ttl_hours),
         on_authorized=runner.nudge if runner else None,
+        build_commit=build_commit,
     )
     return GatewayState(
         settings=settings,

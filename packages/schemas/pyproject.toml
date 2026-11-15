@@ -3,7 +3,7 @@ name = "agw-schemas"
 version = "0.1.0"
 description = "AGW event schemas and CBOR profile (Phase 2+); test vectors (Phase 3)"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["pydantic>=2.9"]
 
 [build-system]
 requires = ["hatchling"]

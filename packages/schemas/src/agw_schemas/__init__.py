@@ -1,8 +1,11 @@
-"""AGW event schemas and the AGW-CBOR-v1 profile.
+"""AGW event schemas and the AGW-CBOR-v1 profile (normative for the gateway).
 
-Phase 1 stub. The encoder/validator arrives in Phase 2 (docs/gateway/05 §6, 06), the frozen
-test vectors in Phase 3. Event-type names are the only shared contract today.
+The verifier (packages/verifier) deliberately does NOT import this package: it re-implements
+the codec and hashing from the spec and is cross-checked against the same frozen vectors in
+``packages/schemas/test-vectors/``.
 """
+
+from agw_schemas.events import HEADER_MODELS, MODEL_ONLY_TYPES
 
 PHASE1_EVENT_TYPES: tuple[str, ...] = (
     "ACTION_REQUESTED",
@@ -16,3 +19,5 @@ PHASE1_EVENT_TYPES: tuple[str, ...] = (
     "ACTION_OUTCOME_UNKNOWN",
     "SECURITY_VIOLATION",
 )
+
+__all__ = ["HEADER_MODELS", "MODEL_ONLY_TYPES", "PHASE1_EVENT_TYPES"]

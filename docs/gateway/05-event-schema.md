@@ -154,6 +154,10 @@ Base: RFC 8949 §4.2.1 *Core Deterministic Encoding Requirements*. Additional re
 
 ## 7. Phase 1 storage form (pre-CBOR)
 
+> Phase 2 (implemented): headers are stored as canonical CBOR in `canonical_bytes` (NOT NULL) with
+> `event_hash`; JSONB `body` is the derived projection. Header additions (`obs`, `dispatch.cg`,
+> `payload.ref`, `code.agent`) are recorded in ADR-0023. Models: `packages/schemas/src/agw_schemas/events.py`.
+
 Phase 1 stores `body JSONB` with **the same keys** as §4 (bstr as lowercase hex, UUIDs as
 canonical strings, `prev` omitted) and `canonical_bytes BYTEA NULL`. Phase 2 makes
 `canonical_bytes` NOT NULL for new rows. From then on JSONB is a *derived, non-authoritative*

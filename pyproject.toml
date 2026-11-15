@@ -35,11 +35,13 @@ extend-exclude = ["docs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "PL", "RUF"]
-ignore = ["PLR0913", "PLR0917", "PLR2004", "PLR0911", "PLR0912"]
+ignore = ["PLR0913", "PLR0917", "PLR2004", "PLR0911", "PLR0912", "PLR0915"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101", "S105", "S106", "S608", "PLR0915", "PLC0415"]
-"apps/gateway/migrations/**" = ["S608"]
+"apps/gateway/migrations/**" = ["S608", "E501"]
+"packages/schemas/test-vectors/**" = ["S101", "PLC0415", "E501", "T201"]
+"experiments/**" = ["S101", "T201", "PLC0415", "S311", "E501", "RUF046"]
 "examples/**" = ["S101", "T201", "PLC0415"]
 
 [tool.ruff.lint.isort]
@@ -67,7 +69,7 @@ ignore_missing_imports = true
 
 # ---------------------------------------------------------------- pytest
 [tool.pytest.ini_options]
-testpaths = ["apps/gateway/tests", "apps/worker/tests"]
+testpaths = ["apps/gateway/tests", "apps/worker/tests", "packages/schemas/tests", "packages/verifier/tests"]
 addopts = "-ra --strict-markers -m 'not slow'"
 markers = [
     "unit: pure functions, no I/O",
@@ -83,7 +85,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 branch = true
-source = ["agw_gateway"]
+source = ["agw_gateway", "agw_schemas", "agw_verifier"]
 
 [tool.coverage.report]
 show_missing = true
@@ -95,10 +97,10 @@ root_packages = ["agw_gateway", "agw_worker", "agw_sdk", "agw_schemas", "agw_ver
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
-name = "verifier is independent of the live system"
+name = "verifier is independent of the live system and of the gateway's codec"
 type = "forbidden"
 source_modules = ["agw_verifier"]
-forbidden_modules = ["agw_gateway", "agw_worker", "agw_sdk"]
+forbidden_modules = ["agw_gateway", "agw_worker", "agw_sdk", "agw_schemas", "pydantic", "sqlalchemy", "httpx"]
 
 [[tool.importlinter.contracts]]
 name = "schemas is a leaf"

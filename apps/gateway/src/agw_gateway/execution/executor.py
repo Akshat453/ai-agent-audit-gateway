@@ -28,10 +28,12 @@ from uuid import UUID
 from pydantic import BaseModel
 from sqlalchemy import Connection, Engine, func, select, text, update
 
+from agw_gateway.crypto.canonical import args_digest, json_or_profile, profile_value
 from agw_gateway.db import tables as t
 from agw_gateway.evidence import EvidenceWriter, NewEvent
-from agw_gateway.evidence.writer import GATEWAY_ACTOR_ID
+from agw_gateway.evidence.writer import GATEWAY_ACTOR_ID, now_us
 from agw_gateway.execution.crash import CrashPoints
+from agw_gateway.ids import uuid7
 from agw_gateway.logs import log
 from agw_gateway.tools.registry import ToolRegistry
 from agw_gateway.tools.spec import ExecutionContext, ToolResult, ToolSpec
@@ -45,6 +47,7 @@ class ClaimedJob:
     action_id: UUID
     tenant_id: str
     attempt: int
+    cg: str = ""  # concurrency group: jobs claimed together by one worker in one batch
 
 
 def default_worker_id() -> str:
@@ -112,9 +115,14 @@ class Executor:
                 ),
                 {"batch": self._batch, "worker": self.worker_id, "lease": self._lease},
             ).all()
+        cg = f"{self.worker_id}/{uuid7().hex[-12:]}"
         return [
             ClaimedJob(
-                job_id=r.job_id, action_id=r.action_id, tenant_id=r.tenant_id, attempt=r.attempts
+                job_id=r.job_id,
+                action_id=r.action_id,
+                tenant_id=r.tenant_id,
+                attempt=r.attempts,
+                cg=cg,
             )
             for r in sorted(rows, key=lambda r: r.job_id)
         ]
@@ -142,7 +150,8 @@ class Executor:
         except FutureTimeout:
             outcome = ("OUTCOME_UNKNOWN", "ADAPTER_TIMEOUT")
         except Exception as exc:  # adapter errors are recorded, never re-raised to the agent
-            outcome = ("FAILED", "TOOL_ERROR")
+            # Sanitized: the exception type only, never its message (it may echo args).
+            outcome = ("FAILED", f"TOOL_ERROR:{type(exc).__name__}")
             log(
                 logger,
                 logging.WARNING,
@@ -151,8 +160,9 @@ class Executor:
                 tool_id=spec.meta.tool_id,
                 error_code=type(exc).__name__,
             )
+        observed = now_us()  # when the executor observed the adapter's outcome
         self._crash.hit("after_adapter_return")
-        self._result_tx(job, spec, outcome)
+        self._result_tx(job, spec, outcome, observed)
 
     def _lock_job(self, conn: Connection, job: ClaimedJob) -> Any:
         return conn.execute(
@@ -203,6 +213,7 @@ class Executor:
                     "FAILED",
                     "TOOL_UNAVAILABLE" if spec is None else "ARGS_INVALID_AT_DISPATCH",
                     None,
+                    now_us(),
                 )
                 return None
 
@@ -220,7 +231,17 @@ class Executor:
                         agent_id=action.agent_id,
                         fields={
                             "tool": tool,
-                            "dispatch": {"attempt": job.attempt, "worker": self.worker_id},
+                            "dispatch": {
+                                "attempt": job.attempt,
+                                "worker": self.worker_id,
+                                "cg": job.cg,
+                            },
+                            "args": args_digest(args),
+                            "obs": now_us(),
+                        },
+                        # Execution (Paper B field 4): exact parameters passed to the adapter.
+                        payload={
+                            "execution": {"params": profile_value(args.model_dump(mode="python"))}
                         },
                     )
                 ],
@@ -236,7 +257,9 @@ class Executor:
         )
         return spec, args
 
-    def _result_tx(self, job: ClaimedJob, spec: ToolSpec, outcome: tuple[str, Any]) -> None:
+    def _result_tx(
+        self, job: ClaimedJob, spec: ToolSpec, outcome: tuple[str, Any], observed: int
+    ) -> None:
         status, detail = outcome
         with self._engine.begin() as conn:
             j = self._lock_job(conn, job)
@@ -257,12 +280,21 @@ class Executor:
             ).one()
             if status == "COMPLETED":
                 assert isinstance(detail, ToolResult)  # noqa: S101
-                self._record_result(conn, job, action, "COMPLETED", None, dict(detail.public))
+                self._record_result(
+                    conn, job, action, "COMPLETED", None, dict(detail.public), observed
+                )
             elif status == "FAILED":
-                self._record_result(conn, job, action, "FAILED", str(detail), None)
+                code, _, exc_type = str(detail).partition(":")
+                self._record_result(conn, job, action, "FAILED", code, None, observed, exc_type)
             else:
                 record_outcome_unknown(
-                    self._writer, conn, job, action, str(detail), worker=self.worker_id
+                    self._writer,
+                    conn,
+                    job,
+                    action,
+                    str(detail),
+                    worker=self.worker_id,
+                    observed=observed,
                 )
         log(logger, logging.INFO, "result recorded", action_id=job.action_id, status=status)
 
@@ -275,10 +307,18 @@ class Executor:
         status: str,
         error_code: str | None,
         result_public: dict[str, Any] | None,
+        observed: int,
+        error_type: str = "",
     ) -> None:
         outcome: dict[str, str] = {"status": status}
         if error_code is not None:
             outcome["code"] = error_code
+        # Effects (Paper B field 5): the observable outcome, never the agent's interpretation.
+        effects: dict[str, Any]
+        if status == "COMPLETED":
+            effects = json_or_profile(result_public or {}, "result")
+        else:
+            effects = {"error": f"{error_code}:{error_type}" if error_type else str(error_code)}
         self._writer.append(
             conn,
             job.tenant_id,
@@ -290,7 +330,8 @@ class Executor:
                     action_id=job.action_id,
                     run_id=action.run_id,
                     agent_id=action.agent_id,
-                    fields={"outcome": outcome},
+                    fields={"outcome": outcome, "obs": observed},
+                    payload={"effects": effects},
                 )
             ],
         )
@@ -323,6 +364,7 @@ def record_outcome_unknown(
     reason: str,
     *,
     worker: str,
+    observed: int | None = None,
 ) -> None:
     """``ACTION_OUTCOME_UNKNOWN`` + action status + job FAILED (ADR-0011). Never re-invokes."""
     writer.append(
@@ -339,7 +381,9 @@ def record_outcome_unknown(
                 fields={
                     "outcome": {"status": "OUTCOME_UNKNOWN", "code": reason},
                     "dispatch": {"attempt": job.attempt, "worker": worker},
+                    "obs": observed if observed is not None else now_us(),
                 },
+                payload={"effects": {"error": reason}},
             )
         ],
     )

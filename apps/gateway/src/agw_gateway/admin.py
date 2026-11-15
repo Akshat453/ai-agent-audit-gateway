@@ -21,6 +21,7 @@ from agw_gateway.auth.tokens import issue_token
 from agw_gateway.config import load_settings
 from agw_gateway.db import create_db_engine
 from agw_gateway.db import tables as t
+from agw_gateway.evidence.export import export_chain
 from agw_gateway.ids import uuid7
 
 DEMO_TENANT = "demo"
@@ -39,6 +40,8 @@ def ensure_tenant(engine: Engine, tenant_id: str, display_name: str) -> None:
             .values(tenant_id=tenant_id, display_name=display_name)
             .on_conflict_do_nothing()
         )
+        # Every tenant owns exactly one hash chain (ADR-0008); genesis head: seq -1, ZERO32.
+        conn.execute(insert(t.chain_heads).values(tenant_id=tenant_id).on_conflict_do_nothing())
 
 
 def ensure_agent(
@@ -118,6 +121,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     ck.add_argument("--expires-days", type=int, default=None)
     rk = sub.add_parser("revoke-key")
     rk.add_argument("--key-id", required=True)
+    ex = sub.add_parser(
+        "export-chain", help="write export.jsonl for agw-verify (PLAINTEXT payloads)"
+    )
+    ex.add_argument("--tenant", required=True)
+    ex.add_argument("--out", required=True)
+    ex.add_argument("--from-seq", type=int, default=0)
+    ex.add_argument("--to-seq", type=int, default=None)
+    ex.add_argument("--no-payloads", action="store_true")
+    hd = sub.add_parser("chain-head", help="print '<seq> <hash hex>' of a tenant's chain head")
+    hd.add_argument("--tenant", required=True)
     args = parser.parse_args(argv)
 
     settings = load_settings()
@@ -132,6 +145,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.cmd == "create-agent-key":
             expires = timedelta(days=args.expires_days) if args.expires_days else None
             print(create_key(engine, args.tenant, args.agent, expires))
+        elif args.cmd == "chain-head":
+            with engine.connect() as conn:
+                head = conn.execute(
+                    select(t.chain_heads.c.last_seq, t.chain_heads.c.last_hash).where(
+                        t.chain_heads.c.tenant_id == args.tenant
+                    )
+                ).one()
+            print(f"{head.last_seq} {bytes(head.last_hash).hex()}")
+        elif args.cmd == "export-chain":
+            with open(args.out, "w", encoding="utf-8") as fh:
+                n = export_chain(
+                    engine,
+                    args.tenant,
+                    fh,
+                    from_seq=args.from_seq,
+                    to_seq=args.to_seq,
+                    include_payloads=not args.no_payloads,
+                )
+            print(f"exported {n} events to {args.out}", file=sys.stderr)
         else:
             print("revoked" if revoke_key(engine, args.key_id) else "not found")
     finally:

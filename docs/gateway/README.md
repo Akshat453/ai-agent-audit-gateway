@@ -1,6 +1,7 @@
 # AI Agent Audit Gateway — Design Documentation
 
-Status: **Phase 0 (design) complete, 2026-11-15.** No application code exists yet.
+Status: **Phase 0 (design), Phase 1 (core gateway) and Phase 2 (flight recorder) implemented,
+2026-11-15.** Per-phase records: [phases/](phases/).
 
 The gateway sits on the execution path between AI agents and the tools they call. It has two
 separate responsibilities. The documents keep them apart deliberately:
@@ -36,6 +37,7 @@ separate responsibilities. The documents keep them apart deliberately:
 | 14 | [14-phase-1-handoff.md](14-phase-1-handoff.md) | **The Phase 1 backlog**: tables, endpoints, demo tools, auth, ordered tasks |
 | 15 | [15-glossary.md](15-glossary.md) | One definition per term |
 | — | [adr/](adr/README.md) | Architecture Decision Records (locked decisions; change only via a new ADR) |
+| — | [phases/](phases/) | One document per implemented phase: what changed, decisions, work done, gaps |
 
 ## Sources
 

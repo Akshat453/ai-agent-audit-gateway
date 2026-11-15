@@ -54,7 +54,7 @@ class PgUrls:
     app: str  # SQLAlchemy URL
 
 
-def init_database(container: Any) -> PgUrls:
+def init_database(container: Any, revision: str = "head") -> PgUrls:
     host = container.get_container_host_ip()
     port = container.get_exposed_port(5432)
     su_pw, mig_pw, app_pw = (secrets.token_hex(12) for _ in range(3))
@@ -73,7 +73,7 @@ def init_database(container: Any) -> PgUrls:
     )
     cfg = Config(str(GATEWAY_DIR / "alembic.ini"))
     cfg.attributes["url"] = urls.migrator
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, revision)
     return urls
 
 

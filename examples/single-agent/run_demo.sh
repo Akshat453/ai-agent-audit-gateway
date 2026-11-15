@@ -23,3 +23,12 @@ done
 curl -fsS "$AGW_GATEWAY_URL/v1/ready" >/dev/null || { echo "gateway not ready; log: $LOG"; cat "$LOG"; exit 1; }
 
 uv run python examples/single-agent/agent.py "$@"
+
+# Phase 2: export the tenant's chain and verify it with the standalone verifier against the
+# chain head read from the gateway (in later phases the trusted head comes from an anchor).
+EXPORT="$(mktemp -t agw-demo-export.XXXXXX)"
+read -r HEAD_SEQ HEAD_HASH < <(uv run python -m agw_gateway.admin chain-head --tenant demo)
+uv run python -m agw_gateway.admin export-chain --tenant demo --out "$EXPORT"
+echo "verifying chain (seq 0..$HEAD_SEQ) with agw-verify:"
+uv run agw-verify chain --export "$EXPORT" --trusted-head "$HEAD_HASH" --trusted-seq "$HEAD_SEQ" \
+  | grep -E '"(result|events_checked|first_bad_seq|reason)"'

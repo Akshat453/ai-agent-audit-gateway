@@ -6,8 +6,10 @@ from dataclasses import replace
 
 import pytest
 from sqlalchemy import Engine, select, text
+from sqlalchemy.exc import IntegrityError
 
 from agw_gateway.auth import AuthenticationFailed, Authenticator
+from agw_gateway.crypto.canonical import decode, event_hash
 from agw_gateway.db import tables as t
 from agw_gateway.evidence import EvidenceWriter, NewEvent
 from agw_gateway.tools.demo import demo_tool_specs
@@ -81,49 +83,70 @@ def test_no_plaintext_keys_at_rest(migrator_engine: Engine, world) -> None:
     assert all(secret not in row for row in dump)
 
 
-def test_seq_gap_free_under_concurrency(app_engine: Engine, world) -> None:
+def _violation() -> NewEvent:
+    return NewEvent(
+        type="SECURITY_VIOLATION",
+        actor_kind="system",
+        actor_id="t",
+        fields={"violation": {"kind": "AGENT_ID_MISMATCH", "claimed": "x"}},
+    )
+
+
+def test_seq_gap_free_and_chained_under_concurrency(app_engine: Engine, world) -> None:
     writer = EvidenceWriter()
 
     def work() -> None:
         for _ in range(10):
             with app_engine.begin() as conn:
-                writer.append(
-                    conn,
-                    world.tenant_id,
-                    [
-                        NewEvent(type="SECURITY_VIOLATION", actor_kind="system", actor_id="t")
-                        for _ in range(2)
-                    ],
-                )
+                writer.append(conn, world.tenant_id, [_violation(), _violation()])
 
     threads = [threading.Thread(target=work) for _ in range(8)]
     for th in threads:
         th.start()
     for th in threads:
         th.join()
-    # a rolled-back append must not leave a gap
+    # a rolled-back append must not leave a gap (allocation is inside the tx)
     with pytest.raises(RuntimeError), app_engine.begin() as conn:
-        writer.append(
-            conn,
-            world.tenant_id,
-            [NewEvent(type="SECURITY_VIOLATION", actor_kind="system", actor_id="t")],
-        )
+        writer.append(conn, world.tenant_id, [_violation()])
         raise RuntimeError("rollback")
     with app_engine.connect() as conn:
-        seqs = (
-            conn.execute(
-                select(t.evidence_events.c.seq)
-                .where(t.evidence_events.c.tenant_id == world.tenant_id)
-                .order_by(t.evidence_events.c.seq)
+        rows = conn.execute(
+            select(
+                t.evidence_events.c.seq,
+                t.evidence_events.c.canonical_bytes,
+                t.evidence_events.c.event_hash,
             )
-            .scalars()
-            .all()
+            .where(t.evidence_events.c.tenant_id == world.tenant_id)
+            .order_by(t.evidence_events.c.seq)
+        ).all()
+        head = conn.execute(
+            select(t.chain_heads).where(t.chain_heads.c.tenant_id == world.tenant_id)
+        ).one()
+    assert [r.seq for r in rows] == list(range(160))
+    prev = bytes(32)
+    for r in rows:
+        rec = decode(bytes(r.canonical_bytes))
+        assert rec["prev"] == prev and rec["seq"] == r.seq
+        assert bytes(r.event_hash) == event_hash(bytes(r.canonical_bytes))
+        prev = bytes(r.event_hash)
+    assert (head.last_seq, bytes(head.last_hash)) == (159, prev)
+
+
+def test_duplicate_event_id_rejected(app_engine: Engine, world) -> None:
+    with app_engine.begin() as conn:
+        stored = EvidenceWriter().append(conn, world.tenant_id, [_violation()])[0]
+    with app_engine.connect() as conn:
+        row = (
+            conn.execute(
+                select(t.evidence_events).where(t.evidence_events.c.event_id == stored.event_id)
+            )
+            .one()
+            ._asdict()
         )
-        next_seq = conn.execute(
-            select(t.tenants.c.next_seq).where(t.tenants.c.tenant_id == world.tenant_id)
-        ).scalar_one()
-    assert seqs == list(range(160))
-    assert next_seq == 160
+    row["seq"] = 10_000  # different position, same event_id
+    with pytest.raises(IntegrityError) as exc, app_engine.begin() as conn:
+        conn.execute(t.evidence_events.insert().values(**row))
+    assert exc.value.orig.sqlstate == "23505"  # unique_violation (event_id PK)
 
 
 def test_unknown_tenant(app_engine: Engine) -> None:

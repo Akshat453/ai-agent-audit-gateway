@@ -1,12 +1,12 @@
 [project]
 name = "agw-verifier"
 version = "0.1.0"
-description = "Standalone AGW evidence verifier (Phase 7). Must not import apps/*."
+description = "Standalone AGW evidence verifier. Stdlib only; must not import apps/* or agw_schemas."
 requires-python = ">=3.12"
-dependencies = ["agw-schemas"]
+dependencies = []
 
-[tool.uv.sources]
-agw-schemas = { workspace = true }
+[project.scripts]
+agw-verify = "agw_verifier.cli:main"
 
 [build-system]
 requires = ["hatchling"]

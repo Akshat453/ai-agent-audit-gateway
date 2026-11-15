@@ -33,6 +33,9 @@ sealed data by hashes and anchors.
 
 ## 3. Sequence allocation (single writer per tenant; ADR-0018)
 
+> Phase 2: the lock and head moved to `chain_heads` (`SELECT last_seq, last_hash … FOR UPDATE`),
+> see ADR-0022. The SQL below is the Phase 1 form; the properties are unchanged.
+
 ```sql
 UPDATE tenants SET next_seq = next_seq + :n
  WHERE tenant_id = :tenant

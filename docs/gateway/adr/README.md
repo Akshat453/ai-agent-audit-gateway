@@ -27,3 +27,7 @@ Template: Context → Decision → Consequences (+/−) → Alternatives rejecte
 | [0018](0018-seq-allocation-chain-head-lock.md) | Per-tenant seq via chain-head row lock |
 | [0019](0019-monitoring-stream-system-tenant.md) | Monitoring stream as a system tenant chain |
 | [0020](0020-phase1-dispatch-args-in-outbox.md) | Phase 1 dispatch args in `outbox_jobs.args` (cleared on completion; replaced in Phase 5) |
+| [0021](0021-own-agw-cbor-codec.md) | Hand-written AGW-CBOR-v1 codec (cbor2 decoder accepts non-canonical input) |
+| [0022](0022-chain-heads-table.md) | Chain head in `chain_heads`, SELECT … FOR UPDATE (supersedes ADR-0018's mechanism) |
+| [0023](0023-agw-evt-v1-header-finalized.md) | AGW-EVT v1 / AGW-PAY v1 as implemented in Phase 2 (obs, cg, payload.ref, code.agent) |
+| [0024](0024-phase2-payload-store-export-events-api.md) | Phase 2 plaintext payload store, operator-only export, scoped `/v1/events` |

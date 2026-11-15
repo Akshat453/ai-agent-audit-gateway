@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     tx1_statement_timeout_ms: int = Field(default=5000, gt=0)
     db_connect_timeout_seconds: int = Field(default=3, gt=0)
     idempotency_ttl_hours: int = Field(default=24, gt=0)
+    # Code provenance: gateway build commit. If unset, resolved from git at startup.
+    build_commit: str | None = Field(default=None, pattern=r"^[0-9a-zA-Z.+_-]{1,64}$")
 
     @model_validator(mode="before")
     @classmethod

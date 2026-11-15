@@ -15,3 +15,6 @@ def domain_tag(tag: str) -> bytes:
 
 APIKEY_TAG: Final = "AGW/apikey/v1"
 REQUEST_TAG: Final = "AGW/request/v1"
+EVENT_TAG: Final = "AGW/event/v1"
+PAYLOAD_TAG: Final = "AGW/payload/v1"
+ARGS_TAG: Final = "AGW/args/v1"

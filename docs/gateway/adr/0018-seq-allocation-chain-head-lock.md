@@ -1,5 +1,5 @@
 # ADR-0018: Per-tenant seq allocation by chain-head row lock (single writer)
-Status: Accepted · Date: 2026-11-15 · Deciders: project owner (Phase 0)
+Status: Accepted; mechanism superseded by [ADR-0022](0022-chain-heads-table.md) · Date: 2026-11-15 · Deciders: project owner (Phase 0)
 
 ## Context
 The hash chain needs a gap-free, commit-ordered `seq` and the predecessor hash at insert time. Paper B §III-C/§V uses a single-writer path.

@@ -134,21 +134,13 @@ def test_policy_evaluated_record_contents(gw) -> None:
     r = gw.post("create_ticket", {"title": "t"})
     aid = uuid.UUID(r.json()["action_id"])
     with gw.engine.connect() as conn:
-        body = conn.execute(
-            select(t.evidence_events.c.body).where(
+        row = conn.execute(
+            select(t.evidence_events.c.body, t.evidence_events.c.canonical_bytes).where(
                 t.evidence_events.c.action_id == aid,
                 t.evidence_events.c.event_type == "POLICY_EVALUATED",
             )
-        ).scalar_one()
-        cb = (
-            conn.execute(
-                select(t.evidence_events.c.canonical_bytes).where(
-                    t.evidence_events.c.action_id == aid
-                )
-            )
-            .scalars()
-            .all()
-        )
+        ).one()
+    body = row.body
     assert body["policy"] == {
         "id": "default",
         "ver": 1,
@@ -159,5 +151,8 @@ def test_policy_evaluated_record_contents(gw) -> None:
         "ev": "policy-v1",
     }
     assert body["risk"] == {"level": "MEDIUM", "score": 20, "rules": [], "cv": "risk-v1"}
-    assert body["class"] == "SYS" and body["v"] == 1 and "prev" not in body
-    assert all(b is None for b in cb)  # Phase 2 fills canonical_bytes
+    assert body["class"] == "SYS" and body["v"] == 1
+    # Phase 2: the JSONB body is a projection of the canonical bytes, which are authoritative.
+    from agw_gateway.crypto.canonical import decode, to_json_projection
+
+    assert to_json_projection(decode(bytes(row.canonical_bytes))) == body

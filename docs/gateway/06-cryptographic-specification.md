@@ -76,8 +76,9 @@ Rules:
    never over a re-serialized JSONB value (ADR-0005).
 2. Chain: for each tenant, `record(seq).prev = event_hash(seq − 1)`, and
    `record(0).prev = ZERO32`.
-3. `seq` starts at 0 and is gap-free per tenant. It is allocated under a row lock on
-   `tenants` (ADR-0018), in the same transaction that inserts the event.
+3. `seq` starts at 0 and is gap-free per tenant. It is allocated under a row lock on the
+   tenant's `chain_heads` row (ADR-0018, mechanism per ADR-0022), in the same transaction that
+   inserts the event.
 4. `canonical_event_bytes` already contains `v` (schema version), `seq` and `prev`, so the hash
    commits to position, predecessor and schema version.
 5. The tenant is inside the record, so an event can't be spliced into another tenant's chain.

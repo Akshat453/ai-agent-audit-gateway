@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, text
@@ -168,3 +168,75 @@ def run_timeline(request: Request, agent: Agent, run_id: UUID) -> dict[str, Any]
             item["status"] = body["outcome"]["status"]
         events.append(item)
     return {"run_id": str(run_id), "events": events}
+
+
+AUDIT_EVENTS_SCOPE = "audit:events:read"
+
+
+@router.get("/events")
+def list_events(
+    request: Request,
+    agent: Agent,
+    agent_id: UUID | None = None,
+    action_id: UUID | None = None,
+    run_id: UUID | None = None,
+    tool: Annotated[str | None, Query(max_length=128)] = None,
+    event_type: Annotated[str | None, Query(alias="type", max_length=64)] = None,
+    from_seq: Annotated[int | None, Query(ge=0)] = None,
+    to_seq: Annotated[int | None, Query(ge=0)] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> dict[str, Any]:
+    """Event HEADERS only (structural, non-sensitive). Payloads are never returned here.
+
+    Without the ``audit:events:read`` scope an agent sees only its own events; with it, every
+    event of its tenant. Never another tenant's.
+    """
+    ev = t.evidence_events
+    conds = [ev.c.tenant_id == agent.tenant_id]
+    if AUDIT_EVENTS_SCOPE not in agent.scopes:
+        if agent_id is not None and agent_id != agent.agent_id:
+            raise NotFound
+        conds.append(ev.c.agent_id == agent.agent_id)
+    elif agent_id is not None:
+        conds.append(ev.c.agent_id == agent_id)
+    if action_id is not None:
+        conds.append(ev.c.action_id == action_id)
+    if run_id is not None:
+        conds.append(ev.c.run_id == run_id)
+    if tool is not None:
+        conds.append(ev.c.body["tool"]["id"].astext == tool)
+    if event_type is not None:
+        conds.append(ev.c.event_type == event_type)
+    if from_seq is not None:
+        conds.append(ev.c.seq >= from_seq)
+    if to_seq is not None:
+        conds.append(ev.c.seq <= to_seq)
+    with _state(request).engine.connect() as conn:
+        rows = conn.execute(
+            select(
+                ev.c.seq,
+                ev.c.event_id,
+                ev.c.event_type,
+                ev.c.occurred_at,
+                ev.c.event_hash,
+                ev.c.body,
+            )
+            .where(*conds)
+            .order_by(ev.c.seq)
+            .limit(limit + 1)
+        ).all()
+    page = rows[:limit]
+    return {
+        "events": [
+            {
+                "seq": r.seq,
+                "event_id": str(r.event_id),
+                "type": r.event_type,
+                "occurred_at": _iso(r.occurred_at),
+                "event_hash": bytes(r.event_hash).hex(),
+                "header": r.body,  # derived projection of the canonical header (05 §7)
+            }
+            for r in page
+        ],
+        "next_from_seq": rows[limit].seq if len(rows) > limit else None,
+    }

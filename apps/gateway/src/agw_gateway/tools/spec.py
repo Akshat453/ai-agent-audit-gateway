@@ -71,6 +71,11 @@ class ToolSpec:
         cls = type(self.adapter)
         return f"{cls.__module__}.{cls.__qualname__}"
 
+    @property
+    def adapter_version(self) -> str:
+        """Code provenance for the adapter: ``<adapter class>@<tool version>``."""
+        return f"{self.adapter_name}@{self.meta.version}"
+
     def args_schema(self) -> dict[str, Any]:
         return self.args_model.model_json_schema()
 

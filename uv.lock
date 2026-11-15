@@ -46,6 +46,12 @@ requires-dist = [
 name = "agw-schemas"
 version = "0.1.0"
 source = { editable = "packages/schemas" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.9" }]
 
 [[package]]
 name = "agw-sdk"
@@ -66,12 +72,6 @@ requires-dist = [
 name = "agw-verifier"
 version = "0.1.0"
 source = { editable = "packages/verifier" }
-dependencies = [
-    { name = "agw-schemas" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "agw-schemas", editable = "packages/schemas" }]
 
 [[package]]
 name = "agw-worker"

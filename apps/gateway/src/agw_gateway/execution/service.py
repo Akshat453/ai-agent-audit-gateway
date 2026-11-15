@@ -27,8 +27,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import Engine, Row, func, insert, select, text
 from sqlalchemy.exc import IntegrityError
 
-from agw_gateway import __version__
 from agw_gateway.auth.models import AuthenticatedAgent
+from agw_gateway.crypto.canonical import ZERO32, args_digest, json_or_profile, profile_value
 from agw_gateway.db import tables as t
 from agw_gateway.evidence import EvidenceWriter, NewEvent
 from agw_gateway.evidence.writer import GATEWAY_ACTOR_ID
@@ -85,7 +85,10 @@ class ActionRequest(_Envelope):
     environment: Literal["dev", "staging", "prod"]
     args: dict[str, Any]
     agent_id: str | None = Field(default=None, max_length=128)
-    # Accepted and validated; persisted only as encrypted payload from Phase 5 (05 §5).
+    # Code provenance claimed by the agent (unauthenticated; recorded as such).
+    agent_version: str | None = Field(default=None, pattern=r"^[A-Za-z0-9._/+\-]{1,64}$")
+    # Recorded in the ACTION_REQUESTED payload (intent / context provenance). There is no
+    # "reasoning" field: chain-of-thought is never captured (extra="forbid" rejects it).
     intent: Intent | None = None
     context: Context | None = None
 
@@ -109,7 +112,9 @@ class ActionService:
         tx1_statement_timeout_ms: int = 5000,
         idempotency_ttl: timedelta = timedelta(hours=24),
         on_authorized: Callable[[], None] | None = None,
+        build_commit: str = "unknown",
     ) -> None:
+        self._build_commit = build_commit
         self._engine = engine
         self._registry = registry
         self._writer = writer
@@ -250,7 +255,9 @@ class ActionService:
         status = _STATUS_FOR_EFFECT[decision.effect]
         tool_version = spec.meta.version if spec else req.tool_version
         body = _response_body(action_id, req.run_id, status, decision)
-        events = _tx1_events(agent, req, action_id, tool_version, spec, decision)
+        events = _tx1_events(
+            agent, req, action_id, tool_version, spec, decision, validated, self._build_commit
+        )
 
         with self._engine.begin() as conn:
             conn.execute(text(f"SET LOCAL statement_timeout = {self._timeout_ms}"))
@@ -362,8 +369,25 @@ def _tx1_events(
     tool_version: str | None,
     spec: ToolSpec | None,
     decision: Decision,
+    validated: BaseModel | None,
+    build_commit: str,
 ) -> list[NewEvent]:
     tool: dict[str, str] = {"id": req.tool}
+    code: dict[str, str] = {"gw": build_commit}
+    if req.agent_version is not None:
+        code["agent"] = req.agent_version
+    # Intent (Paper B field 1): validated args if valid, else the raw args as sorted JSON text.
+    intent = (
+        {"args": profile_value(validated.model_dump(mode="python"))}
+        if validated is not None
+        else json_or_profile(req.args, "args")
+    )
+    if req.intent is not None and req.intent.summary:
+        intent["summary"] = req.intent.summary
+    sources = [
+        {"uri": src.uri, "digest": bytes.fromhex(src.sha256)}
+        for src in (req.context.sources if req.context else ())
+    ]
     if tool_version is not None:
         tool["ver"] = tool_version
     common: dict[str, Any] = {
@@ -377,7 +401,9 @@ def _tx1_events(
             type="ACTION_REQUESTED",
             actor_kind="agent",
             actor_id=str(agent.agent_id),
-            fields={"tool": tool, "env": req.environment},
+            fields={"tool": tool, "env": req.environment, "code": dict(code)},
+            payload={"intent": intent, "context": {"sources": sources}},
+            delegation_present=True,
             **common,
         ),
         NewEvent(
@@ -414,7 +440,11 @@ def _tx1_events(
                 type="ACTION_AUTHORIZED",
                 actor_kind="gateway",
                 actor_id=GATEWAY_ACTOR_ID,
-                fields={"tool": tool, "code": {"gw": __version__, "adapter": spec.adapter_name}},
+                fields={
+                    "tool": tool,
+                    "code": {**code, "adapter": spec.adapter_version},
+                    "args": args_digest(validated) if validated is not None else ZERO32,
+                },
                 **common,
             )
         )

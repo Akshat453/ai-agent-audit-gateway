@@ -1,5 +1,13 @@
-"""Standalone AGW verifier (Phase 7). Phase 1 stub.
+"""Standalone AGW evidence verifier.
 
-MUST NOT import apps/* or agw_sdk (enforced by import-linter). It re-implements 06 from the
-spec so that a gateway bug cannot hide in shared code.
+Independence (docs/gateway/10 §1, 00 §3): this package imports nothing from the gateway, the
+worker, the SDK or agw_schemas, and has no third-party dependencies. It re-implements the
+AGW-CBOR-v1 profile and the 06 hashing rules from the spec; both implementations are checked
+against the same frozen vectors in packages/schemas/test-vectors/.
 """
+
+STATEMENT = (
+    "Verified means the records are unchanged and correctly ordered relative to the trusted "
+    "inputs given. It does not mean the recorded actions were truthful, authorized, complete "
+    "or correct."
+)

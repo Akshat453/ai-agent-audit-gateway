@@ -42,6 +42,15 @@ jobs:
           uv run coverage report --fail-under=85
           --include='*/agw_gateway/policies/*,*/agw_gateway/auth/*,*/agw_gateway/tools/*,*/agw_gateway/execution/*'
 
+  vectors-and-verifier-isolation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - run: make vectors
+      - run: make verify-isolated
+
   secrets-scan:
     runs-on: ubuntu-latest
     steps:

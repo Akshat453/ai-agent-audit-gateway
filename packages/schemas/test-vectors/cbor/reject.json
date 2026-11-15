@@ -1,0 +1,185 @@
+{
+ "profile": "AGW-CBOR-v1",
+ "vectors": [
+  {
+   "name": "unsorted keys",
+   "hex": "a2616201616102",
+   "error": "KEY_ORDER"
+  },
+  {
+   "name": "unsorted by length",
+   "hex": "a262616101616202",
+   "error": "KEY_ORDER"
+  },
+  {
+   "name": "duplicate key",
+   "hex": "a2616101616102",
+   "error": "DUPLICATE_KEY"
+  },
+  {
+   "name": "non-shortest uint 1-byte",
+   "hex": "1805",
+   "error": "NON_SHORTEST"
+  },
+  {
+   "name": "non-shortest uint 2-byte",
+   "hex": "190005",
+   "error": "NON_SHORTEST"
+  },
+  {
+   "name": "non-shortest uint 4-byte",
+   "hex": "1a00000005",
+   "error": "NON_SHORTEST"
+  },
+  {
+   "name": "non-shortest uint 8-byte",
+   "hex": "1b0000000000000005",
+   "error": "NON_SHORTEST"
+  },
+  {
+   "name": "non-shortest uint 2-byte 255",
+   "hex": "1900ff",
+   "error": "NON_SHORTEST"
+  },
+  {
+   "name": "non-shortest nint",
+   "hex": "3800",
+   "error": "NON_SHORTEST"
+  },
+  {
+   "name": "non-shortest bstr length",
+   "hex": "580100",
+   "error": "NON_SHORTEST"
+  },
+  {
+   "name": "non-shortest tstr length",
+   "hex": "780161",
+   "error": "NON_SHORTEST"
+  },
+  {
+   "name": "non-shortest array length",
+   "hex": "980100",
+   "error": "NON_SHORTEST"
+  },
+  {
+   "name": "non-shortest map length",
+   "hex": "b801616101",
+   "error": "NON_SHORTEST"
+  },
+  {
+   "name": "indefinite array",
+   "hex": "9f01ff",
+   "error": "INDEFINITE"
+  },
+  {
+   "name": "indefinite map",
+   "hex": "bf616101ff",
+   "error": "INDEFINITE"
+  },
+  {
+   "name": "indefinite tstr",
+   "hex": "7f6161ff",
+   "error": "INDEFINITE"
+  },
+  {
+   "name": "indefinite bstr",
+   "hex": "5f4101ff",
+   "error": "INDEFINITE"
+  },
+  {
+   "name": "lone break",
+   "hex": "ff",
+   "error": "INDEFINITE"
+  },
+  {
+   "name": "float16",
+   "hex": "f93c00",
+   "error": "FLOAT"
+  },
+  {
+   "name": "float32",
+   "hex": "fa3f800000",
+   "error": "FLOAT"
+  },
+  {
+   "name": "float64",
+   "hex": "fb3ff0000000000000",
+   "error": "FLOAT"
+  },
+  {
+   "name": "undefined",
+   "hex": "f7",
+   "error": "UNDEFINED"
+  },
+  {
+   "name": "simple 16",
+   "hex": "f0",
+   "error": "SIMPLE"
+  },
+  {
+   "name": "simple 1-byte",
+   "hex": "f818",
+   "error": "SIMPLE"
+  },
+  {
+   "name": "tag 1 epoch time",
+   "hex": "c100",
+   "error": "TAG"
+  },
+  {
+   "name": "tag 37 uuid",
+   "hex": "d8255000000000000000000000000000000000",
+   "error": "TAG"
+  },
+  {
+   "name": "bignum tag",
+   "hex": "c249010000000000000000",
+   "error": "TAG"
+  },
+  {
+   "name": "invalid utf-8",
+   "hex": "62c328",
+   "error": "UTF8"
+  },
+  {
+   "name": "non-text map key",
+   "hex": "a10101",
+   "error": "MAP_KEY"
+  },
+  {
+   "name": "bstr map key",
+   "hex": "a1410001",
+   "error": "MAP_KEY"
+  },
+  {
+   "name": "trailing bytes",
+   "hex": "0000",
+   "error": "TRAILING"
+  },
+  {
+   "name": "truncated uint",
+   "hex": "1a0000",
+   "error": "TRUNCATED"
+  },
+  {
+   "name": "truncated tstr",
+   "hex": "6361",
+   "error": "TRUNCATED"
+  },
+  {
+   "name": "reserved ai 28",
+   "hex": "1c",
+   "error": "RESERVED"
+  },
+  {
+   "name": "nint below -2^63",
+   "hex": "3b8000000000000000",
+   "error": "INT_RANGE"
+  },
+  {
+   "name": "depth 17",
+   "hex": "818181818181818181818181818181818100",
+   "error": "DEPTH"
+  }
+ ]
+}

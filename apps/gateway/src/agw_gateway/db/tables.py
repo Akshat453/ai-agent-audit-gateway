@@ -11,6 +11,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    ForeignKey,
     Integer,
     LargeBinary,
     MetaData,
@@ -27,8 +28,16 @@ tenants = Table(
     metadata,
     Column("tenant_id", Text, primary_key=True),
     Column("display_name", Text, nullable=False),
-    Column("next_seq", BigInteger, nullable=False),
     Column("created_at", DateTime(timezone=True)),
+)
+
+chain_heads = Table(
+    "chain_heads",
+    metadata,
+    Column("tenant_id", Text, primary_key=True),
+    Column("last_seq", BigInteger, nullable=False),
+    Column("last_hash", LargeBinary, nullable=False),
+    Column("updated_at", DateTime(timezone=True)),
 )
 
 agents = Table(
@@ -120,7 +129,21 @@ evidence_events = Table(
     Column("agent_id", UUID(as_uuid=True)),
     Column("occurred_at", DateTime(timezone=True)),
     Column("body", JSONB, nullable=False),
-    Column("canonical_bytes", LargeBinary),
+    Column("canonical_bytes", LargeBinary, nullable=False),
+    Column("event_hash", LargeBinary, nullable=False),
+)
+
+evidence_payloads = Table(
+    "evidence_payloads",
+    metadata,
+    Column(
+        "event_id", UUID(as_uuid=True), ForeignKey("evidence_events.event_id"), primary_key=True
+    ),
+    Column("tenant_id", Text, nullable=False),
+    Column("seq", BigInteger, nullable=False),
+    Column("storage", Text, nullable=False),
+    Column("content", LargeBinary, nullable=False),
+    Column("created_at", DateTime(timezone=True)),
 )
 
 outbox_jobs = Table(
