@@ -1,7 +1,7 @@
 # AI Agent Audit Gateway — Design Documentation
 
-Status: **Phase 0 (design), Phase 1 (core gateway) and Phase 2 (flight recorder) implemented,
-2026-11-15.** Per-phase records: [phases/](phases/).
+Status: **Phase 0 (design), Phase 1 (core gateway), Phase 2 (flight recorder) and Phase 3
+(Merkle epochs + offline verifier) implemented, 2026-11-15.** Per-phase records: [phases/](phases/).
 
 The gateway sits on the execution path between AI agents and the tools they call. It has two
 separate responsibilities. The documents keep them apart deliberately:

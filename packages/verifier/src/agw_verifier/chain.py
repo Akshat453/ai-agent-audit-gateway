@@ -65,6 +65,7 @@ HEADER_KEYS = frozenset(
         "code",
         "violation",
         "obs",
+        "epoch",
     }
 )
 REQUIRED_KEYS = ("v", "tenant", "seq", "prev", "id", "type", "ts", "class", "actor")
@@ -93,6 +94,7 @@ class Report:
     last_seq: int | None = None
     last_hash: str | None = None
     statement: str = STATEMENT
+    hashes: dict[int, bytes] = field(default_factory=dict)  # recomputed event hashes by seq
 
     def tamper(self, seq: int | None, reason: str) -> Report:
         self.result, self.first_bad_seq, self.reason = "TAMPERED", seq, reason
@@ -235,6 +237,7 @@ def verify_lines(
         elif "payload" in line:
             return report.tamper(seq, "UNEXPECTED_PAYLOAD")
         hashes[seq] = h
+        report.hashes[seq] = h
         prev_hash, expected_seq = h, seq + 1
         report.events_checked += 1
         report.last_seq, report.last_hash = seq, h.hex()

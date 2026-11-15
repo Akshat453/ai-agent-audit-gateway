@@ -31,3 +31,4 @@ Template: Context → Decision → Consequences (+/−) → Alternatives rejecte
 | [0022](0022-chain-heads-table.md) | Chain head in `chain_heads`, SELECT … FOR UPDATE (supersedes ADR-0018's mechanism) |
 | [0023](0023-agw-evt-v1-header-finalized.md) | AGW-EVT v1 / AGW-PAY v1 as implemented in Phase 2 (obs, cg, payload.ref, code.agent) |
 | [0024](0024-phase2-payload-store-export-events-api.md) | Phase 2 plaintext payload store, operator-only export, scoped `/v1/events` |
+| [0025](0025-phase3-epochs-membership-proofs-receipts.md) | Phase 3: derived epoch membership, on-demand proofs, EPOCH_SEALED receipts, sealer locking, 300 s max-age |

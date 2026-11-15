@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agw.invalid/schemas/evidence-bundle.v1.schema.json",
+  "title": "AGW evidence bundle v1 (agw-bundle/v1)",
+  "description": "Everything an offline verifier needs to check one event: canonical header (+ optional payload), RFC 9162 inclusion proof, the event's epoch record and the chain of later epoch records. trust_root is the producer's claim and is informational only: verifiers must obtain their trusted root out of band.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "bundle_version", "tenant", "event", "proof", "epoch", "epoch_chain", "trust_root"],
+  "$defs": {
+    "hex32": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "uint": {"type": "integer", "minimum": 0},
+    "epoch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenant", "epoch_no", "tree_size", "first_seq", "last_seq", "merkle_root", "prev_root", "epoch_root", "sealed_at", "seal_reason"],
+      "properties": {
+        "tenant": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"},
+        "epoch_no": {"$ref": "#/$defs/uint"},
+        "tree_size": {"type": "integer", "minimum": 1},
+        "first_seq": {"$ref": "#/$defs/uint"},
+        "last_seq": {"$ref": "#/$defs/uint"},
+        "merkle_root": {"$ref": "#/$defs/hex32", "description": "M_t (RFC 9162 MTH over event hashes)"},
+        "prev_root": {"$ref": "#/$defs/hex32", "description": "R_{t-1}; 32 zero bytes for epoch 0"},
+        "epoch_root": {"$ref": "#/$defs/hex32", "description": "R_t per docs/gateway/06 §7"},
+        "sealed_at": {"type": ["string", "null"], "description": "informational, not in R_t"},
+        "seal_reason": {"enum": ["MAX_EVENTS", "MAX_AGE", "RISK_HIGH", "RISK_CRITICAL", "MANUAL"]}
+      }
+    }
+  },
+  "properties": {
+    "format": {"const": "agw-bundle/v1"},
+    "bundle_version": {"const": 1},
+    "tenant": {"type": "string"},
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "seq", "header"],
+      "properties": {
+        "event_id": {"type": "string", "format": "uuid"},
+        "seq": {"$ref": "#/$defs/uint"},
+        "header": {"type": "string", "pattern": "^([0-9a-f]{2})+$", "description": "exact canonical AGW-CBOR-v1 header bytes"},
+        "payload": {"type": "string", "pattern": "^([0-9a-f]{2})+$", "description": "optional canonical payload (PLAINTEXT until encryption)"}
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["epoch_no", "tree_size", "leaf_index", "audit_path"],
+      "properties": {
+        "epoch_no": {"$ref": "#/$defs/uint"},
+        "tree_size": {"type": "integer", "minimum": 1},
+        "leaf_index": {"$ref": "#/$defs/uint"},
+        "audit_path": {"type": "array", "items": {"$ref": "#/$defs/hex32"}}
+      }
+    },
+    "epoch": {"$ref": "#/$defs/epoch"},
+    "epoch_chain": {"type": "array", "items": {"$ref": "#/$defs/epoch"}},
+    "trust_root": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["epoch_no", "epoch_root", "source"],
+      "properties": {
+        "epoch_no": {"$ref": "#/$defs/uint"},
+        "epoch_root": {"$ref": "#/$defs/hex32"},
+        "source": {"enum": ["local-seal", "anchor"]}
+      }
+    }
+  }
+}

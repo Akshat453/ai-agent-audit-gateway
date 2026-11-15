@@ -18,6 +18,10 @@ seal point.
 
 ## 2. Seal triggers
 
+> Phase 3 (implemented): `max_events` (default 100) and `max_age` (default **300 s**, changed from
+> 60 s by ADR-0025) via `apps/worker` sealer; risk triggers come later. Membership is derived from
+> tiled ranges and proofs are computed on demand (ADR-0025).
+
 The sealer seals pending events (seq > `sealed_up_to`) when **any** trigger fires:
 
 | Trigger | Condition | Epoch(s) produced | `seal_reason` |

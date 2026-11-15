@@ -47,6 +47,11 @@ class NotFound(GatewayError):
     http_status = 404
 
 
+class EventNotSealedYet(GatewayError):
+    code = "EVENT_NOT_SEALED"
+    http_status = 409
+
+
 class DependencyUnavailable(GatewayError):
     code = "DEPENDENCY_UNAVAILABLE"
     http_status = 503

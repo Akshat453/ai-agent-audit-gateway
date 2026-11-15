@@ -1,0 +1,46 @@
+{
+ "tree_size": 4,
+ "leaf_inputs": [
+  "979a876a637a2d5f9d0eb3eac2b337d530423bf60908df8e834f7c74e9048c05",
+  "7368adebd8a004a74423e025e5ee7a16d9ea58c7eb02cf488ab090d9c2d971ad",
+  "5481976d011ed2d98ac78fc70cb8bad87cd8347b1b8f41e86dd2cb5426693eb1",
+  "0d80232a4d193f9e697809f7d084ad0251bbe34270bbc722a15410195679fa5a"
+ ],
+ "leaf_hashes": [
+  "3e7d6b41df81acd06463047e7b05f83b6f80cea0d4ba94524ee71fefe771dcd0",
+  "b3f236c9dd0ed2d525584830d93225e2cb9043dbfa328d47d7666bd7df457a20",
+  "34df27d1d5cf2027cf1e22db7b100e575ac55a9aed42a06de9415660971edd2e",
+  "2a610ab04eb6e30b4d3b06c27ec6c50b9ec4435febaf336ca8b43bfb1a43072b"
+ ],
+ "root": "1baebe43526c2e20104c00fefd99be9dd880c1ff99bcbaeafaa8416e2aabefa6",
+ "proofs": [
+  {
+   "leaf_index": 0,
+   "audit_path": [
+    "b3f236c9dd0ed2d525584830d93225e2cb9043dbfa328d47d7666bd7df457a20",
+    "576d1a65f7d37f88ab255e8bcc89ed172bb15286f983487a92736664cbc47170"
+   ]
+  },
+  {
+   "leaf_index": 1,
+   "audit_path": [
+    "3e7d6b41df81acd06463047e7b05f83b6f80cea0d4ba94524ee71fefe771dcd0",
+    "576d1a65f7d37f88ab255e8bcc89ed172bb15286f983487a92736664cbc47170"
+   ]
+  },
+  {
+   "leaf_index": 2,
+   "audit_path": [
+    "2a610ab04eb6e30b4d3b06c27ec6c50b9ec4435febaf336ca8b43bfb1a43072b",
+    "6e3787811a418fd20d2b015a62fbd6bf5e96261315e1cdd2245415ef4f2c113b"
+   ]
+  },
+  {
+   "leaf_index": 3,
+   "audit_path": [
+    "34df27d1d5cf2027cf1e22db7b100e575ac55a9aed42a06de9415660971edd2e",
+    "6e3787811a418fd20d2b015a62fbd6bf5e96261315e1cdd2245415ef4f2c113b"
+   ]
+  }
+ ]
+}

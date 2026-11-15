@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     tx1_statement_timeout_ms: int = Field(default=5000, gt=0)
     db_connect_timeout_seconds: int = Field(default=3, gt=0)
     idempotency_ttl_hours: int = Field(default=24, gt=0)
+    # Epoch sealing (09 §2). Phase 3 triggers: max_events OR max_age (risk triggers: Phase 4).
+    epoch_max_events: int = Field(default=100, ge=1, le=100_000)
+    epoch_max_age_seconds: float = Field(default=300.0, gt=0)
+    sealer_interval_seconds: float = Field(default=1.0, gt=0)
     # Code provenance: gateway build commit. If unset, resolved from git at startup.
     build_commit: str | None = Field(default=None, pattern=r"^[0-9a-zA-Z.+_-]{1,64}$")
 

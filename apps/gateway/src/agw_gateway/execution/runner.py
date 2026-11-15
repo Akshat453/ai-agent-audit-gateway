@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Callable, Sequence
 
 from agw_gateway.db import is_db_unavailable
 from agw_gateway.execution.executor import Executor
@@ -22,7 +23,10 @@ class BackgroundRunner:
         *,
         poll_seconds: float,
         reconcile_seconds: float,
+        periodic: Sequence[tuple[float, Callable[[], object]]] = (),
     ) -> None:
+        # Extra (interval, task) pairs, e.g. the worker's epoch sealer.
+        self._periodic = [(interval, task, [0.0]) for interval, task in periodic]
         self._executor = executor
         self._reconciler = reconciler
         self._poll = poll_seconds
@@ -53,6 +57,10 @@ class BackgroundRunner:
                     last_reconcile = time.monotonic()
                 while self._executor.run_once() and not self._stop.is_set():
                     pass
+                for interval, task, last in self._periodic:
+                    if time.monotonic() - last[0] >= interval:
+                        task()
+                        last[0] = time.monotonic()
             except Exception as exc:  # keep the loop alive; DB outages are expected (fail closed)
                 level = logging.WARNING if is_db_unavailable(exc) else logging.ERROR
                 log(logger, level, "executor loop error", error_code=type(exc).__name__)

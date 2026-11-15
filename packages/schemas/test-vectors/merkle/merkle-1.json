@@ -1,0 +1,16 @@
+{
+ "tree_size": 1,
+ "leaf_inputs": [
+  "979a876a637a2d5f9d0eb3eac2b337d530423bf60908df8e834f7c74e9048c05"
+ ],
+ "leaf_hashes": [
+  "3e7d6b41df81acd06463047e7b05f83b6f80cea0d4ba94524ee71fefe771dcd0"
+ ],
+ "root": "3e7d6b41df81acd06463047e7b05f83b6f80cea0d4ba94524ee71fefe771dcd0",
+ "proofs": [
+  {
+   "leaf_index": 0,
+   "audit_path": []
+  }
+ ]
+}

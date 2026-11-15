@@ -163,10 +163,11 @@ def test_duplicate_id_and_genesis_and_metadata() -> None:
 def test_cli_exit_codes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     f = tmp_path / "e.jsonl"
     f.write_text("\n".join(export_lines()) + "\n")
-    assert (
-        main(["chain", "--export", str(f), "--trusted-head", HEAD.hex(), "--trusted-seq", "2"]) == 0
-    )
+    args = ["chain", "--export", str(f), "--trusted-head", HEAD.hex(), "--trusted-seq", "2"]
+    assert main([*args, "--json"]) == 0
     assert json.loads(capsys.readouterr().out)["result"] == "VERIFIED"
+    assert main(args) == 0
+    assert capsys.readouterr().out.startswith("RESULT: VERIFIED")
     f.write_text("\n".join(export_lines()[:3]) + "\n")
     assert (
         main(["chain", "--export", str(f), "--trusted-head", HEAD.hex(), "--trusted-seq", "2"]) == 1

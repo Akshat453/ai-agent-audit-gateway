@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV ?= uv
 COV_PKGS := */agw_gateway/policies/*,*/agw_gateway/auth/*,*/agw_gateway/tools/*,*/agw_gateway/execution/*
 
-.PHONY: up down migrate test lint demo sync vectors verify-isolated bench
+.PHONY: up down migrate test lint demo sync vectors verify-isolated bench tamper
 
 .env:
 	cp .env.example .env
@@ -36,6 +36,7 @@ demo: .env sync
 # Regenerate the frozen vectors in memory and fail on any difference (never overwrites).
 vectors: sync
 	$(UV) run --with cbor2 python packages/schemas/test-vectors/generate_phase2.py --check
+	$(UV) run python packages/schemas/test-vectors/generate_phase3.py --check
 
 # Install ONLY packages/verifier into a throwaway venv and run its CLI (independence check).
 VERIFIER_VENV ?= $(shell python3 -c "import tempfile,os;print(os.path.join(tempfile.gettempdir(),'agw-verifier-venv'))")
@@ -48,3 +49,7 @@ verify-isolated:
 
 bench: .env sync
 	set -a; . ./.env; set +a; $(UV) run python experiments/benchmarks/phase2_event_latency.py
+
+# Tamper matrix over real exports: make tamper EVENTS=events.jsonl EPOCHS=epochs.jsonl
+tamper: sync
+	$(UV) run python experiments/tampering/run_tamper_suite.py --events $(EVENTS) --epochs $(EPOCHS)

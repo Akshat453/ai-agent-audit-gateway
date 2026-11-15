@@ -15,6 +15,7 @@ dev-dependencies = [
     "hypothesis>=6.115",
     "testcontainers[postgres]>=4.8",
     "import-linter>=2.1",
+    "jsonschema>=4.23",
 ]
 
 [tool.uv.workspace]
@@ -38,7 +39,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "PL", "RUF"]
 ignore = ["PLR0913", "PLR0917", "PLR2004", "PLR0911", "PLR0912", "PLR0915"]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = ["S101", "S105", "S106", "S608", "PLR0915", "PLC0415"]
+"**/tests/**" = ["S101", "S105", "S106", "S603", "S608", "PLR0915", "PLC0415", "E501"]
 "apps/gateway/migrations/**" = ["S608", "E501"]
 "packages/schemas/test-vectors/**" = ["S101", "PLC0415", "E501", "T201"]
 "experiments/**" = ["S101", "T201", "PLC0415", "S311", "E501", "RUF046"]
@@ -85,7 +86,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 branch = true
-source = ["agw_gateway", "agw_schemas", "agw_verifier"]
+source = ["agw_gateway", "agw_schemas", "agw_verifier", "agw_worker"]
 
 [tool.coverage.report]
 show_missing = true

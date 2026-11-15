@@ -27,6 +27,7 @@ MESSAGES: Final[dict[str, str]] = {
     "METHOD_NOT_ALLOWED": "Method not allowed.",
     "IDEMPOTENCY_KEY_REUSED": "Idempotency-Key was used with a different request body.",
     "PAYLOAD_TOO_LARGE": "Request body too large.",
+    "EVENT_NOT_SEALED": "The event is not sealed into an epoch yet; retry later.",
     "REQUEST_INVALID": "Request envelope is invalid.",
     "DEPENDENCY_UNAVAILABLE": "A required dependency is unavailable. Nothing was executed.",
     "INTERNAL": "Internal error.",

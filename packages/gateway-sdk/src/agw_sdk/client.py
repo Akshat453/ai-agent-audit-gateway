@@ -114,3 +114,20 @@ class Client:
 
     def timeline(self, run_id: str) -> list[dict[str, Any]]:
         return list(self._check(self._http.get(f"/v1/runs/{run_id}/timeline"))["events"])
+
+    # ---------------------------------------------------------------- evidence (Phase 2/3)
+    def events(self, **filters: Any) -> list[dict[str, Any]]:
+        params = {k: v for k, v in filters.items() if v is not None}
+        if "event_type" in params:
+            params["type"] = params.pop("event_type")
+        return list(self._check(self._http.get("/v1/events", params=params))["events"])
+
+    def epoch(self, epoch_no: int | str = "latest") -> dict[str, Any]:
+        return self._check(self._http.get(f"/v1/epochs/{epoch_no}"))
+
+    def proof(self, event_id: str) -> dict[str, Any] | None:
+        """Evidence bundle for an event, or None while it is not sealed yet (409)."""
+        resp = self._http.get(f"/v1/events/{event_id}/proof")
+        if resp.status_code == 409:
+            return None
+        return self._check(resp)

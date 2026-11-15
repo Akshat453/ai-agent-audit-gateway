@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Query, Request, Response
+from fastapi import APIRouter, Depends, Header, Path, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, text
@@ -13,7 +13,14 @@ from sqlalchemy import select, text
 from agw_gateway.api.state import GatewayState
 from agw_gateway.auth import AuthenticatedAgent
 from agw_gateway.db import tables as t
-from agw_gateway.execution.errors import NotFound, PayloadTooLarge
+from agw_gateway.evidence.bundle import (
+    EventNotFound,
+    EventNotSealed,
+    build_bundle,
+    epoch_record,
+    get_epoch,
+)
+from agw_gateway.execution.errors import EventNotSealedYet, NotFound, PayloadTooLarge
 
 router = APIRouter(prefix="/v1")
 
@@ -240,3 +247,58 @@ def list_events(
         ],
         "next_from_seq": rows[limit].seq if len(rows) > limit else None,
     }
+
+
+ADMIN_EVIDENCE_SCOPE = "admin:evidence:read"
+
+
+def _scoped_tenant(agent: AuthenticatedAgent, tenant: str | None) -> str:
+    """Agents read their own tenant; another tenant needs the admin scope (else 404)."""
+    if tenant is None or tenant == agent.tenant_id:
+        return agent.tenant_id
+    if ADMIN_EVIDENCE_SCOPE not in agent.scopes:
+        raise NotFound
+    return tenant
+
+
+@router.get("/epochs/latest")
+def latest_epoch(
+    request: Request, agent: Agent, tenant: Annotated[str | None, Query(max_length=63)] = None
+) -> dict[str, Any]:
+    with _state(request).engine.connect() as conn:
+        row = get_epoch(conn, _scoped_tenant(agent, tenant), None)
+    if row is None:
+        raise NotFound
+    return epoch_record(row)
+
+
+@router.get("/epochs/{epoch_no}")
+def get_epoch_by_no(
+    request: Request,
+    agent: Agent,
+    epoch_no: Annotated[int, Path(ge=0)],
+    tenant: Annotated[str | None, Query(max_length=63)] = None,
+) -> dict[str, Any]:
+    with _state(request).engine.connect() as conn:
+        row = get_epoch(conn, _scoped_tenant(agent, tenant), epoch_no)
+    if row is None:
+        raise NotFound
+    return epoch_record(row)
+
+
+@router.get("/events/{event_id}/proof")
+def event_proof(
+    request: Request,
+    agent: Agent,
+    event_id: UUID,
+    tenant: Annotated[str | None, Query(max_length=63)] = None,
+) -> dict[str, Any]:
+    """Evidence bundle for one event: header + inclusion proof + epoch chain. No payload."""
+    scope = _scoped_tenant(agent, tenant)
+    try:
+        with _state(request).engine.connect() as conn:
+            return build_bundle(conn, event_id, tenant_id=scope, include_payload=False)
+    except EventNotFound:
+        raise NotFound from None
+    except EventNotSealed:
+        raise EventNotSealedYet from None

@@ -1,0 +1,26 @@
+{
+ "tree_size": 2,
+ "leaf_inputs": [
+  "979a876a637a2d5f9d0eb3eac2b337d530423bf60908df8e834f7c74e9048c05",
+  "7368adebd8a004a74423e025e5ee7a16d9ea58c7eb02cf488ab090d9c2d971ad"
+ ],
+ "leaf_hashes": [
+  "3e7d6b41df81acd06463047e7b05f83b6f80cea0d4ba94524ee71fefe771dcd0",
+  "b3f236c9dd0ed2d525584830d93225e2cb9043dbfa328d47d7666bd7df457a20"
+ ],
+ "root": "6e3787811a418fd20d2b015a62fbd6bf5e96261315e1cdd2245415ef4f2c113b",
+ "proofs": [
+  {
+   "leaf_index": 0,
+   "audit_path": [
+    "b3f236c9dd0ed2d525584830d93225e2cb9043dbfa328d47d7666bd7df457a20"
+   ]
+  },
+  {
+   "leaf_index": 1,
+   "audit_path": [
+    "3e7d6b41df81acd06463047e7b05f83b6f80cea0d4ba94524ee71fefe771dcd0"
+   ]
+  }
+ ]
+}

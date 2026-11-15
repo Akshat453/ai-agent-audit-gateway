@@ -103,6 +103,19 @@ class Code(_M):
     agent: Text | None = None  # agent-declared version (unauthenticated claim)
 
 
+class EpochRef(_M):
+    """EPOCH_SEALED receipt: the sealed epoch's header (06 §7). Lands in a LATER epoch."""
+
+    no: UInt
+    first: UInt
+    last: UInt
+    size: UInt
+    mroot: Bytes32  # M_t
+    prev: Bytes32  # R_{t-1}
+    root: Bytes32  # R_t
+    reason: Literal["MAX_EVENTS", "MAX_AGE", "RISK_HIGH", "RISK_CRITICAL", "MANUAL"]
+
+
 class Violation(_M):
     kind: Literal["AGENT_ID_MISMATCH"]
     claimed: Annotated[str, Field(max_length=128)]
@@ -138,6 +151,7 @@ class EventHeader(_M):
     payload: PayloadRef | None = None
     code: Code | None = None
     violation: Violation | None = None
+    epoch: EpochRef | None = None  # EPOCH_SEALED only (ADR-0025)
     obs: UInt | None = None  # observed_at, µs: when the executor/reconciler observed it
 
     def model_post_init(self, _context: Any) -> None:
@@ -179,6 +193,7 @@ ActionOutcomeUnknown = _header(
     "ACTION_OUTCOME_UNKNOWN", "SYS", ("action", "outcome", "payload", "obs")
 )
 SecurityViolation = _header("SECURITY_VIOLATION", "SYS", ("violation",))
+EpochSealed = _header("EPOCH_SEALED", "SYS", ("epoch",))
 
 HEADER_MODELS: Final[dict[str, type[EventHeader]]] = {
     m.TYPE: m
@@ -196,6 +211,7 @@ HEADER_MODELS: Final[dict[str, type[EventHeader]]] = {
         ActionFailed,
         ActionOutcomeUnknown,
         SecurityViolation,
+        EpochSealed,
     )
 }
 # APPROVAL_GRANTED/DENIED/EXPIRED are models only until the approval phase.

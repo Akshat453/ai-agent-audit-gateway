@@ -133,6 +133,32 @@ evidence_events = Table(
     Column("event_hash", LargeBinary, nullable=False),
 )
 
+epoch_heads = Table(
+    "epoch_heads",
+    metadata,
+    Column("tenant_id", Text, primary_key=True),
+    Column("next_epoch_no", BigInteger, nullable=False),
+    Column("sealed_up_to", BigInteger, nullable=False),
+    Column("last_root", LargeBinary, nullable=False),
+    Column("updated_at", DateTime(timezone=True)),
+)
+
+epochs = Table(
+    "epochs",
+    metadata,
+    Column("tenant_id", Text, primary_key=True),
+    Column("epoch_no", BigInteger, primary_key=True),
+    Column("first_seq", BigInteger, nullable=False),
+    Column("last_seq", BigInteger, nullable=False),
+    Column("tree_size", BigInteger, nullable=False),
+    Column("merkle_root", LargeBinary, nullable=False),
+    Column("prev_root", LargeBinary, nullable=False),
+    Column("epoch_root", LargeBinary, nullable=False),
+    Column("state", Text, nullable=False),
+    Column("sealed_at", DateTime(timezone=True)),
+    Column("seal_reason", Text, nullable=False),
+)
+
 evidence_payloads = Table(
     "evidence_payloads",
     metadata,
@@ -160,6 +186,8 @@ outbox_jobs = Table(
     Column("lease_expires_at", DateTime(timezone=True)),
     Column("last_error_code", Text),
     Column("args", JSONB),
+    Column("up_to_seq", BigInteger),
+    Column("seal_reason", Text),
     Column("created_at", DateTime(timezone=True)),
 )
 

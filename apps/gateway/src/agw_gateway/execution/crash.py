@@ -9,7 +9,13 @@ from __future__ import annotations
 from typing import Final
 
 CRASH_POINTS: Final = frozenset(
-    {"after_tx1_commit", "after_claim", "after_dispatch_commit", "after_adapter_return"}
+    {
+        "after_tx1_commit",
+        "after_claim",
+        "after_dispatch_commit",
+        "after_adapter_return",
+        "seal_before_commit",
+    }
 )
 
 

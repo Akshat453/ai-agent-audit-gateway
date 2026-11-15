@@ -10,9 +10,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 from sqlalchemy import Engine, func, select, update
 from sqlalchemy.dialects.postgresql import insert
@@ -21,6 +23,7 @@ from agw_gateway.auth.tokens import issue_token
 from agw_gateway.config import load_settings
 from agw_gateway.db import create_db_engine
 from agw_gateway.db import tables as t
+from agw_gateway.evidence.bundle import build_bundle, export_epochs
 from agw_gateway.evidence.export import export_chain
 from agw_gateway.ids import uuid7
 
@@ -42,6 +45,7 @@ def ensure_tenant(engine: Engine, tenant_id: str, display_name: str) -> None:
         )
         # Every tenant owns exactly one hash chain (ADR-0008); genesis head: seq -1, ZERO32.
         conn.execute(insert(t.chain_heads).values(tenant_id=tenant_id).on_conflict_do_nothing())
+        conn.execute(insert(t.epoch_heads).values(tenant_id=tenant_id).on_conflict_do_nothing())
 
 
 def ensure_agent(
@@ -131,6 +135,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     ex.add_argument("--no-payloads", action="store_true")
     hd = sub.add_parser("chain-head", help="print '<seq> <hash hex>' of a tenant's chain head")
     hd.add_argument("--tenant", required=True)
+    ee = sub.add_parser("export-epochs", help="write epochs.jsonl for agw-verify epochs")
+    ee.add_argument("--tenant", required=True)
+    ee.add_argument("--out", required=True)
+    eb = sub.add_parser("export-bundle", help="write an evidence bundle for one event")
+    eb.add_argument("--event-id", required=True)
+    eb.add_argument("--out", required=True)
+    eb.add_argument("--include-payload", action="store_true", help="PLAINTEXT payload (sensitive)")
     args = parser.parse_args(argv)
 
     settings = load_settings()
@@ -153,6 +164,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                     )
                 ).one()
             print(f"{head.last_seq} {bytes(head.last_hash).hex()}")
+        elif args.cmd == "export-epochs":
+            with engine.connect() as conn, open(args.out, "w", encoding="utf-8") as fh:
+                n = export_epochs(conn, args.tenant, fh)
+            print(f"exported {n} epochs to {args.out}", file=sys.stderr)
+        elif args.cmd == "export-bundle":
+            with engine.connect() as conn:
+                bundle = build_bundle(
+                    conn, UUID(args.event_id), tenant_id=None, include_payload=args.include_payload
+                )
+            with open(args.out, "w", encoding="utf-8") as fh:
+                json.dump(bundle, fh, indent=1)
+            print(
+                f"wrote bundle for epoch {bundle['proof']['epoch_no']} to {args.out}",
+                file=sys.stderr,
+            )
         elif args.cmd == "export-chain":
             with open(args.out, "w", encoding="utf-8") as fh:
                 n = export_chain(

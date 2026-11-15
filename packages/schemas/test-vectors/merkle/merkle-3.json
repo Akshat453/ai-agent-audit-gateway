@@ -1,0 +1,36 @@
+{
+ "tree_size": 3,
+ "leaf_inputs": [
+  "979a876a637a2d5f9d0eb3eac2b337d530423bf60908df8e834f7c74e9048c05",
+  "7368adebd8a004a74423e025e5ee7a16d9ea58c7eb02cf488ab090d9c2d971ad",
+  "5481976d011ed2d98ac78fc70cb8bad87cd8347b1b8f41e86dd2cb5426693eb1"
+ ],
+ "leaf_hashes": [
+  "3e7d6b41df81acd06463047e7b05f83b6f80cea0d4ba94524ee71fefe771dcd0",
+  "b3f236c9dd0ed2d525584830d93225e2cb9043dbfa328d47d7666bd7df457a20",
+  "34df27d1d5cf2027cf1e22db7b100e575ac55a9aed42a06de9415660971edd2e"
+ ],
+ "root": "0a18dd2c9de293167a22e06a4138fc0d7c6ad1dfc04aa38d5ac072060c7e76fe",
+ "proofs": [
+  {
+   "leaf_index": 0,
+   "audit_path": [
+    "b3f236c9dd0ed2d525584830d93225e2cb9043dbfa328d47d7666bd7df457a20",
+    "34df27d1d5cf2027cf1e22db7b100e575ac55a9aed42a06de9415660971edd2e"
+   ]
+  },
+  {
+   "leaf_index": 1,
+   "audit_path": [
+    "3e7d6b41df81acd06463047e7b05f83b6f80cea0d4ba94524ee71fefe771dcd0",
+    "34df27d1d5cf2027cf1e22db7b100e575ac55a9aed42a06de9415660971edd2e"
+   ]
+  },
+  {
+   "leaf_index": 2,
+   "audit_path": [
+    "6e3787811a418fd20d2b015a62fbd6bf5e96261315e1cdd2245415ef4f2c113b"
+   ]
+  }
+ ]
+}
