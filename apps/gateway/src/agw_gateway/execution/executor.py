@@ -34,7 +34,11 @@ from agw_gateway.evidence import EvidenceWriter, NewEvent
 from agw_gateway.evidence.writer import GATEWAY_ACTOR_ID, now_us
 from agw_gateway.execution.crash import CrashPoints
 from agw_gateway.ids import uuid7
+from agw_gateway.keys import KeyUnavailable
 from agw_gateway.logs import log
+from agw_gateway.privacy.cipher import EnvelopeCipher, SealedDataError, ops_context
+from agw_gateway.privacy.classification import FieldClasses
+from agw_gateway.privacy.minimize import Minimizer
 from agw_gateway.tools.registry import ToolRegistry
 from agw_gateway.tools.spec import ExecutionContext, ToolResult, ToolSpec
 
@@ -68,7 +72,11 @@ class Executor:
         adapter_timeout_seconds: float = 10.0,
         batch: int = 10,
         worker_id: str | None = None,
+        cipher: EnvelopeCipher | None = None,
+        minimizer: Minimizer | None = None,
     ) -> None:
+        self._cipher_obj = cipher
+        self._minimizer_obj = minimizer
         self._engine = engine
         self._registry = registry
         self._writer = writer
@@ -127,9 +135,31 @@ class Executor:
             for r in sorted(rows, key=lambda r: r.job_id)
         ]
 
+    def _cipher(self) -> EnvelopeCipher:
+        if self._cipher_obj is None:
+            raise KeyUnavailable("no KEK configured")
+        return self._cipher_obj
+
+    def _minimizer(self) -> Minimizer:
+        if self._minimizer_obj is None:
+            raise KeyUnavailable("no KEK configured")
+        return self._minimizer_obj
+
     # ---------------------------------------------------------------- per job
     def _process(self, job: ClaimedJob) -> None:
-        prepared = self._dispatch_tx(job)
+        try:
+            prepared = self._dispatch_tx(job)
+        except KeyUnavailable:
+            # KEK down: nothing was dispatched (tx rolled back); the lease expires and the
+            # reconciler returns the AUTHORIZED job to PENDING. Fail closed, retry later.
+            log(
+                logger,
+                logging.ERROR,
+                "KEK unavailable: dispatch postponed",
+                action_id=job.action_id,
+                error_code="KEK_UNAVAILABLE",
+            )
+            return
         if prepared is None:
             return
         spec, args = prepared
@@ -169,7 +199,8 @@ class Executor:
             select(
                 t.outbox_jobs.c.status,
                 t.outbox_jobs.c.claimed_by,
-                t.outbox_jobs.c.args,
+                t.outbox_jobs.c.args_sealed,
+                t.outbox_jobs.c.gate_anchor,
                 (t.outbox_jobs.c.lease_expires_at > func.now()).label("lease_live"),
             )
             .where(t.outbox_jobs.c.job_id == job.job_id)
@@ -203,7 +234,16 @@ class Executor:
             if action.status != "AUTHORIZED" and not redispatch_ok:
                 self._finish_job(conn, job, "FAILED", "INVALID_STATE_FOR_DISPATCH")
                 return None
-            args = spec.validate_args(j.args) if spec is not None else None
+            args = None
+            if spec is not None and j.args_sealed is not None:
+                try:
+                    raw = self._cipher().open_json(
+                        ops_context(job.tenant_id, "dispatch_args", job.action_id.bytes),
+                        bytes(j.args_sealed),
+                    )
+                except SealedDataError:
+                    raw = None  # tampered / not ours: definite failure, the adapter never runs
+                args = spec.validate_args(raw) if raw is not None else None
             if spec is None or args is None:
                 # Never reached the adapter: a definite failure without side effect.
                 self._record_result(
@@ -235,13 +275,24 @@ class Executor:
                                 "attempt": job.attempt,
                                 "worker": self.worker_id,
                                 "cg": job.cg,
+                                "anchor": _anchor_ref(j.gate_anchor),
                             },
                             "args": args_digest(args),
                             "obs": now_us(),
                         },
-                        # Execution (Paper B field 4): exact parameters passed to the adapter.
+                        # Execution (Paper B field 4): the parameters passed to the adapter,
+                        # minimized (secret fields -> salted markers, ADR-0029 §4).
                         payload={
-                            "execution": {"params": profile_value(args.model_dump(mode="python"))}
+                            "execution": {
+                                "params": profile_value(
+                                    self._minimizer().args(
+                                        conn,
+                                        job.tenant_id,
+                                        spec.classes,
+                                        args.model_dump(mode="python"),
+                                    )
+                                )
+                            }
                         },
                     )
                 ],
@@ -281,7 +332,7 @@ class Executor:
             if status == "COMPLETED":
                 assert isinstance(detail, ToolResult)  # noqa: S101
                 self._record_result(
-                    conn, job, action, "COMPLETED", None, dict(detail.public), observed
+                    conn, job, action, "COMPLETED", None, dict(detail.public), observed, spec=spec
                 )
             elif status == "FAILED":
                 code, _, exc_type = str(detail).partition(":")
@@ -309,6 +360,7 @@ class Executor:
         result_public: dict[str, Any] | None,
         observed: int,
         error_type: str = "",
+        spec: ToolSpec | None = None,
     ) -> None:
         outcome: dict[str, str] = {"status": status}
         if error_code is not None:
@@ -316,7 +368,13 @@ class Executor:
         # Effects (Paper B field 5): the observable outcome, never the agent's interpretation.
         effects: dict[str, Any]
         if status == "COMPLETED":
-            effects = json_or_profile(result_public or {}, "result")
+            # Secret results -> markers in the encrypted payload; only public/internal results
+            # stay in plaintext (actions.result_public, returned to the agent) (ADR-0029 §4).
+            classes = spec.classes if spec is not None else FieldClasses()
+            minimized, result_public = self._minimizer().results(
+                conn, job.tenant_id, classes, result_public or {}
+            )
+            effects = json_or_profile(minimized, "result")
         else:
             effects = {"error": f"{error_code}:{error_type}" if error_type else str(error_code)}
         self._writer.append(
@@ -352,8 +410,23 @@ class Executor:
         conn.execute(
             update(t.outbox_jobs)
             .where(t.outbox_jobs.c.job_id == job.job_id)
-            .values(status=status, last_error_code=error_code, lease_expires_at=None, args=None)
+            .values(
+                status=status, last_error_code=error_code, lease_expires_at=None, args_sealed=None
+            )
         )
+
+
+def _anchor_ref(gate_anchor: Any) -> dict[str, Any] | None:
+    """dispatch.anchor for a pre-anchored CRITICAL action (ADR-0028); None otherwise."""
+    if not gate_anchor:
+        return None
+    tx = gate_anchor.get("tx")
+    return {
+        "epoch": int(gate_anchor["epoch"]),
+        "block": int(gate_anchor["block"]),
+        "tx": bytes.fromhex(tx) if tx else None,
+        "fin": str(gate_anchor["fin"]),
+    }
 
 
 def record_outcome_unknown(
@@ -400,5 +473,5 @@ def record_outcome_unknown(
     conn.execute(
         update(t.outbox_jobs)
         .where(t.outbox_jobs.c.job_id == job.job_id)
-        .values(status="FAILED", last_error_code=reason, lease_expires_at=None, args=None)
+        .values(status="FAILED", last_error_code=reason, lease_expires_at=None, args_sealed=None)
     )

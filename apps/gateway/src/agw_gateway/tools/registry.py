@@ -69,6 +69,7 @@ class ToolRegistry:
             "external_effect": m.external_effect,
             "target_field": m.target_field,
             "tags": sorted(m.tags),
+            "risk_attributes": m.risk_attributes(),
             "args_schema": spec.args_schema(),
             "adapter": spec.adapter_name,
         }

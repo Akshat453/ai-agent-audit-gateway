@@ -1,6 +1,12 @@
 # 07 — Key Management, Encryption and Selective Disclosure
 
-Status: Accepted (Phase 0); implemented in Phase 5. ADRs: 0012 (random per-event DEK),
+Status: Accepted (Phase 0); **implemented in Phase 7** ([ADR-0029](adr/0029-phase7-encryption-disclosure.md)).
+Deviations, as implemented:
+- **AAD:** the payload AAD is `TAG || cbor({tenant, event_id, seq, payload_digest, schema_version})`, and the wrap AAD is `TAG || cbor({context, kek_id})`.
+- **Storage:** blobs go to MinIO above 64 KiB, and ciphertext lives in `payload_objects`, deletable only by the evidenced erasure path.
+- **Disclosure:** it uses HPKE (RFC 9180), not `age`, with DISCLOSURE_GRANTED / DISCLOSURE_ACCESSED instead of KEY_DISCLOSED.
+- **Erasure:** the event is PAYLOAD_DELETED, not PAYLOAD_ERASED.
+- **Additions:** field classification, secret redaction and sealed operational args. ADRs: 0012 (random per-event DEK),
 0013 (salted payloads), 0017 (ciphertext storage). Sources: Paper A §3 (data minimization),
 §8 (key management, deletion); Paper B §III-E, §VIII-B.
 

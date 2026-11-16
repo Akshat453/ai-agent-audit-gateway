@@ -25,7 +25,7 @@ from typing import Any, Final
 from uuid import UUID
 
 from pydantic import ValidationError
-from sqlalchemy import Connection, insert, text
+from sqlalchemy import Connection, insert, select, text
 
 from agw_gateway.crypto.canonical import (
     ZERO32,
@@ -35,7 +35,7 @@ from agw_gateway.crypto.canonical import (
     to_json_projection,
 )
 from agw_gateway.db import tables as t
-from agw_gateway.evidence.payloads import PayloadStore, PlaintextPayloadStore
+from agw_gateway.evidence.payloads import NoPayloadStore, PayloadStore
 from agw_gateway.ids import uuid7
 from agw_schemas.events import HEADER_MODELS, MODEL_ONLY_TYPES, Payload
 
@@ -43,8 +43,13 @@ SCHEMA_VERSION: Final = 1
 MAX_RECORD_BYTES: Final = 16 * 1024
 MAX_PAYLOAD_BYTES: Final = 1024 * 1024
 ACTOR_KINDS: Final = frozenset({"agent", "human", "gateway", "system"})
+RISK_LEVELS: Final = frozenset({"LOW", "MEDIUM", "HIGH", "CRITICAL"})
 GATEWAY_ACTOR_ID: Final = "agw-gateway"
-PAYLOAD_SECTIONS: Final = frozenset({"intent", "execution", "effects", "context", "approval"})
+# "delegation" carries the agent-DECLARED depth since Phase 4 (ADR-0026); otherwise it is
+# written as an explicit null (Paper B field 8: present, unknown).
+PAYLOAD_SECTIONS: Final = frozenset(
+    {"intent", "execution", "effects", "context", "approval", "delegation", "disclosure"}
+)
 
 
 class EvidenceSchemaError(ValueError):
@@ -66,6 +71,9 @@ class NewEvent:
     fields: Mapping[str, Any] = field(default_factory=dict)  # header fields
     payload: Mapping[str, Any] | None = None  # payload sections (sensitive content)
     delegation_present: bool = False
+    # Risk level used ONLY to decide seal urgency (ADR-0026). Not part of the hashed header.
+    # None + action_id => the action's recorded risk level; None without action => no risk.
+    risk_level: str | None = None
 
     def __post_init__(self) -> None:
         model = HEADER_MODELS.get(self.type)
@@ -94,6 +102,8 @@ class NewEvent:
             raise EvidenceSchemaError("absent optional fields must be omitted, not null")
         if self.payload is not None and set(self.payload) - PAYLOAD_SECTIONS:
             raise EvidenceSchemaError("unknown payload sections")
+        if self.risk_level is not None and self.risk_level not in RISK_LEVELS:
+            raise EvidenceSchemaError("unknown risk level")
 
 
 @dataclass(frozen=True)
@@ -106,7 +116,8 @@ class StoredEvent:
 
 class EvidenceWriter:
     def __init__(self, payload_store: PayloadStore | None = None) -> None:
-        self.payloads: PayloadStore = payload_store or PlaintextPayloadStore()
+        # Phase 7: no default plaintext store. Without a KEK, events with payloads fail closed.
+        self.payloads: PayloadStore = payload_store or NoPayloadStore()
 
     def append(
         self, conn: Connection, tenant_id: str, events: Sequence[NewEvent]
@@ -120,6 +131,7 @@ class EvidenceWriter:
         if head is None:
             raise LookupError("unknown tenant (no chain head)")
         last_seq, last_hash = int(head.last_seq), bytes(head.last_hash)
+        inherited = self._action_risk(conn, events)
 
         rows: list[dict[str, Any]] = []
         payload_rows: list[tuple[UUID, int, bytes]] = []
@@ -147,7 +159,7 @@ class EvidenceWriter:
                 header["payload"] = {
                     "digest": payload_digest(plaintext),
                     "len": len(plaintext),
-                    "ref": "inline",
+                    "ref": self.payloads.ref_for(len(plaintext)),
                 }
                 payload_rows.append((event_id, seq, plaintext))
             try:
@@ -172,6 +184,8 @@ class EvidenceWriter:
                     "body": to_json_projection(record),
                     "canonical_bytes": canonical,
                     "event_hash": digest,
+                    "risk_level": ev.risk_level
+                    or (inherited.get(ev.action_id) if ev.action_id is not None else None),
                 }
             )
             stored.append(StoredEvent(event_id=event_id, seq=seq, type=ev.type, event_hash=digest))
@@ -192,6 +206,18 @@ class EvidenceWriter:
         return stored
 
     @staticmethod
+    def _action_risk(conn: Connection, events: Sequence[NewEvent]) -> dict[UUID, str]:
+        ids = {ev.action_id for ev in events if ev.risk_level is None and ev.action_id}
+        if not ids:
+            return {}
+        rows = conn.execute(
+            select(t.actions.c.action_id, t.actions.c.risk_level).where(
+                t.actions.c.action_id.in_(ids)
+            )
+        ).all()
+        return {r.action_id: r.risk_level for r in rows}
+
+    @staticmethod
     def _payload_bytes(event_id: UUID, ev: NewEvent) -> bytes:
         assert ev.payload is not None  # noqa: S101
         try:
@@ -200,5 +226,5 @@ class EvidenceWriter:
             raise EvidenceSchemaError("payload invalid") from exc
         plaintext = encode(payload.to_record(delegation_present=ev.delegation_present))
         if len(plaintext) > MAX_PAYLOAD_BYTES:
-            raise EvidenceSchemaError("payload exceeds 1 MiB (blob storage arrives later)")
+            raise EvidenceSchemaError("payload exceeds 1 MiB")
         return plaintext

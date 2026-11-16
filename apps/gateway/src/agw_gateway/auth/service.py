@@ -52,6 +52,7 @@ class Authenticator:
                 t.agents.c.name,
                 t.agents.c.scopes,
                 t.agents.c.status,
+                t.agents.c.trust_tier,
             )
             .join(t.agents, t.agents.c.agent_id == t.agent_credentials.c.agent_id)
             .where(t.agent_credentials.c.key_id == key_id)
@@ -76,4 +77,5 @@ class Authenticator:
             name=row.name,
             scopes=frozenset(row.scopes),
             active=True,
+            trust_tier=row.trust_tier,
         )

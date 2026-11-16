@@ -42,6 +42,15 @@ class PolicyRule(_Strict):
     match: RuleMatch = Field(default_factory=RuleMatch)
     control_ids: tuple[str, ...] = ()
     allow_high_without_approval: bool = False
+    # Phase 4 (ADR-0026): CRITICAL is DENY unless a matching exception rule exists; even then
+    # the result is REQUIRE_APPROVAL, never ALLOW.
+    critical_exception: bool = False
+
+    @model_validator(mode="after")
+    def _exception_requires_approval(self) -> PolicyRule:
+        if self.critical_exception and self.effect != "REQUIRE_APPROVAL":
+            raise ValueError("critical_exception rules must have effect REQUIRE_APPROVAL")
+        return self
 
 
 class PolicyDocument(_Strict):

@@ -14,6 +14,13 @@ Status: Accepted (Phase 0). Verifier in Phase 7, experiments in Phase 8. Sources
   `--keys` (disclosed DEKs).
 - Output: a JSON report plus a human summary. Each check is `VERIFIED`, `TAMPERED` or
   `INCOMPLETE` (Paper B §V), and the overall result is the worst of them.
+  *As implemented through Phase 6:*
+  - **Results:** `VERIFIED` (0), `TAMPERED` (1), `INCOMPLETE` (2), `INVALID_PROOF` (3), `UNANCHORED` (4: no external trust root, or the anchor is not final yet), `UNTRUSTED_ANCHOR` (5: anchor data cannot be tied to the auditor's pinned chain id, contract and recorder id).
+  - **Chain mode:** `--chain-rpc` plus `--trust-config` or explicit pins (ADR-0028 §6).
+  - **Disclosure bundles (Phase 7, ADR-0029 §6):** `--auditor-key`, with the optional `agw-verifier[disclosure]` extra.
+    - Order: HPKE-open the DEK, AES-GCM decrypt with the AAD rebuilt from the header, then the digest, the proof and the anchor. VERIFIED only if all pass.
+    - A deleted payload is INCOMPLETE. A swapped or altered ciphertext is TAMPERED.
+    - In chain exports, `payload_status` DECRYPT_FAILED / BLOB_CORRUPT means TAMPERED, and DELETED / BLOB_MISSING means INCOMPLETE.
 - Every report carries the fixed statement: *"Verified means the records are unchanged since
   they were anchored and are correctly ordered. It does not mean the recorded actions were
   truthful, authorized, complete or correct."* (Paper A §2, §8)
@@ -38,13 +45,13 @@ A directory or zip with:
 | V2 | Recompute `event_hash`. `prev` links. `seq` contiguity within the range. | edit, delete, reorder, insert | TAMPERED |
 | V3 | Inclusion proofs / full-tree recomputation → `M_t` | edit of sealed event, phantom leaves | TAMPERED |
 | V4 | Recompute `R_t` from header. Header consistency (`tree_size`, tiling). | tail truncation in epoch, size games, renumbering | TAMPERED |
-| V5 | On-chain `getAnchor(tenantKey, epoch)` equals `R_t`, and `prevRoot` equals `R_{t−1}` | post-anchor rewrite, fork, deleted epoch | TAMPERED |
-| V6 | Anchor finality per requested level. Agreement across RPCs. | reorg, lying RPC | INCOMPLETE (not final) / TAMPERED (RPCs disagree on a finalized block) |
+| V5 | On-chain `getAnchor(recorderId, epoch)` at the finality block equals (`R_t`, `tree_size`, `last_seq`). In whole-export mode, the chain's last epoch must not exceed the material's. *(Phase 6, ADR-0028: no on-chain `prevRoot`; continuity comes from recomputed `R_t` chaining.)* | post-anchor rewrite, fork, deleted epoch, deleted tail | TAMPERED |
+| V6 | Anchor finality per requested level. Agreement across RPCs. *(Phase 6: one RPC; not final → UNANCHORED `ANCHOR_NOT_FINAL`; RPC down → INCOMPLETE. Cross-RPC agreement is not built.)* | reorg, lying RPC | INCOMPLETE (not final) / TAMPERED (RPCs disagree on a finalized block) |
 | V7 | Events after the last anchored epoch | unsealed tail | INCOMPLETE (reported, never VERIFIED) |
 | V8 | Payload decrypt → digest → `payload.event == id` | payload swap or edit | TAMPERED |
 | V9 | Lifecycle conformance per action (05 §2 ordering) | missing AUTHORIZED before DISPATCHED, DISPATCHED without result or OUTCOME_UNKNOWN | TAMPERED (order) / INCOMPLETE (pending) |
 | V10 | GRC assertions (Paper A §5 Table 1): approval precedes dispatch for HIGH/CRITICAL. Dispatched `args` digest = approved binding's args digest. CRITICAL dispatch has `dispatch.anchor` and the anchored epoch precedes it. | approved ≠ executed (Paper A §2) | TAMPERED |
-| V11 | Contract identity / tenant key matches the signed manifest | substitute contract | TAMPERED |
+| V11 | Contract identity / tenant key matches the signed manifest. *(Phase 6: pinned `agw-anchor-trust/v1` config, unsigned; RPC chain id, code hash and bundle claims are checked against it.)* | substitute contract | **UNTRUSTED_ANCHOR** (exit 5, Phase 6) |
 
 ## 4. Tamper experiments (`experiments/tampering/`, Phase 8)
 

@@ -1,7 +1,12 @@
 # AI Agent Audit Gateway — Design Documentation
 
-Status: **Phase 0 (design), Phase 1 (core gateway), Phase 2 (flight recorder) and Phase 3
-(Merkle epochs + offline verifier) implemented, 2026-11-15.** Per-phase records: [phases/](phases/).
+Status: **Phase 0 (design), Phase 1 (core gateway), Phase 2 (flight recorder), Phase 3
+(Merkle epochs + offline verifier), Phase 4 (risk engine + risk-adaptive sealing), Phase 5
+(action-bound human approval) and Phase 6 (blockchain anchoring, on Anvil; Base Sepolia pending a
+funded key) and Phase 7 (encryption, key management, selective disclosure) implemented,
+2026-11-16.** Per-phase records: [phases/](phases/).
+Phase numbers follow the phase prompts, which differ from [13-roadmap.md](13-roadmap.md) (see
+the note there).
 
 The gateway sits on the execution path between AI agents and the tools they call. It has two
 separate responsibilities. The documents keep them apart deliberately:

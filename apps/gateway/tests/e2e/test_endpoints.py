@@ -42,7 +42,7 @@ def test_get_action_owner_only(gw) -> None:
     assert mine.status_code == 200
     data = mine.json()
     assert data["status"] == "COMPLETED"
-    assert data["decision"]["matched_rule_ids"] == ["allow-low-read"]
+    assert data["decision"]["matched_rule_ids"] == ["allow-low"]
     assert CANARY not in mine.text  # raw args are never returned
     for token in (gw.world.other_token, gw.world.readonly_token):
         other = gw.client.get(f"/v1/actions/{aid}", headers=gw.headers(token))
@@ -76,7 +76,7 @@ def test_timeline_only_own_events(gw) -> None:
     ]
     assert [e["seq"] for e in tl] == sorted(e["seq"] for e in tl)
     assert tl[1]["decision"] == "ALLOW" and tl[4]["decision"] == "DENY"
-    assert tl[4]["reasons"] == ["POLICY_RULE_DENY"]
+    assert tl[4]["reasons"] == ["POLICY_RULE_DENY", "CRITICAL_DENIED"]  # policy-v2 (ADR-0026)
     assert tl[-1]["status"] == "COMPLETED"
     other = gw.client.get(
         f"/v1/runs/{rid}/timeline", headers=gw.headers(gw.world.other_token)

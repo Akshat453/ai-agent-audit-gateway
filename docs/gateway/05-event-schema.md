@@ -23,9 +23,9 @@ stateDiagram-v2
   [*] --> DENIED: POLICY_EVALUATED(DENY) + ACTION_DENIED
   [*] --> PENDING_APPROVAL: POLICY_EVALUATED(REQUIRE_APPROVAL) + APPROVAL_REQUIRED
   [*] --> AUTHORIZED: POLICY_EVALUATED(ALLOW) + ACTION_AUTHORIZED
-  PENDING_APPROVAL --> AUTHORIZED: APPROVAL_GRANTED + ACTION_AUTHORIZED (Phase 4)
-  PENDING_APPROVAL --> DENIED: APPROVAL_DENIED (Phase 4)
-  PENDING_APPROVAL --> EXPIRED: APPROVAL_EXPIRED (Phase 4)
+  PENDING_APPROVAL --> AUTHORIZED: APPROVAL_GRANTED + POLICY_EVALUATED + ACTION_AUTHORIZED (Phase 5)
+  PENDING_APPROVAL --> DENIED: APPROVAL_DENIED, or POLICY_EVALUATED? + ACTION_DENIED at revalidation (Phase 5)
+  PENDING_APPROVAL --> EXPIRED: APPROVAL_EXPIRED (Phase 5)
   AUTHORIZED --> WAITING_ANCHOR: CRITICAL only (Phase 6)
   WAITING_ANCHOR --> DISPATCHED: anchor reached finality
   WAITING_ANCHOR --> FAILED: ACTION_FAILED(ANCHOR_TIMEOUT), no side effect
@@ -68,7 +68,10 @@ waits for reconciliation, which may be manual.
 | `DELEGATION_ISSUED` | A2A | 10 | own tx | delegator, delegate, scope digest | delegation token |
 | `MONITOR_REPORT` | SYS | 8 | `_monitor` tenant | checked range, result | full report |
 | `PAYLOAD_ERASED` | SYS | 5 | erasure tx | erased event id, legal-basis code, requester | — |
+| `PAYLOAD_DELETED` (Phase 7, replaces PAYLOAD_ERASED) | SYS | 7 | retention / erasure tx | `erasure {event, seq, reason RETENTION\|ERASURE_REQUEST, policy}` | — |
 | `KEY_DISCLOSED` | SYS | 7 | export tx | disclosed event ids, recipient id, purpose code | — |
+| `DISCLOSURE_GRANTED` (Phase 7, replaces KEY_DISCLOSED) | A2H | 7 | grant tx | `disclosure {grant, auditor, key, mode, scope, exp, n, ids}`; purpose + ids in payload | payload |
+| `DISCLOSURE_ACCESSED` (Phase 7) | A2H | 7 | every export attempt | `disclosure {...}` + `outcome {COMPLETED\|DENIED, code}` | — |
 
 All eight Paper B §III-B fields are covered: **intent** (REQUESTED payload), **policy evaluation**
 (POLICY_EVALUATED record), **human approval** (APPROVAL_*), **execution** (DISPATCHED payload),
@@ -96,9 +99,9 @@ Optional fields are **omitted** when absent and are never encoded as `null`.
 | `run` | bstr(16) | opt | Run id |
 | `tool` | map {`id`: tstr, `ver`: tstr} | opt | |
 | `env` | tstr | opt | `dev` \| `staging` \| `prod` |
-| `risk` | map {`level`: tstr, `score`: uint, `rules`: [tstr], `cv`: tstr} | opt | §04 §2.3 |
+| `risk` | map {`level`: tstr, `score`: uint, `rules`: [tstr], `cv`: tstr} + risk-v2 (ADR-0026): `pid`: tstr, `pver`: uint, `pd`: bstr(32) risk policy digest, `f`: [{`n`,`v`,`p`,`w`,`miss`?}], `reasons`: [tstr], `forced`?: tstr | opt | §04 §2.3, ADR-0026 |
 | `policy` | map {`id`: tstr, `ver`: uint, `effect`: tstr, `rules`: [tstr], `reasons`: [tstr], `controls`: [tstr], `ev`: tstr} | opt | §04 §4.4 |
-| `approval` | map {`id`: bstr(16), `binding`: bstr(32), `approver`: tstr, `exp`: uint} | opt | Phase 4 |
+| `approval` | map {`id`: bstr(16), `binding`: bstr(32) action digest, `exp`: uint µs, `req`?: 1\|2, `votes`?: uint, `approver`?: tstr, `dec`?: `APPROVED`\|`REJECTED`, `dd`?: bstr(32), `sig`?: bstr(64), `kid`?: tstr, `decs`?: [{`approver`, `dd`, `sig`, `kid`}]} | opt | Phase 5, ADR-0027 §6 |
 | `args` | bstr(32) | opt | `args_digest` (06 §3), Phase 2+ |
 | `dispatch` | map {`attempt`: uint, `worker`: tstr, `anchor`: map} | opt | |
 | `outcome` | map {`status`: tstr, `code`: tstr} | opt | |
@@ -109,6 +112,16 @@ Optional fields are **omitted** when absent and are never encoded as `null`.
 
 **Unknown keys** are rejected by the v1 encoder and by the verifier. New fields require
 `v = 2` and a new ADR.
+
+> Phase 5 note (ADR-0027): the `approval` map was redefined before any record used it
+> (APPROVAL_* were model-only until Phase 5). APPROVAL_GRANTED / DENIED / EXPIRED are
+> writable; `violation.kind` gains `AGENT_ON_HUMAN_ENDPOINT`; the APPROVAL_GRANTED/DENIED
+> payload `approval` section is `{"record": <signed decision record>, "comment": tstr}`.
+> The prompt's "APPROVAL_REQUESTED" is the existing APPROVAL_REQUIRED type.
+
+> Phase 4 note (ADR-0026): optional keys were added *inside* the existing `risk` map,
+> discriminated by `cv = "risk-v2"`, as ADR-0023 did for Phase 2 additions. "New fields" above
+> means new top-level keys; Phase 1–3 records remain valid unchanged.
 
 ## 5. Payload (AGW-PAY v1)
 

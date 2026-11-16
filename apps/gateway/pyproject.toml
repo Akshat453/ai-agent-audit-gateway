@@ -12,6 +12,11 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "alembic>=1.14",
     "agw-schemas",
+    "prometheus-client>=0.21",
+    "cryptography>=43",
+    "argon2-cffi>=23.1",
+    "minio>=7.2,<8",
+    "httpx>=0.27",
 ]
 
 [tool.uv.sources]

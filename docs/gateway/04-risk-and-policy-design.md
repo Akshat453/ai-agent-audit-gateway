@@ -1,7 +1,16 @@
 # 04 — Risk and Policy Design
 
 Status: Accepted (Phase 0). ADRs: 0001 (deny by default), 0002 (deterministic policy),
-0010 (approval binding). Sources: Paper A §5 (*Risk-based evidence selection*, Table 1),
+0010 (approval binding), **0026 (Phase 4)**, **0027 (Phase 5, approvals)**.
+
+> **Phase 4 (implemented, ADR-0026).** §2's fixed four-factor classifier (`risk-v1`) is replaced
+> by `risk-v2`: a versioned TOML risk policy (`agw_gateway/risk/default_risk_policy.toml`) with
+> nine weighted factors, thresholds, mandatory rules that can force DENY / REQUIRE_APPROVAL or
+> set a floor, missing ⇒ worst value, and control ids; its digest is recorded in every
+> POLICY_EVALUATED. §4.3 `CAP-CRITICAL-APPROVAL` is superseded: CRITICAL is **DENY** unless a
+> `critical_exception` rule matches (then REQUIRE_APPROVAL). MEDIUM follows the tool's
+> `medium_effect`. The policy document is `default` v2. §2 and §4.3 below describe v1 and are
+> kept for records written before Phase 4. Sources: Paper A §5 (*Risk-based evidence selection*, Table 1),
 Paper B §III-B (policy evaluation field).
 
 Risk and policy are **separate pure functions** with different jobs:
@@ -161,7 +170,18 @@ Each rule MAY carry `control_ids: [HITL-APPROVAL, SOD-REVIEW, ...]`. These are c
 `POLICY_EVALUATED` so evidence maps to GRC control objectives (Paper A §3 `control_id`). They
 are not used for decisions.
 
-## 5. Approval binding (Phase 4; specified now)
+## 5. Approval binding (implemented in Phase 5; see ADR-0027)
+
+> **Phase 5 (implemented, ADR-0027) supersedes the layout below.** What an approval binds is
+> the **action digest** `SHA-256(TAG("AGW/action/v1") || cbor({tenant, agent_id, tool_id,
+> tool_version, canonical_args_digest, target_resource, environment, policy_id,
+> policy_version, policy_digest, risk_policy_digest, risk_level, delegation_ref}))`, computed
+> once at request time and stored on the action. `action_id`, `expires_at` and the 16-byte
+> nonce live on the `approvals` row and in the gateway-signed decision record, not in the
+> digest. A policy change does **not** by itself invalidate an approval: at authorization the
+> action is re-evaluated under the current policy, and the stricter result wins (DENY, or a
+> higher risk level than approved, means a new approval is needed). Approvers authenticate
+> with a separate session scheme. The text below is kept as the Phase 0 design record.
 
 An approval is valid for exactly one tuple:
 

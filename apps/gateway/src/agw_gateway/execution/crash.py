@@ -15,6 +15,7 @@ CRASH_POINTS: Final = frozenset(
         "after_dispatch_commit",
         "after_adapter_return",
         "seal_before_commit",
+        "anchor_before_broadcast",  # Phase 6: after the write-ahead SUBMITTED row commits
     }
 )
 

@@ -23,7 +23,11 @@ def _url() -> str:
 def run_migrations_online() -> None:
     engine = create_engine(_url(), poolclass=pool.NullPool)
     with engine.connect() as connection:
-        context.configure(connection=connection, target_metadata=None)
+        # One transaction per migration (Phase 7): 0008 may refuse until the re-encryption job
+        # has run; 0007 must stay applied when it does.
+        context.configure(
+            connection=connection, target_metadata=None, transaction_per_migration=True
+        )
         with context.begin_transaction():
             context.run_migrations()
     engine.dispose()

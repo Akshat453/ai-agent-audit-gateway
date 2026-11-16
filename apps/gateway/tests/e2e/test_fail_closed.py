@@ -24,15 +24,17 @@ def test_db_down_fails_closed(tmp_path: Path) -> None:
         urls = init_database(container)
         mig = create_db_engine(urls.migrator, pool_size=1)
         ensure_tenant(mig, "fc", "fail closed")
-        ensure_agent(mig, "fc", "a", ["tools:public_doc_search", "tools:create_ticket"])
+        ensure_agent(
+            mig, "fc", "a", ["tools:public_doc_search", "tools:create_ticket", "tools:send_email"]
+        )
         token = create_key(mig, "fc", "a")
-        mig.dispose()
+        from ..approvalkit import make_humans
 
         spies = make_spies()
         engine = create_db_engine(urls.app, connect_timeout=2, pool_size=2)
         registry = make_registry(spies)
         state = build_state(make_settings(urls.app, tmp_path), engine=engine, registry=registry)
-        registry.sync(engine)
+        state.sync()
         client = TestClient(create_app(state, sync_registry=False))
         headers = {"Authorization": f"Bearer {token}"}
         body = {
@@ -44,8 +46,36 @@ def test_db_down_fails_closed(tmp_path: Path) -> None:
 
         ok = client.post("/v1/actions", json=body, headers={**headers, "Idempotency-Key": "a"})
         assert ok.status_code == 201  # authorized while the DB is up, not yet dispatched
+        # Phase 5: an approval pending while the DB is up...
+        humans = make_humans(mig, client, "fc")
+        mig.dispose()
+        email = {
+            **body,
+            "tool": "send_email",
+            "args": {"to": ["x@partner.example"], "subject": "s"},
+        }
+        pending = client.post(
+            "/v1/actions", json=email, headers={**headers, "Idempotency-Key": "e"}
+        )
+        approval_id = pending.json()["approval"]["approval_id"]
+        shown = client.get(f"/v1/approvals/{approval_id}", headers=humans.headers("alice")).json()
 
         container.stop()
+
+        # ...cannot be decided while it is down: 503, nothing recorded, nothing executes.
+        decision = client.post(
+            f"/v1/approvals/{approval_id}/decision",
+            json={
+                "decision": "APPROVE",
+                "action_digest": shown["action_digest"],
+                "nonce": shown["nonce"],
+            },
+            headers=humans.headers("alice"),
+        )
+        assert decision.status_code == 503
+        assert decision.json()["error"]["code"] == "DEPENDENCY_UNAVAILABLE"
+        with pytest.raises(Exception):  # noqa: B017 - the sweeper cannot run without the DB
+            state.approvals.sweep()
 
         down = client.post("/v1/actions", json=body, headers={**headers, "Idempotency-Key": "b"})
         assert down.status_code == 503

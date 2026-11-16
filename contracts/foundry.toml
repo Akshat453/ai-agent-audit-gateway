@@ -1,0 +1,23 @@
+# Phase 6 (ADR-0028). Pinned compiler, no external libraries (no forge-std: test/Vm.sol is a
+# minimal cheatcode interface), so the build has no network or git-submodule inputs besides solc.
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+cache_path = "cache"
+libs = []
+solc_version = "0.8.28"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 10000
+bytecode_hash = "none"
+cbor_metadata = false
+fs_permissions = [{ access = "read-write", path = "./deployments" }]
+
+[fuzz]
+runs = 1024
+seed = "0x6167770606"
+
+[lint]
+exclude_lints = ["screaming-snake-case-const"]  # `vm` is the conventional cheatcode handle

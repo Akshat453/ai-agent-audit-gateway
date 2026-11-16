@@ -25,7 +25,7 @@ CANARY = "CANARY-p2-5b1e-NEVER-IN-HEADERS"
 
 def _export(gw: Any, **kw: Any) -> list[str]:
     buf = io.StringIO()
-    export_chain(gw.engine, gw.world.tenant_id, buf, **kw)
+    export_chain(gw.engine, gw.world.tenant_id, buf, store=gw.state.payloads, **kw)
     return buf.getvalue().splitlines()
 
 
@@ -40,13 +40,8 @@ def _head(gw: Any) -> tuple[int, bytes]:
 def _su(pg: Any, sql: str, params: tuple = ()) -> None:
     """Privileged attacker: superuser who can bypass the append-only triggers."""
     with psycopg.connect(pg.superuser, autocommit=True) as conn:
-        conn.execute("ALTER TABLE evidence_events DISABLE TRIGGER USER")
-        conn.execute("ALTER TABLE evidence_payloads DISABLE TRIGGER USER")
-        try:
-            conn.execute(sql, params)  # type: ignore[arg-type]
-        finally:
-            conn.execute("ALTER TABLE evidence_events ENABLE TRIGGER USER")
-            conn.execute("ALTER TABLE evidence_payloads ENABLE TRIGGER USER")
+        conn.execute("SET session_replication_role = replica")  # no triggers, no FK checks
+        conn.execute(sql, params)  # type: ignore[arg-type]
 
 
 def _lifecycle(gw: Any) -> str:
@@ -75,18 +70,20 @@ def test_full_lifecycle_round_trips_and_verifies(gw) -> None:
     with gw.engine.connect() as conn:
         rows = conn.execute(
             select(
+                t.evidence_events.c.event_id,
                 t.evidence_events.c.event_type,
                 t.evidence_events.c.canonical_bytes,
-                t.evidence_payloads.c.content,
             )
-            .select_from(t.evidence_events.outerjoin(t.evidence_payloads))
             .where(t.evidence_events.c.action_id == uuid.UUID(aid))
             .order_by(t.evidence_events.c.seq)
         ).all()
-    by_type = {
-        r.event_type: (decode(bytes(r.canonical_bytes)), r.content and decode(bytes(r.content)))
-        for r in rows
-    }
+        by_type = {}
+        for r in rows:
+            content = gw.state.payloads.load_payload(conn, r.event_id)  # decrypts (KEK)
+            by_type[r.event_type] = (
+                decode(bytes(r.canonical_bytes)),
+                content and decode(content),
+            )
     req_h, req_p = by_type["ACTION_REQUESTED"]
     assert req_p["intent"] == {
         "args": {"title": "p2 ticket", "body": "b", "priority": "high"},
@@ -97,7 +94,7 @@ def test_full_lifecycle_round_trips_and_verifies(gw) -> None:
     }
     assert "delegation" in req_p and req_p["delegation"] is None
     assert req_h["code"]["agent"] == "demo-agent/2.1" and req_h["code"]["gw"]
-    assert by_type["POLICY_EVALUATED"][0]["policy"]["rules"] == ["allow-medium-ticket"]
+    assert by_type["POLICY_EVALUATED"][0]["policy"]["rules"] == ["allow-medium"]
     auth_h = by_type["ACTION_AUTHORIZED"][0]
     assert auth_h["code"]["adapter"].endswith("CreateTicketAdapter@1.0.0")
     disp_h, disp_p = by_type["ACTION_DISPATCHED"]
@@ -116,15 +113,23 @@ def test_reasoning_field_is_rejected(gw) -> None:
     assert r.status_code == 422 and r.json()["error"]["fields"] == ["reasoning"]
 
 
-def test_invalid_args_intent_kept_as_json_text(gw) -> None:
+def test_invalid_args_are_not_stored_only_keys_and_salted_digest(gw) -> None:
+    """Phase 7 (ADR-0029 §4): unvalidated args cannot be classified, so their values are never
+    stored (Phase 2 kept them as JSON text). Key names + a per-tenant salted digest remain."""
     aid = gw.post("public_doc_search", {"query": "x", "limit": 2.5}).json()["action_id"]
     with gw.engine.connect() as conn:
-        content = conn.execute(
-            select(t.evidence_payloads.c.content)
-            .select_from(t.evidence_events.join(t.evidence_payloads))
-            .where(t.evidence_events.c.action_id == uuid.UUID(aid))
+        eid = conn.execute(
+            select(t.evidence_events.c.event_id).where(
+                t.evidence_events.c.action_id == uuid.UUID(aid),
+                t.evidence_events.c.event_type == "ACTION_REQUESTED",
+            )
         ).scalar_one()
-    assert decode(bytes(content))["intent"] == {"args_json": '{"limit":2.5,"query":"x"}'}
+        content = gw.state.payloads.load_payload(conn, eid)
+    intent = decode(content)["intent"]
+    assert set(intent) == {"args_unvalidated"}  # no raw values anywhere in the payload
+    assert set(intent["args_unvalidated"]) == {"keys", "digest"}
+    assert intent["args_unvalidated"]["keys"] == ["limit", "query"]
+    assert intent["args_unvalidated"]["digest"].startswith("[REDACTED:sha256:")
 
 
 @pytest.mark.parametrize("target", ["header", "payload"])
@@ -139,9 +144,11 @@ def test_one_byte_edit_in_db_is_tampered_at_that_seq(gw, pg, target: str) -> Non
             "WHERE tenant_id = %s AND seq = %s"
         )
     else:
+        # Phase 7: the stored bytes are AES-GCM ciphertext; one flipped byte fails the
+        # stored SHA-256 / AEAD tag, which the export reports and the verifier calls TAMPERED.
         sql = (
-            "UPDATE evidence_payloads SET content = overlay(content placing "
-            "decode(lpad(to_hex(get_byte(content, 20) # 1), 2, '0'), 'hex') from 21 for 1) "
+            "UPDATE payload_objects SET ciphertext = overlay(ciphertext placing "
+            "decode(lpad(to_hex(get_byte(ciphertext, 20) # 1), 2, '0'), 'hex') from 21 for 1) "
             "WHERE tenant_id = %s AND seq = %s"
         )
     _su(pg, sql, (gw.world.tenant_id, victim))
@@ -152,15 +159,24 @@ def test_one_byte_edit_in_db_is_tampered_at_that_seq(gw, pg, target: str) -> Non
 def test_delete_middle_event_detected(gw, pg) -> None:
     _lifecycle(gw)
     seq, head = _head(gw)
-    _su(pg, "DELETE FROM evidence_payloads WHERE tenant_id = %s AND seq = 2", (gw.world.tenant_id,))
+    _su(pg, "DELETE FROM payload_keys WHERE event_id IN (SELECT event_id FROM payload_objects "
+        "WHERE tenant_id = %s AND seq = 2)", (gw.world.tenant_id,))  # fmt: skip
+    _su(pg, "DELETE FROM payload_objects WHERE tenant_id = %s AND seq = 2", (gw.world.tenant_id,))
     _su(pg, "DELETE FROM evidence_events WHERE tenant_id = %s AND seq = 2", (gw.world.tenant_id,))
     r = verify_lines(_export(gw), trusted_head=head, trusted_seq=seq)
     assert r.result in ("TAMPERED", "INCOMPLETE")
     assert r.missing_ranges == [(2, 2)]
     # A smarter attacker renumbers the tail to close the gap: the prev link breaks.
+    # Two steps, so the (tenant, seq) unique check never depends on the row update order
+    # (a single "seq = seq - 1" collides whenever Postgres happens to visit seq 4 first).
     _su(
         pg,
-        "UPDATE evidence_events SET seq = seq - 1 WHERE tenant_id = %s AND seq > 2",
+        "UPDATE evidence_events SET seq = seq + 1000000 WHERE tenant_id = %s AND seq > 2",
+        (gw.world.tenant_id,),
+    )
+    _su(
+        pg,
+        "UPDATE evidence_events SET seq = seq - 1000001 WHERE tenant_id = %s AND seq > 1000000",
         (gw.world.tenant_id,),
     )
     r2 = verify_lines(_export(gw, to_seq=seq))
@@ -180,7 +196,7 @@ def test_suffix_deletion_needs_a_trusted_head(gw, pg) -> None:
         ).scalar_one()
     _su(
         pg,
-        "DELETE FROM evidence_payloads WHERE tenant_id = %s AND seq > %s",
+        "DELETE FROM payload_objects WHERE tenant_id = %s AND seq > %s",
         (gw.world.tenant_id, seq - 2),
     )
     _su(

@@ -40,8 +40,21 @@ hash input can collide in type with a Merkle leaf or node input (first byte 0x00
 | `AGW/payload/v1` | `0e 4147572f7061796c6f61642f7631` | Payload digest | §5 |
 | `AGW/epoch/v1` | `0c 4147572f65706f63682f7631` | Epoch root | §7 |
 | `AGW/args/v1` | `0b 4147572f617267732f7631` | Canonical args digest (approval binding) | §3 |
-| `AGW/approval/v1` | `0f 4147572f617070726f76616c2f7631` | Approval binding digest | 04 §5 |
-| `AGW/tenant-key/v1` | `11 4147572f74656e616e742d6b65792f7631` | On-chain tenant key | 09 §7 |
+| `AGW/approval/v1` | `0f 4147572f617070726f76616c2f7631` | Approval binding digest (**unused**: superseded by `AGW/action/v1` + the decision record, ADR-0027) | 04 §5 |
+| `AGW/risk-policy/v1` | `12 4147572f7269736b2d706f6c6963792f7631` | Risk policy digest (over its canonical CBOR) | ADR-0026 |
+| `AGW/action/v1` | `0d 4147572f616374696f6e2f7631` | Action digest (what an approval binds) | ADR-0027 §1 |
+| `AGW/policy/v1` | `0d 4147572f706f6c6963792f7631` | Policy document digest (stored JSON, canonical CBOR) | ADR-0027 §1 |
+| `AGW/approval-decision/v1` | `18 4147572f617070726f76616c2d6465636973696f6e2f7631` | Approver decision record digest | ADR-0027 §4 |
+| `AGW/approval-sig/v1` | `13 4147572f617070726f76616c2d7369672f7631` | Ed25519 message prefix for decision signatures | ADR-0027 §4 |
+| `AGW/session/v1` | `0e 4147572f73657373696f6e2f7631` | Human session token digest | ADR-0027 §3 |
+| `AGW/tenant-key/v1` | `11 4147572f74656e616e742d6b65792f7631` | On-chain tenant key (**unused**: replaced by `AGW/recorder/v1`, ADR-0028) | 09 §7 |
+| `AGW/payload-aad/v1` | `12 4147572f7061796c6f61642d6161642f7631` | AEAD label: payload AAD prefix (`cbor({tenant, event_id, seq, payload_digest, schema_version})`) | ADR-0029 §1 |
+| `AGW/dek-wrap-aad/v1` | `13 4147572f64656b2d777261702d6161642f7631` | AEAD label: DEK wrap AAD prefix (`cbor({context, kek_id})`) | ADR-0029 §2 |
+| `AGW/sealed-ops/v1` | `11 4147572f7365616c65642d6f70732f7631` | AEAD label: sealed operational args | ADR-0029 §5 |
+| `AGW/redact/v1` | `0d 4147572f7265646163742f7631` | Secret-field redaction marker (salted) | ADR-0029 §4 |
+| `AGW/disclosure/v1` | `11 4147572f646973636c6f737572652f7631` | HPKE `info` prefix for disclosed DEKs | ADR-0029 §6 |
+| `AGW/disclosure-ids/v1` | `15 4147572f646973636c6f737572652d6964732f7631` | Digest of the event ids of a grant / access | ADR-0029 §6 |
+| `AGW/recorder/v1` | `0f 4147572f7265636f726465722f7631` | On-chain recorder id (salted; §10) | ADR-0028 §2 |
 | `AGW/request/v1` | `0e 4147572f726571756573742f7631` | Idempotency request fingerprint | 08 §5 |
 | `AGW/apikey/v1` | `0d 4147572f6170696b65792f7631` | API key digest | 11 §3 |
 | `AGW/bundle/v1` | `0d 4147572f62756e646c652f7631` | Evidence bundle manifest digest | 10 §2 |
@@ -228,6 +241,11 @@ informational and are **not** in `R_t`.
 
 ## 8. Full verification of one event (summary; details in 10)
 
+> Phase 6 (ADR-0028): the contract stores `R_t` with `tree_size` and `last_seq`, not `R_{t−1}`.
+> Step 4's continuity check therefore uses the recomputed chain of roots (each `R_t` commits to
+> `R_{t−1}`) plus the contract's own contiguity and seq-tiling checks. The chain lookups in steps
+> 3–5 use `eth_call` at the finality block, under trust roots pinned by the auditor.
+
 1. Strict-decode the record. Recompute `event_hash`.
 2. Verify the inclusion proof against `M_t`, using `tree_size` and `leaf_index = seq − first_seq` from the header.
 3. Recompute `R_t` from the header. Compare it with the anchored root for `(tenant_key, epoch_no)` on-chain.
@@ -254,3 +272,12 @@ dir and fails on any diff. Changing a frozen vector requires an ADR.
 
 Both the gateway test suite and the verifier test suite consume these files. CI fails if
 either implementation disagrees with a single byte.
+
+## 10. Recorder id (Phase 6, ADR-0028)
+
+```
+recorderId = SHA-256( TAG("AGW/recorder/v1") || u16(len(utf8(tenant))) || utf8(tenant) || salt )
+```
+
+- **Salt.** `salt` is the 32-byte deployment salt (`AGW_ANCHOR_DEPLOYMENT_SALT`). It stops anyone from confirming a guessed tenant name against the chain. Auditors are given `recorderId`, never the salt.
+- **Frozen vector** (unit test `test_recorder_id_matches_spec_bytes`): tenant `acme`, salt `00 01 .. 1f` → `3559e18e6a0c528f27792b8d211ea73d69e6100322e15812ba44c1937be9d8f8`.

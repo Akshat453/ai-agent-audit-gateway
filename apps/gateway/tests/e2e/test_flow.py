@@ -65,7 +65,7 @@ def test_allow_path_ordering_and_result(gw) -> None:
             select(t.outbox_jobs).where(t.outbox_jobs.c.action_id == uuid.UUID(aid))
         ).one()
     assert (ticket.title, ticket.priority) == ("hello", "high")
-    assert (job.status, job.args, job.attempts) == ("DONE", None, 1)  # plaintext args cleared
+    assert (job.status, job.args_sealed, job.attempts) == ("DONE", None, 1)  # sealed args cleared
 
 
 def test_crash_after_tx1_commit_authorized_is_durable_and_adapter_not_called(gw) -> None:

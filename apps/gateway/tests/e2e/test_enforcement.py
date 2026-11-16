@@ -112,8 +112,9 @@ def test_denials_never_reach_adapter(gw, tool, args, env, token_attr, rule) -> N
 def test_delete_record_denied_despite_scope(gw) -> None:
     r = gw.post("delete_record", {"record_id": str(uuid.uuid4())})
     d = r.json()["decision"]
-    assert d["matched_rule_ids"] == ["deny-delete-record", "deny-critical"]
+    assert d["matched_rule_ids"] == ["deny-delete-record", "CAP-CRITICAL-DENY"]
     assert d["risk_level"] == "CRITICAL"
+    assert d["reasons"] == ["POLICY_RULE_DENY", "CRITICAL_DENIED"]
 
 
 def test_require_approval_leaves_pending(gw) -> None:
@@ -143,14 +144,29 @@ def test_policy_evaluated_record_contents(gw) -> None:
     body = row.body
     assert body["policy"] == {
         "id": "default",
-        "ver": 1,
+        "ver": 2,
         "effect": "ALLOW",
-        "rules": ["allow-medium-ticket"],
+        "rules": ["allow-medium"],
         "reasons": [],
         "controls": [],
-        "ev": "policy-v1",
+        "ev": "policy-v2",
     }
-    assert body["risk"] == {"level": "MEDIUM", "score": 20, "rules": [], "cv": "risk-v1"}
+    from agw_gateway.risk import load_risk_policy_toml
+    from agw_gateway.risk_store import default_risk_policy_text
+
+    risk_policy = load_risk_policy_toml(default_risk_policy_text())
+    risk = body["risk"]
+    assert {k: risk[k] for k in ("level", "score", "rules", "cv", "pid", "pver")} == {
+        "level": "MEDIUM",
+        "score": 20,
+        "rules": [],
+        "cv": "risk-v2",
+        "pid": "risk-default",
+        "pver": 1,
+    }
+    assert risk["pd"] == risk_policy.digest().hex()  # the policy digest is in the hashed header
+    assert {f["n"]: f["v"] for f in risk["f"]}["data_classification"] == "internal"
+    assert risk["reasons"] == ["SCORE_LEVEL:LOW", "BASE_RISK:MEDIUM"]
     assert body["class"] == "SYS" and body["v"] == 1
     # Phase 2: the JSONB body is a projection of the canonical bytes, which are authoritative.
     from agw_gateway.crypto.canonical import decode, to_json_projection

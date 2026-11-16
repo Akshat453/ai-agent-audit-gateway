@@ -140,13 +140,30 @@ Payload content (args, results) is omitted.
 
 ### 5.7 Later
 
-*(Phase 4)* `GET /v1/approvals?status=pending`, `POST /v1/approvals/{id}:grant|:deny`
-(human auth), `POST /v1/actions/{id}:reconcile`. *(Phase 3)* `GET /v1/events/{seq}/proof`.
+*(Phase 5, implemented, ADR-0027)* human auth `POST /v1/auth/login` / `POST /v1/auth/logout`
+(`Authorization: Session <token>`); `GET /v1/approvals?state=PENDING`,
+`GET /v1/approvals/{id}` (exact tool, args rendered safely, target, risk reasons,
+`action_digest`, `nonce`), `POST /v1/approvals/{id}/decision {decision, reason,
+action_digest, nonce}` (the echo must match), `GET /v1/approvals-signing-keys`;
+`GET /v1/actions/{id}?wait=N` long-poll. Agent keys on these endpoints → 403
+`AGENT_NOT_PERMITTED` + SECURITY_VIOLATION. *(Later)* `POST /v1/actions/{id}:reconcile`. *(Phase 3)* `GET /v1/events/{seq}/proof`.
 *(Phase 7)* `POST /v1/exports` (bundle). *(Phase 10)* MCP adapter front-end.
+*(Phase 6)* The `GET /v1/epochs/{n|latest}` and `GET /v1/events/{id}/proof` responses gain an optional, **untrusted** `anchor` claim: `{chain_id, contract, recorder_id, epoch_no, status, tx_hash, block_number}` (bundle schema updated). Verifiers compare it with their pins and never take trust roots from it. Operator CLI `python -m agw_worker.anchoring.admin` (`recorder-id`, `deploy`, `record-deployment`, `register`, `trust-config`). `agw-verify event|epochs --chain-rpc URL --trust-config pinned.json` (exit 5 = UNTRUSTED_ANCHOR).
 
 ## 6. Database contracts
 
 Exact Phase 1 tables: [14-phase-1-handoff.md §3](14-phase-1-handoff.md). Later additions:
-`epoch_heads`, `epochs`, `anchors` (Phase 3/6), `approvals`, `approval_uses` (Phase 4),
-`evidence_payloads`, `payload_keys` (Phase 5). Evidence tables (`evidence_events`, `policies`,
+`epoch_heads`, `epochs` (Phase 3), `anchors` and `anchor_recorders` (Phase 6, migration 0006, ADR-0028 §4), `humans`, `human_sessions`, `approvals`,
+`approval_decisions`, `approval_uses`, `approval_signing_keys` (Phase 5, migration 0005),
+`evidence_payloads` (Phase 2 ledger; plaintext `content` dropped by migration 0008),
+`payload_objects`, `payload_keys`, `tenant_redaction_keys`, `auditor_keys`,
+`disclosure_grants`, `retention_policies`, `legal_holds` (Phase 7, migration 0007; ADR-0029).
+*(Phase 7 endpoints)*
+- `POST /v1/auditor-keys`
+- `POST /v1/disclosures`
+- `POST /v1/disclosures/{id}/revoke`
+- `POST /v1/disclosures/{id}/export`
+- `GET /v1/auth/me`
+
+All human sessions only; an agent key gets 403 AGENT_NOT_PERMITTED. Evidence tables (`evidence_events`, `policies`,
 `evidence_payloads`) are append-only (08 §2).

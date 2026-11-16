@@ -5,6 +5,10 @@ description = "Standalone AGW evidence verifier. Stdlib only; must not import ap
 requires-python = ">=3.12"
 dependencies = []
 
+[project.optional-dependencies]
+# Phase 7: open disclosure bundles (HPKE X25519 + AES-256-GCM). The core verifier stays stdlib-only.
+disclosure = ["cryptography>=46"]
+
 [project.scripts]
 agw-verify = "agw_verifier.cli:main"
 

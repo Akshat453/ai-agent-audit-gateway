@@ -15,3 +15,4 @@ class AuthenticatedAgent:
     name: str
     scopes: frozenset[str]
     active: bool = True
+    trust_tier: str | None = None  # trusted | standard | untrusted; None = missing (worst)

@@ -43,7 +43,7 @@ def test_app_role_lacks_privilege(app_engine: Engine, seeded: None, table: str, 
     assert state == "42501"  # insufficient_privilege
 
 
-@pytest.mark.parametrize("table", APPEND_ONLY)
+@pytest.mark.parametrize("table", ["evidence_events", "policies"])
 @pytest.mark.parametrize("op", ["update", "delete", "truncate"])
 def test_trigger_blocks_privileged_role(
     migrator_engine: Engine, seeded: None, table: str, op: str
@@ -79,3 +79,13 @@ def test_app_role_least_privilege(app_engine: Engine, sql: str) -> None:
 def test_app_role_can_append(app_engine: Engine, seeded: None) -> None:
     with app_engine.connect() as conn:
         assert conn.execute(text("SELECT count(*) FROM evidence_events")).scalar_one() > 0
+
+
+@pytest.mark.parametrize("op", ["update", "truncate"])
+def test_payload_ciphertext_is_never_updated(
+    migrator_engine: Engine, seeded: None, op: str
+) -> None:
+    """Phase 7: payload_objects rows are never rewritten (rotation re-wraps the DEK in
+    payload_keys); only the retention/erasure path DELETEs them, writing PAYLOAD_DELETED."""
+    state, msg = _sqlstate(migrator_engine, _sql(op, "payload_objects"))
+    assert state == "P0001" and "is append-only" in msg

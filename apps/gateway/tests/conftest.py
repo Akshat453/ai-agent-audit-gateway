@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import secrets
+import tempfile
 import threading
 import uuid
 from collections.abc import Callable, Iterator
@@ -24,7 +25,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Engine, func, select
 
 from agw_gateway.admin import create_key, ensure_agent, ensure_tenant
@@ -33,8 +34,14 @@ from agw_gateway.api.state import GatewayState
 from agw_gateway.config import load_settings
 from agw_gateway.db import create_db_engine
 from agw_gateway.db import tables as t
+from agw_gateway.privacy.classification import FieldClasses
 from agw_gateway.tools.adapters.create_ticket import CreateTicketAdapter
 from agw_gateway.tools.adapters.delete_record import DeleteRecordAdapter
+from agw_gateway.tools.adapters.phase4_mocks import (
+    ExportCustomerDataAdapter,
+    SendEmailAdapter,
+    UpdateIamRoleAdapter,
+)
 from agw_gateway.tools.adapters.public_doc_search import PublicDocSearchAdapter
 from agw_gateway.tools.demo import demo_tool_specs
 from agw_gateway.tools.metadata import ToolMetadata
@@ -156,6 +163,20 @@ class EchoArgs(BaseModel):
     text: str
 
 
+class SecretToolArgs(BaseModel):
+    """Phase 7: one field of every class (secret = a credential the tool needs)."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+    endpoint: str
+    api_token: str
+    note: str = ""
+
+
+class BigDocArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+    text: str = Field(max_length=200_000)
+
+
 # Test-only tools (unique ids; never in production registries).
 RESTRICTED_UPDATE = ToolMetadata(
     tool_id="test_restricted_update",
@@ -167,6 +188,9 @@ RESTRICTED_UPDATE = ToolMetadata(
     required_scope="tools:test_restricted_update",
     is_idempotent=False,
     external_effect=False,
+    data_classification="confidential",
+    reversible=True,
+    medium_effect="REQUIRE_APPROVAL",
 )
 # LOW read (allowed by the default policy) but declared non-idempotent, to exercise ADR-0011.
 ECHO_NONIDEMPOTENT = ToolMetadata(
@@ -179,6 +203,42 @@ ECHO_NONIDEMPOTENT = ToolMetadata(
     required_scope="tools:test_echo",
     is_idempotent=False,
     external_effect=False,
+    data_classification="public",
+    reversible=True,
+    medium_effect="ALLOW",
+)
+
+SECRET_TOOL = ToolMetadata(
+    tool_id="test_secret_tool",
+    version="1.0.0",
+    operation_type="read",
+    sensitivity="public",
+    base_risk="LOW",
+    environments_allowed=frozenset({"dev"}),
+    required_scope="tools:test_secret_tool",
+    is_idempotent=True,
+    external_effect=False,
+    data_classification="public",
+    reversible=True,
+    medium_effect="ALLOW",
+)
+SECRET_TOOL_CLASSES = FieldClasses(
+    args={"endpoint": "internal", "api_token": "secret", "note": "confidential"},
+    results={"status": "public", "session_token": "secret", "detail": "confidential"},
+)
+BIGDOC = ToolMetadata(
+    tool_id="test_bigdoc",
+    version="1.0.0",
+    operation_type="read",
+    sensitivity="public",
+    base_risk="LOW",
+    environments_allowed=frozenset({"dev"}),
+    required_scope="tools:test_bigdoc",
+    is_idempotent=True,
+    external_effect=False,
+    data_classification="public",
+    reversible=True,
+    medium_effect="ALLOW",
 )
 
 ALL_SCOPES = (
@@ -187,6 +247,11 @@ ALL_SCOPES = (
     "tools:delete_record",
     "tools:test_restricted_update",
     "tools:test_echo",
+    "tools:send_email",
+    "tools:export_customer_data",
+    "tools:update_iam_role",
+    "tools:test_secret_tool",
+    "tools:test_bigdoc",
 )
 
 
@@ -197,9 +262,25 @@ class Spies:
     delete: SpyAdapter
     restricted: SpyAdapter
     echo: SpyAdapter
+    email: SpyAdapter
+    export: SpyAdapter
+    iam: SpyAdapter
+    secret: SpyAdapter
+    bigdoc: SpyAdapter
 
     def all(self) -> list[SpyAdapter]:
-        return [self.search, self.ticket, self.delete, self.restricted, self.echo]
+        return [
+            self.secret,
+            self.bigdoc,
+            self.search,
+            self.ticket,
+            self.delete,
+            self.restricted,
+            self.echo,
+            self.email,
+            self.export,
+            self.iam,
+        ]
 
     def total_calls(self) -> int:
         return sum(len(s.calls) for s in self.all())
@@ -210,6 +291,21 @@ def _echo(args: BaseModel, ctx: ExecutionContext) -> ToolResult:
     return ToolResult(public={"echo": args.text})
 
 
+SECRET_RECEIVED: list[str] = []  # what the adapter really got (the tool needs the real token)
+
+
+def _secret_tool(args: BaseModel, ctx: ExecutionContext) -> ToolResult:
+    assert isinstance(args, SecretToolArgs)
+    SECRET_RECEIVED.append(args.api_token)
+    return ToolResult(
+        public={
+            "status": "ok",
+            "session_token": "sess-" + args.api_token,  # a secret RESULT
+            "detail": "confidential detail for " + args.note,
+        }
+    )
+
+
 def make_spies() -> Spies:
     return Spies(
         search=SpyAdapter(PublicDocSearchAdapter()),
@@ -217,13 +313,50 @@ def make_spies() -> Spies:
         delete=SpyAdapter(DeleteRecordAdapter()),
         restricted=SpyAdapter(name="tests.RestrictedAdapter", behavior=lambda a, c: ToolResult()),
         echo=SpyAdapter(name="tests.EchoAdapter", behavior=_echo),
+        email=SpyAdapter(SendEmailAdapter()),
+        export=SpyAdapter(ExportCustomerDataAdapter()),
+        iam=SpyAdapter(UpdateIamRoleAdapter()),
+        secret=SpyAdapter(name="tests.SecretToolAdapter", behavior=_secret_tool),
+        bigdoc=SpyAdapter(
+            name="tests.BigDocAdapter", behavior=lambda a, c: ToolResult(public={"ok": True})
+        ),
     )
 
 
 def make_registry(spies: Spies) -> ToolRegistry:
-    specs = demo_tool_specs(search=spies.search, ticket=spies.ticket, delete=spies.delete)
-    specs.append(ToolSpec(RESTRICTED_UPDATE, RestrictedArgs, spies.restricted))
-    specs.append(ToolSpec(ECHO_NONIDEMPOTENT, EchoArgs, spies.echo))
+    specs = demo_tool_specs(
+        search=spies.search,
+        ticket=spies.ticket,
+        delete=spies.delete,
+        email=spies.email,
+        export=spies.export,
+        iam=spies.iam,
+    )
+    specs.append(
+        ToolSpec(
+            RESTRICTED_UPDATE,
+            RestrictedArgs,
+            spies.restricted,
+            FieldClasses(args={"name": "internal"}),
+        )
+    )
+    specs.append(
+        ToolSpec(
+            ECHO_NONIDEMPOTENT,
+            EchoArgs,
+            spies.echo,
+            FieldClasses(args={"text": "internal"}, results={"echo": "internal"}),
+        )
+    )
+    specs.append(ToolSpec(SECRET_TOOL, SecretToolArgs, spies.secret, SECRET_TOOL_CLASSES))
+    specs.append(
+        ToolSpec(
+            BIGDOC,
+            BigDocArgs,
+            spies.bigdoc,
+            FieldClasses(args={"text": "internal"}, results={"ok": "public"}),
+        )
+    )
     return ToolRegistry(specs)
 
 
@@ -340,8 +473,39 @@ class Gw:
             )
 
 
+_SIGNING_KEY: list[Path] = []
+
+
+def signing_key_file() -> Path:
+    """One dev Ed25519 decision-signing key for the whole test session."""
+    if not _SIGNING_KEY:
+        from agw_gateway.approvals.signing import generate_key_file
+
+        path = Path(tempfile.mkdtemp(prefix="agw-test-")) / "approval-signing.key"
+        generate_key_file(path)
+        _SIGNING_KEY.append(path)
+    return _SIGNING_KEY[0]
+
+
+_KEK_DIR: list[Path] = []
+
+
+def kek_dir() -> Path:
+    """One dev KEK keyring (version 1) for the whole test session, outside the repo, 0600."""
+    if not _KEK_DIR:
+        from agw_gateway.keys import LocalKeyProvider
+
+        path = Path(tempfile.mkdtemp(prefix="agw-kek-"))
+        LocalKeyProvider.generate(path, "test")
+        _KEK_DIR.append(path)
+    return _KEK_DIR[0]
+
+
 def make_settings(app_url: str, tmp_path: Path, **overrides: Any) -> Any:
     values: dict[str, Any] = {
+        "approval_signing_key_file": signing_key_file(),
+        "kek_dir": kek_dir(),
+        "kek_id": "test",
         "env": "test",
         "database_url": app_url,
         "executor_mode": "worker",
@@ -349,6 +513,9 @@ def make_settings(app_url: str, tmp_path: Path, **overrides: Any) -> Any:
         "demo_sandbox_dir": tmp_path,
         "lease_seconds": 30,
         "adapter_timeout_seconds": 5,
+        # Production default is "*" (every CRITICAL action is pre-anchored, ADR-0028); tests
+        # of other phases run without a chain, so they opt out. Phase 6 tests opt back in.
+        "pre_anchor_rules": (),
     }
     values.update(overrides)
     return load_settings(**values)
@@ -361,9 +528,100 @@ def gw(pg: PgUrls, app_engine: Engine, world: World, tmp_path: Path) -> Iterator
         spy.tenant = world.tenant_id
     registry = make_registry(spies)
     state = build_state(make_settings(pg.app, tmp_path), engine=app_engine, registry=registry)
-    registry.sync(app_engine)
+    state.sync()  # tool registry + bundled risk policy
     app = create_app(state, sync_registry=False)
     with TestClient(app) as client:
         g = Gw(state=state, client=client, spies=spies, world=world, engine=app_engine)
         yield g
         g.drain()  # leave no PENDING jobs behind for later tests
+
+
+# --------------------------------------------------------------------------- chain (Phase 6)
+@pytest.fixture(scope="session")
+def chain() -> Iterator[Any]:
+    """A real Anvil node (pinned Foundry image) with EpochAnchor deployed from the committed
+    artifact. Started only by tests that use it."""
+    from .anchorkit import deploy_registry, start_anvil
+
+    container, rpc = start_anvil()
+    try:
+        yield deploy_registry(rpc, container)
+    finally:
+        container.stop()
+
+
+# --------------------------------------------------------------------------- Phase 7 services
+MINIO_IMAGE = "cgr.dev/chainguard/minio@sha256:18c8fa28697b25e0f34c6faae171079e88a03efb8e76a21d3b5d07b4e3cbef3e"
+VAULT_IMAGE = "hashicorp/vault:1.20.4"
+
+
+@dataclass
+class ServiceUrl:
+    endpoint: str  # host:port (MinIO) or http URL (Vault)
+    user: str
+    secret: str
+    container: Any
+
+
+@pytest.fixture(scope="session")
+def minio() -> Iterator[ServiceUrl]:
+    """A real MinIO (S3 API), pinned by digest. Started only by tests that use it."""
+    import time
+
+    from minio import Minio
+    from testcontainers.core.container import DockerContainer
+
+    user, pw = "agw-" + secrets.token_hex(4), secrets.token_urlsafe(24)
+    c = (
+        DockerContainer(MINIO_IMAGE)
+        .with_env("MINIO_ROOT_USER", user)
+        .with_env("MINIO_ROOT_PASSWORD", pw)
+        .with_command("server /data")
+        .with_exposed_ports(9000)
+    )
+    c.start()
+    endpoint = f"{c.get_container_host_ip()}:{c.get_exposed_port(9000)}"
+    for _ in range(100):
+        try:
+            Minio(endpoint, access_key=user, secret_key=pw, secure=False).list_buckets()
+            break
+        except Exception:
+            time.sleep(0.3)
+    try:
+        yield ServiceUrl(endpoint, user, pw, c)
+    finally:
+        c.stop()
+
+
+@pytest.fixture(scope="session")
+def vault() -> Iterator[ServiceUrl]:
+    """Vault dev server with the transit engine and an aes256-gcm96 key ``agw-kek``."""
+    import time
+
+    import httpx
+    from testcontainers.core.container import DockerContainer
+
+    token = secrets.token_urlsafe(24)
+    c = (
+        DockerContainer(VAULT_IMAGE)
+        .with_env("VAULT_DEV_ROOT_TOKEN_ID", token)
+        .with_env("VAULT_DEV_LISTEN_ADDRESS", "0.0.0.0:8200")
+        .with_kwargs(cap_add=["IPC_LOCK"])
+        .with_exposed_ports(8200)
+    )
+    c.start()
+    url = f"http://{c.get_container_host_ip()}:{c.get_exposed_port(8200)}"
+    h = {"X-Vault-Token": token}
+    for _ in range(100):
+        try:
+            if httpx.get(f"{url}/v1/sys/health", timeout=2).status_code == 200:
+                break
+        except httpx.HTTPError:
+            pass
+        time.sleep(0.3)
+    httpx.post(f"{url}/v1/sys/mounts/transit", json={"type": "transit"}, headers=h)
+    httpx.post(f"{url}/v1/transit/keys/agw-kek", json={"type": "aes256-gcm96"}, headers=h)
+    try:
+        yield ServiceUrl(url, "root", token, c)
+    finally:
+        c.stop()

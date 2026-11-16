@@ -1,0 +1,145 @@
+# Default risk policy (ADR-0026). Loaded into Pydantic, stored immutably as canonical CBOR in
+# `risk_policies`, and referenced by digest from every POLICY_EVALUATED event.
+#
+# Every weight, point and threshold below is a HYPOTHESIS chosen by hand for the demo tools
+# and the labeled dataset in experiments/risk/. None of it is empirically validated.
+# Integers only (the canonical profile has no floats). Points must not decrease along each
+# factor's risk order; the last value/bucket is what a missing factor is scored as.
+# Any change to this file needs a new `version`.
+
+policy_id = "risk-default"
+version = 1
+description = "Paper A risk-based evidence selection: factors, thresholds, mandatory rules"
+unknown_tool_level = "HIGH"
+internal_domains = ["corp.example", "internal.example"]
+
+[thresholds]          # minimum score for the level; LOW is below MEDIUM
+MEDIUM = 25
+HIGH = 45
+CRITICAL = 75
+
+[factors.tool_sensitivity]
+weight = 5
+values = { public = 0, internal = 1, confidential = 2, restricted = 3 }
+
+[factors.operation]
+weight = 5
+values = { read = 0, create = 1, update = 2, delete = 3, execute = 4 }
+
+[factors.environment]
+weight = 5
+values = { dev = 0, staging = 1, prod = 2 }
+
+[factors.data_classification]
+weight = 5
+values = { public = 0, internal = 1, confidential = 2, secret = 4, pii = 4 }
+
+[factors.reversibility]
+weight = 5
+values = { reversible = 0, irreversible = 2 }
+
+[factors.external_destination]
+weight = 5
+values = { internal = 0, external = 3 }
+
+[factors.agent_trust_tier]
+weight = 5
+values = { trusted = 0, standard = 1, untrusted = 3 }
+
+[factors.volume]       # records / recipients affected (blast radius)
+weight = 5
+buckets = [
+  { label = "single", up_to = 1, points = 0 },
+  { label = "few", up_to = 10, points = 1 },
+  { label = "many", up_to = 100, points = 2 },
+  { label = "bulk", up_to = 1000, points = 3 },
+  { label = "mass", points = 5 },
+]
+
+[factors.delegation_depth]   # agent-declared; can only raise risk
+weight = 5
+buckets = [
+  { label = "direct", up_to = 0, points = 0 },
+  { label = "one_hop", up_to = 1, points = 1 },
+  { label = "two_hops", up_to = 2, points = 2 },
+  { label = "deep", points = 4 },
+]
+
+# Mandatory rules are evaluated before the score is used. They can only make things stricter.
+[[mandatory_rules]]
+rule_id = "MR-NO-SCOPE"
+description = "caller lacks the tool's required scope"
+when = { scope_present = false }
+effect = "DENY"
+floor = "HIGH"
+control_ids = ["AGW-CTRL-01"]
+
+[[mandatory_rules]]
+rule_id = "MR-DELETE-PROD"
+description = "delete in production"
+when = { operation = ["delete"], environment = ["prod"] }
+floor = "CRITICAL"
+control_ids = ["AGW-CTRL-02"]
+
+[[mandatory_rules]]
+rule_id = "MR-PRIVILEGE"
+description = "privilege change or credential access"
+when = { tags_any = ["privilege_change", "credential_access"] }
+floor = "CRITICAL"
+control_ids = ["AGW-CTRL-03"]
+
+[[mandatory_rules]]
+rule_id = "MR-RESTRICTED-WRITE"
+description = "state change on a restricted system"
+when = { tool_sensitivity = ["restricted"], operation = ["create", "update", "delete", "execute"] }
+floor = "HIGH"
+control_ids = ["AGW-CTRL-04"]
+
+[[mandatory_rules]]
+rule_id = "MR-EXTERNAL-TRANSFER"
+description = "confidential, secret or personal data leaving the organization"
+when = { external_destination = true, data_classification = ["confidential", "secret", "pii"] }
+effect = "REQUIRE_APPROVAL"
+floor = "HIGH"
+control_ids = ["AGW-CTRL-05", "HITL-APPROVAL"]
+
+[[mandatory_rules]]
+rule_id = "MR-PII-EXTERNAL-BULK"
+description = "bulk personal data to an external destination"
+when = { external_destination = true, data_classification = ["pii"], min_volume = 1000 }
+effect = "DENY"
+floor = "CRITICAL"
+control_ids = ["AGW-CTRL-06"]
+
+[[mandatory_rules]]
+rule_id = "MR-MISSING-META"
+description = "risk metadata missing or unknown: treated as worst value and at least HIGH"
+when = { missing_any = ["tool_sensitivity", "operation", "environment", "data_classification", "reversibility", "external_destination", "agent_trust_tier", "volume", "delegation_depth", "base_risk"] }
+floor = "HIGH"
+control_ids = ["AGW-CTRL-07"]
+
+[[mandatory_rules]]
+rule_id = "MR-DEEP-DELEGATION"
+description = "call delegated through three or more agents"
+when = { min_delegation_depth = 3 }
+effect = "REQUIRE_APPROVAL"
+floor = "HIGH"
+control_ids = ["AGW-CTRL-08", "HITL-APPROVAL"]
+
+[[mandatory_rules]]
+rule_id = "MR-UNTRUSTED-WRITE"
+description = "untrusted agent changing state"
+when = { agent_trust_tier = ["untrusted"], operation = ["create", "update", "delete", "execute"] }
+floor = "HIGH"
+control_ids = ["AGW-CTRL-09"]
+
+# Added after the first labeled-dataset run (experiments/risk/results/phase4-initial-untuned.txt):
+# the score alone let an untrusted agent export PII (L50) or change IAM roles under an
+# exception rule (L61) with only an approval. A missing tier counts as untrusted.
+[[mandatory_rules]]
+rule_id = "MR-UNTRUSTED-SENSITIVE"
+description = "untrusted agent touching secret or personal data"
+when = { agent_trust_tier = ["untrusted"], data_classification = ["secret", "pii"] }
+effect = "DENY"
+floor = "CRITICAL"
+control_ids = ["AGW-CTRL-10"]

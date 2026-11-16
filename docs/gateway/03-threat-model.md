@@ -49,7 +49,7 @@ Status: Accepted (Phase 0). Sources: Paper A §2, §3 (*Authenticity and authori
 | T4 | Malformed / injected args | ADV1 | Pydantic models with `extra="forbid"` and strict types. Failure → DENY, recorded, never executed. | 04 §3 | Phase 1 tests |
 | T5 | LLM-manipulable authorization | ADV1 | No LLM in allow/deny. Policy is pure deterministic code. | ADR-0002 | Code review + import-linter (no LLM SDK in `policies`/`risk`) |
 | T6 | Duplicate execution via retries or races | ADV1 | Idempotency key unique per agent. Same body → replay. Different body → 409. 20 concurrent → 1 action. | 08 §5 | Phase 1 test |
-| T7 | Approval replay / approve one thing, execute another (Paper A §2) | ADV1 | Approval binds agent, tool+version, args digest, target, policy version, expiry, single-use nonce. Any change → new evaluation. | ADR-0010 | Phase 4 tests |
+| T7 | Approval replay / approve one thing, execute another (Paper A §2) | ADV1 | Approval binds the action digest (agent, tool+version, args digest, target, env, policy version + digest, risk, delegation); single-use nonce; expiry by DB time; digest + nonce echo; revalidation in one tx. Any change → new action + new approval. | ADR-0010, ADR-0027 | Phase 5 attack suite A1–A13 (`test_approval_attacks.py`) |
 | T8 | Side effect without durable record | ADV4 (crash) | ACTION_AUTHORIZED + outbox in one tx. DISPATCHED committed before the adapter call. | ADR-0004 | Phase 1 crash-hook test |
 | T9 | Double side effect after ambiguous crash | ADV6 / crash | No auto-retry for non-idempotent tools → OUTCOME_UNKNOWN → reconciliation | ADR-0011 | Phase 1 test |
 | T10 | Edit / delete evidence rows | ADV3 | (a) REVOKE UPDATE/DELETE/TRUNCATE from `agw_app`. (b) Trigger raising on UPDATE/DELETE + statement trigger on TRUNCATE. (c) Phase 2+: hash chain. (d) Phase 3+: Merkle. (e) Phase 6+: anchor. | 08 §2, 06 | Phase 1 DB tests. Phase 8 tamper experiments. |
@@ -60,13 +60,13 @@ Status: Accepted (Phase 0). Sources: Paper A §2, §3 (*Authenticity and authori
 | T15 | Merkle ambiguity (odd leaf count) | ADV3 | RFC 9162 tree, no duplication. `tree_size` bound in `R_t`. | ADR-0007 | Phase 3 vectors |
 | T16 | Cross-type hash confusion (event vs node vs payload) | ADV3 | Length-prefixed domain tags. RFC 9162 0x00/0x01 prefixes. | ADR-0006 | Phase 2/3 tests |
 | T17 | Cross-tenant splicing (reuse an event/epoch of tenant X for Y) | ADV3 | Tenant id inside event record, epoch root and on-chain tenant key | 06 | Phase 8 |
-| T18 | Guess payload content from its digest | anyone with records | 32-byte random salt in every payload | ADR-0013 | Phase 5 test |
-| T19 | Payload ciphertext swap between events | ADV3 | AAD binds tenant, event_id, payload_digest. Decrypted plaintext must hash to the committed digest. | 07 §3 | Phase 5 test |
+| T18 | Guess payload content from its digest | anyone with records | 32-byte random salt in every payload | ADR-0013 | Phase 7: salted payloads + DB-only-attacker dump test (`test_db_only_attacker_cannot_read_payloads`). Residual: the header args digest is unsalted (ADR-0029 Consequences) |
+| T19 | Payload ciphertext swap between events | ADV3 | AAD binds tenant, event_id, seq, payload_digest, schema version; the DEK wrap binds the event. Decrypted plaintext must hash to the committed digest. | 07 §3, ADR-0029 | Phase 7: `test_ciphertext_swap_between_events_fails`, `test_grant_for_x_cannot_open_y_in_the_same_epoch` |
 | T20 | Anchor forgery by others / spam | anyone on-chain | Contract: only the registered submitter per tenant key can anchor | 09 §7 | Phase 6 forge tests |
 | T21 | Strategic anchoring delay (Paper B §VIII-A(6)) | ADV5 | `max_age` seal trigger. CRITICAL dispatch blocked without anchor. Monitoring stream alerts on overdue epochs. | 09 | Phase 8 |
 | T22 | Reorg removes an anchor after "inclusion" | ADV7 | Separate included/finalized states. Re-submit on reorg. CRITICAL gate waits for configured finality. | 09 §6 | Phase 6 Anvil reorg test |
 | T23 | DB unavailable → bypass | infra | Fail closed: 503, nothing executes, since the executor needs the DB to claim jobs | 08 §6 | Phase 1 test |
-| T24 | Secrets or args leak via errors/logs | ADV1/2 | Uniform error model. Args never echoed. Structured logs with an allow-list of fields. | 11 §2 | Phase 1 test (log capture) |
+| T24 | Secrets or args leak via errors/logs | ADV1/2 | Uniform error model. Args never echoed. Structured logs with an allow-list of fields. Phase 7: secret fields redacted everywhere, unvalidated args not stored. | 11 §2, ADR-0029 | Phase 7 canary test across logs/metrics/errors/headers (`test_canary_never_leaks`) |
 | T25 | Compromised runtime anchors a benign substitute (Paper A §3) | ADV4 | **Not prevented.** Partially mitigated: the gateway, not the agent, captures; identity is bound before hashing; DB roles are separated. Future: signed records, TEE attestation (Paper B §VIII-A(1)). | 13 | — |
 
 ## 5. Security invariants (numbered, referenced by tests)
@@ -80,8 +80,8 @@ Status: Accepted (Phase 0). Sources: Paper A §2, §3 (*Authenticity and authori
 - **INV-7** The authenticated agent identity is the only identity recorded for an action.
 - **INV-8** (Phase 2) For each tenant, `seq` is gap-free and `prev_event_hash(seq) = event_hash(seq-1)`.
 - **INV-9** (Phase 3) Every event with `seq < sealed_up_to` belongs to exactly one epoch, and epochs tile the seq range without overlap.
-- **INV-10** (Phase 6) A CRITICAL action is never dispatched unless the epoch containing its `ACTION_AUTHORIZED` has reached the configured finality.
-- **INV-11** (Phase 4) An approval authorizes at most one dispatch, and only for the exact bound tuple.
+- **INV-10** (Phase 6; implemented, ADR-0028 §5) A CRITICAL action is never dispatched unless the epoch containing its `ACTION_AUTHORIZED` has reached the configured finality. Tests: `test_critical_pre_anchor_released_only_after_finality`, `test_critical_pre_anchor_rpc_down_fails_closed` (adapter calls 0) and `test_gate_release_and_timeout_exactly_one_wins`.
+- **INV-11** (Phase 5, ADR-0027) An approval authorizes at most one dispatch, and only for the exact bound action digest.
 
 ## 6. Residual risks (accepted, documented)
 

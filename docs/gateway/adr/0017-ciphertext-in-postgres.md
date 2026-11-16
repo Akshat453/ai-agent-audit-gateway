@@ -1,5 +1,5 @@
 # ADR-0017: Store payload ciphertext in Postgres in the event's transaction; MinIO for large blobs and bundles
-Status: Accepted · Date: 2026-11-15 · Deciders: project owner (Phase 0)
+Status: Accepted, **superseded in part by [ADR-0029](0029-phase7-encryption-disclosure.md)** (threshold 64 KiB, ciphertext in `payload_objects`, deletable only via the evidenced erasure path) · Date: 2026-11-15 · Deciders: project owner (Phase 0)
 
 ## Context
 Writing the ciphertext to an object store and the event to Postgres is a dual write. A crash between them yields an event whose payload is missing, or orphaned ciphertext.

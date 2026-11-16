@@ -1,5 +1,5 @@
 # ADR-0009: CRITICAL pre-action anchoring gate
-Status: Accepted · Date: 2026-11-15 · Deciders: project owner (Phase 0)
+Status: Accepted; **implemented in Phase 6** ([ADR-0028](0028-phase6-blockchain-anchoring.md) §5: per-rule via `AGW_PRE_ANCHOR_RULES`, default every CRITICAL action) · Date: 2026-11-15 · Deciders: project owner (Phase 0)
 
 ## Context
 For the most dangerous actions we want a public commitment to the exact authorization *before* the side effect, so the operator can't rewrite it after an incident (Paper A §7 scenario; Paper B §II-D Scenario 1).

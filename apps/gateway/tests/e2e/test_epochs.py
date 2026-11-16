@@ -69,7 +69,7 @@ def seal_jobs(gw: Any) -> list[Any]:
 
 def exports(gw: Any) -> tuple[list[str], list[str]]:
     ev, ep = io.StringIO(), io.StringIO()
-    export_chain(gw.engine, gw.world.tenant_id, ev)
+    export_chain(gw.engine, gw.world.tenant_id, ev, store=gw.state.payloads)
     with gw.engine.connect() as conn:
         export_epochs(conn, gw.world.tenant_id, ep)
     return ev.getvalue().splitlines(), ep.getvalue().splitlines()
@@ -335,7 +335,9 @@ def test_epoch_and_proof_endpoints_and_bundle_verification(gw, migrator_engine) 
                 t.evidence_events.c.event_type == "ACTION_DISPATCHED",
             )
         ).scalar_one()
-        with_payload = build_bundle(conn, dispatched, tenant_id=None, include_payload=True)
+        with_payload = build_bundle(
+            conn, dispatched, tenant_id=None, include_payload=True, store=gw.state.payloads
+        )
     jsonschema.validate(with_payload, SCHEMA)
     assert verify_bundle(with_payload, trusted_root=root).result == "VERIFIED"
     bad = json.loads(json.dumps(with_payload))

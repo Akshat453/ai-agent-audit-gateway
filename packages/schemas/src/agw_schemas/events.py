@@ -7,7 +7,7 @@ sensitive content (args, params, results, error text) and are committed to by
 =====================  =============================================================
 intent                 ACTION_REQUESTED payload ``intent`` (validated or raw args, summary)
 policy evaluation      POLICY_EVALUATED header ``policy`` + ``risk``
-human approval         APPROVAL_* header ``approval`` (models only; populated later)
+human approval         APPROVAL_* + ACTION_AUTHORIZED header ``approval`` (Phase 5, ADR-0027)
 execution              ACTION_DISPATCHED payload ``execution.params``
 effects                ACTION_COMPLETED / FAILED / OUTCOME_UNKNOWN payload ``effects``
 context provenance     ACTION_REQUESTED payload ``context`` (sources + digests) + header ``env``
@@ -31,6 +31,7 @@ SCHEMA_VERSION: Final = 1
 UInt = Annotated[int, Field(ge=0, le=2**64 - 1)]
 Bytes16 = Annotated[bytes, Field(min_length=16, max_length=16)]
 Bytes32 = Annotated[bytes, Field(min_length=32, max_length=32)]
+Bytes64 = Annotated[bytes, Field(min_length=64, max_length=64)]
 Text = Annotated[str, Field(max_length=1024)]
 TenantId = Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9-]{0,62}$")]
 EventClass = Literal["A2S", "A2A", "A2H", "SYS"]
@@ -52,11 +53,28 @@ class ToolRef(_M):
     ver: Annotated[str, Field(max_length=32)] | None = None
 
 
+class RiskFactor(_M):
+    """One resolved risk factor (ADR-0026): name, vocabulary value/bucket, points, weight."""
+
+    n: Annotated[str, Field(max_length=64)]
+    v: Annotated[str, Field(max_length=64)]
+    p: UInt
+    w: UInt
+    miss: Literal[True] | None = None  # present only when the factor was missing/unknown
+
+
 class Risk(_M):
     level: RiskLevelName
     score: UInt
-    rules: list[Text]
-    cv: Text
+    rules: list[Text]  # matched mandatory risk rules
+    cv: Text  # engine version: "risk-v1" (Phases 1-3) | "risk-v2" (Phase 4+)
+    # risk-v2 only (ADR-0026); absent in risk-v1 records.
+    pid: Text | None = None  # risk policy id
+    pver: UInt | None = None  # risk policy version
+    pd: Bytes32 | None = None  # risk policy digest SHA-256(TAG("AGW/risk-policy/v1") || cbor)
+    f: Annotated[list[RiskFactor], Field(max_length=32)] | None = None
+    reasons: Annotated[list[Text], Field(max_length=64)] | None = None
+    forced: Literal["DENY", "REQUIRE_APPROVAL"] | None = None
 
 
 class PolicyEvaluation(_M):
@@ -69,19 +87,52 @@ class PolicyEvaluation(_M):
     ev: Text
 
 
-class Approval(_M):
-    """Human approval (Paper B field 3). Model only until the approval phase."""
+class ApprovalDecisionRef(_M):
+    """One signed approver decision referenced by ACTION_AUTHORIZED."""
 
-    id: Bytes16
-    binding: Bytes32
-    approver: Text
-    exp: UInt
+    approver: Text  # human id (from the authenticated session)
+    dd: Bytes32  # decision digest SHA-256(TAG("AGW/approval-decision/v1") || cbor(record))
+    sig: Bytes64  # Ed25519(gateway key, TAG("AGW/approval-sig/v1") || dd)
+    kid: Annotated[str, Field(max_length=32)]
+
+
+class Approval(_M):
+    """Human approval (Paper B field 3; Phase 5, ADR-0027).
+
+    APPROVAL_REQUIRED: id, binding, exp, req. APPROVAL_GRANTED / APPROVAL_DENIED: + approver,
+    dec, votes, dd, sig, kid (one approver's signed decision). APPROVAL_EXPIRED: + votes.
+    ACTION_AUTHORIZED: + decs (the decisions that authorized it).
+    """
+
+    id: Bytes16  # approval id
+    binding: Bytes32  # action digest SHA-256(TAG("AGW/action/v1") || cbor(binding))
+    exp: UInt  # expires_at, us since Unix epoch UTC (DB clock)
+    req: Annotated[int, Field(ge=1, le=2)] | None = None  # approvals required (2 = four-eyes)
+    votes: UInt | None = None  # distinct APPROVED decisions so far
+    approver: Text | None = None
+    dec: Literal["APPROVED", "REJECTED"] | None = None
+    dd: Bytes32 | None = None
+    sig: Bytes64 | None = None
+    kid: Annotated[str, Field(max_length=32)] | None = None
+    decs: Annotated[list[ApprovalDecisionRef], Field(min_length=1, max_length=2)] | None = None
+
+
+class AnchorRef(_M):
+    """CRITICAL pre-action anchoring (ADR-0009, ADR-0028): the on-chain anchor of the epoch
+    holding ACTION_AUTHORIZED, at the finality that released the dispatch. It proves the
+    authorization was committed publicly before the side effect, not that the result is right."""
+
+    epoch: UInt
+    block: UInt
+    tx: Bytes32 | None = None  # None when an existing on-chain anchor was adopted
+    fin: Annotated[str, Field(max_length=32)]  # finality level reached (09 §6)
 
 
 class Dispatch(_M):
     attempt: UInt
     worker: Text
     cg: Text | None = None  # concurrency group: actions claimed/dispatched together
+    anchor: AnchorRef | None = None  # Phase 6: set only for pre-anchored CRITICAL actions
 
 
 class Outcome(_M):
@@ -92,7 +143,7 @@ class Outcome(_M):
 class PayloadRef(_M):
     digest: Bytes32
     len: UInt
-    ref: Literal["inline"] = "inline"  # where the payload lives; "blob" arrives with MinIO
+    ref: Literal["inline", "blob"] = "inline"  # ciphertext in Postgres | MinIO object (Phase 7)
 
 
 class Code(_M):
@@ -116,8 +167,33 @@ class EpochRef(_M):
     reason: Literal["MAX_EVENTS", "MAX_AGE", "RISK_HIGH", "RISK_CRITICAL", "MANUAL"]
 
 
+class Disclosure(_M):
+    """Phase 7 (ADR-0029): a disclosure grant or an access under it. No purpose text and no
+    event list in the header (both are in the encrypted payload); only their commitments."""
+
+    grant: Bytes16
+    auditor: Bytes16  # human id of the auditor
+    key: Annotated[str, Field(pattern=r"^[0-9a-f]{32}$")]  # auditor X25519 key id
+    mode: Literal["hpke", "plaintext"]
+    scope: Literal["events", "action"]
+    exp: UInt | None = None  # grant expiry, µs
+    n: UInt | None = None  # number of events granted / exported
+    ids: Bytes32 | None = None  # H(TAG("AGW/disclosure-ids/v1") || cbor(sorted event ids))
+
+
+class Erasure(_M):
+    """Phase 7: PAYLOAD_DELETED. The target event's header, proof and digest stay valid."""
+
+    event: Bytes16
+    seq: UInt
+    reason: Literal["RETENTION", "ERASURE_REQUEST"]
+    policy: Annotated[str, Field(max_length=64)] | None = None
+
+
 class Violation(_M):
-    kind: Literal["AGENT_ID_MISMATCH"]
+    # AGENT_ON_HUMAN_ENDPOINT: an agent credential presented to a human-only endpoint
+    # (approvals); ``claimed`` then names the endpoint, never request content.
+    kind: Literal["AGENT_ID_MISMATCH", "AGENT_ON_HUMAN_ENDPOINT"]
     claimed: Annotated[str, Field(max_length=128)]
 
 
@@ -152,6 +228,8 @@ class EventHeader(_M):
     code: Code | None = None
     violation: Violation | None = None
     epoch: EpochRef | None = None  # EPOCH_SEALED only (ADR-0025)
+    disclosure: Disclosure | None = None  # DISCLOSURE_* only (Phase 7)
+    erasure: Erasure | None = None  # PAYLOAD_DELETED only (Phase 7)
     obs: UInt | None = None  # observed_at, µs: when the executor/reconciler observed it
 
     def model_post_init(self, _context: Any) -> None:
@@ -194,6 +272,9 @@ ActionOutcomeUnknown = _header(
 )
 SecurityViolation = _header("SECURITY_VIOLATION", "SYS", ("violation",))
 EpochSealed = _header("EPOCH_SEALED", "SYS", ("epoch",))
+DisclosureGranted = _header("DISCLOSURE_GRANTED", "A2H", ("disclosure", "payload"))
+DisclosureAccessed = _header("DISCLOSURE_ACCESSED", "A2H", ("disclosure", "outcome"))
+PayloadDeleted = _header("PAYLOAD_DELETED", "SYS", ("erasure",))
 
 HEADER_MODELS: Final[dict[str, type[EventHeader]]] = {
     m.TYPE: m
@@ -212,10 +293,13 @@ HEADER_MODELS: Final[dict[str, type[EventHeader]]] = {
         ActionOutcomeUnknown,
         SecurityViolation,
         EpochSealed,
+        DisclosureGranted,
+        DisclosureAccessed,
+        PayloadDeleted,
     )
 }
-# APPROVAL_GRANTED/DENIED/EXPIRED are models only until the approval phase.
-MODEL_ONLY_TYPES: Final = frozenset({"APPROVAL_GRANTED", "APPROVAL_DENIED", "APPROVAL_EXPIRED"})
+# Types that have a model but may not be written yet. Empty since Phase 5 (ADR-0027).
+MODEL_ONLY_TYPES: Final[frozenset[str]] = frozenset()
 
 
 def parse_header(record: dict[str, Any]) -> EventHeader:
@@ -242,8 +326,9 @@ class Payload(_M):
     execution: dict[str, Any] | None = None  # {"params": exact adapter input}
     effects: dict[str, Any] | None = None  # {"result": ...} | {"result_json": ...}, "error"
     context: dict[str, Any] | None = None  # {"sources": [{uri, digest}]}
-    approval: dict[str, Any] | None = None  # {"prompt", "comment"} (later)
+    approval: dict[str, Any] | None = None  # {"record": signed decision record, "comment"}
     delegation: dict[str, Any] | None = None  # {"from", "parent", "scope"} (later)
+    disclosure: dict[str, Any] | None = None  # {"purpose", "event_ids"} (Phase 7)
 
     def to_record(self, *, delegation_present: bool = False) -> dict[str, Any]:
         record = self.model_dump(mode="python", exclude_none=True)

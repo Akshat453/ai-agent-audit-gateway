@@ -1,6 +1,7 @@
 # 09 — Batching (Epochs) and Anchoring
 
-Status: Accepted (Phase 0). Sealing in Phase 3, anchoring in Phase 6. ADRs: 0008 (one chain
+Status: Accepted (Phase 0). Sealing in Phase 3, anchoring in Phase 6 (**implemented, ADR-0028**:
+the contract is `EpochAnchor.sol`, not the §7 sketch; see the notes in §2, §6, §7, §8). ADRs: 0008 (one chain
 per tenant; separate risk queues rejected), 0009 (CRITICAL pre-action anchoring), 0014
 (on-chain registry). Sources: Paper A §3 (Merkle aggregation), §4 (anchor time, ordering),
 §5 (routine batching vs immediate anchoring); Paper B §III-C (epochs), §IV-A (protocol,
@@ -19,8 +20,20 @@ seal point.
 ## 2. Seal triggers
 
 > Phase 3 (implemented): `max_events` (default 100) and `max_age` (default **300 s**, changed from
-> 60 s by ADR-0025) via `apps/worker` sealer; risk triggers come later. Membership is derived from
-> tiled ranges and proofs are computed on demand (ADR-0025).
+> 60 s by ADR-0025) via `apps/worker` sealer. Membership is derived from tiled ranges and proofs
+> are computed on demand (ADR-0025).
+>
+> Phase 4 (implemented, ADR-0026): per-level thresholds (LOW 100/300 s, MEDIUM 25/60 s) and the
+> risk trigger (HIGH/CRITICAL → seal up to and including the latest urgent event, reasons
+> RISK_HIGH / RISK_CRITICAL). The trigger is derived each tick from `evidence_events.risk_level`
+> (durable rows) instead of a SEAL job inserted in tx1 (that would deadlock against the sealer;
+> see ADR-0026 §4). CRITICAL is sealed immediately and flagged `anchor_priority = CRITICAL`; the
+> separate `[s, s]` epoch for a CRITICAL *authorization* below needs approvals (Phase 5) and
+> anchoring (Phase 6).
+>
+> Phase 6 (implemented, ADR-0028 §5): the `[s, s]` epoch is built for every gated CRITICAL
+> authorization. It is derived from `outbox_jobs(status=WAITING_ANCHOR, gate_seq=s)`, not from a
+> SEAL job, so it avoids the deadlock that ADR-0026 §4 describes. Both epochs get `RISK_CRITICAL`.
 
 The sealer seals pending events (seq > `sealed_up_to`) when **any** trigger fires:
 
@@ -105,6 +118,12 @@ ACTION_DISPATCHED / ACTION_COMPLETED records.
 
 ## 6. Anchor states
 
+> Phase 6 (implemented, ADR-0028 §4):
+> - **Where rows come from.** The worker derives `anchors` rows from `epochs`; the seal tx does not insert them.
+> - **Write-ahead.** The signed raw tx is stored before it is broadcast, so a retry re-sends identical bytes.
+> - **Adopting chain state.** "Already anchored with the same root" is adopted from chain state, not inferred from a revert.
+> - **Different root on-chain.** The row becomes FAILED and the recorder is halted.
+
 ```
 PENDING ──submit──▶ SUBMITTED ──receipt in block──▶ INCLUDED ──finality reached──▶ FINALIZED
    ▲                    │  ▲                            │
@@ -136,6 +155,13 @@ is re-submitted with the same `(epochNo, root, prevRoot)`. An "already anchored 
 root" revert counts as success.
 
 ## 7. On-chain registry (Phase 6; Solidity + Foundry)
+
+> **Superseded by [ADR-0028](adr/0028-phase6-blockchain-anchoring.md) §1–§2 as implemented.** The contract is `contracts/src/EpochAnchor.sol` (solc 0.8.28):
+> - **Key:** `recorderId` (salted, 06 §10) instead of `tenantKey`.
+> - **Stored per epoch:** `Anchor{root, treeSize, lastSeq, timestamp, blockNumber}` instead of `prevRoot`. Continuity comes from `epochNo == nextEpoch` plus seq tiling on-chain, and from root recomputation in the verifier.
+> - **Not built:** `anchorBatch`.
+>
+> The sketch below is kept for history.
 
 ```solidity
 // SPDX-License-Identifier: Apache-2.0
@@ -180,6 +206,15 @@ Equivocation through a *different* contract or key remains possible. Verifiers M
 contract address, chain id and tenant key from a signed operator manifest (Paper B §III-D).
 
 ## 8. Cost expectations (to be measured, not assumed)
+
+> **Phase 6 measurement** (Anvil, 40 mined anchors, `experiments/anchoring/results/gas-anvil-31337.md`):
+>
+> | Anchor | Gas |
+> |---|---|
+> | First anchor of a recorder | 96,171 |
+> | Later anchors | median 81,569 |
+>
+> Base Sepolia (L1 data fee, time to `safe`/`finalized`) is pending a funded key; see `docs/gateway/phases/phase-06-blockchain-anchoring.md`.
 
 Paper B §VI-D measured a mean 91,800 gas per `anchor()` on Base Sepolia (100 txs) for a
 contract that stores root + back-pointer. Ours adds a submitter check and a contiguity check, so

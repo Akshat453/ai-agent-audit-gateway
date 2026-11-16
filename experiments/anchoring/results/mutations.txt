@@ -1,0 +1,25 @@
+uv sync --frozen
+Audited 96 packages in 0.26ms
+uv run python experiments/anchoring/mutation_check.py
+CAUGHT   write-ahead before broadcast                     test_kill_rpc_mid_submit_restart_same_root_single_anchor
+CAUGHT   same-root re-broadcast after drop                test_kill_rpc_mid_submit_restart_crash_before_broadcast
+CAUGHT   reorg detection                                  test_reorg_resubmits_same_root
+CAUGHT   equivocation halt                                test_different_root_on_chain_halts_recorder
+CAUGHT   epoch header self-check                          test_epoch_row_edited_before_anchoring_halts
+CAUGHT   strict epoch order                               test_strict_epoch_order_when_predecessor_not_ready
+CAUGHT   finality before FINALIZED                        test_seal_anchor_finalize_verify
+CAUGHT   gate on CRITICAL authorization                   test_critical_pre_anchor_released_only_after_finality
+CAUGHT   release only when FINALIZED                      test_critical_pre_anchor_released_only_after_finality
+CAUGHT   release only before deadline                     test_gate_release_and_timeout_exactly_one_wins
+CAUGHT   timeout fails closed                             test_critical_pre_anchor_rpc_down_fails_closed
+CAUGHT   own epoch for ACTION_AUTHORIZED                  test_critical_pre_anchor_released_only_after_finality
+CAUGHT   anchored root comparison                         test_edit_db_epoch_root_after_anchoring
+CAUGHT   epochs missing vs chain                          test_delete_db_tail_detected_vs_chain
+CAUGHT   bundle claims vs pinned                          test_wrong_contract_in_bundle_untrusted
+CAUGHT   RPC chain id pinned                              test_wrong_contract_in_bundle_untrusted
+CAUGHT   finality block for checks                        test_seal_anchor_finalize_verify
+CAUGHT   contract: submitter only                         forge test
+CAUGHT   contract: next epoch only (no overwrite/gap/replay) forge test
+CAUGHT   contract: seq tiling                             forge test
+CAUGHT   contract: owner-only registration                forge test
+21/21 mutations caught

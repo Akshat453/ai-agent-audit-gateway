@@ -1,5 +1,5 @@
 # ADR-0012: AES-256-GCM with random per-event DEK wrapped by a KEK (reject Paper B's HKDF hierarchy)
-Status: Accepted · Date: 2026-11-15 · Deciders: project owner (Phase 0)
+Status: Accepted; **implemented in Phase 7** ([ADR-0029](0029-phase7-encryption-disclosure.md)) · Date: 2026-11-15 · Deciders: project owner (Phase 0)
 
 ## Context
 Paper B §III-E derives event keys from an epoch key via HKDF. Its §VIII-B says obtaining the epoch key reveals all events of the epoch and that erasure requires destroying epoch-key material.

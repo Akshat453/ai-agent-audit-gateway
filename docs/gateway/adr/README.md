@@ -32,3 +32,7 @@ Template: Context → Decision → Consequences (+/−) → Alternatives rejecte
 | [0023](0023-agw-evt-v1-header-finalized.md) | AGW-EVT v1 / AGW-PAY v1 as implemented in Phase 2 (obs, cg, payload.ref, code.agent) |
 | [0024](0024-phase2-payload-store-export-events-api.md) | Phase 2 plaintext payload store, operator-only export, scoped `/v1/events` |
 | [0025](0025-phase3-epochs-membership-proofs-receipts.md) | Phase 3: derived epoch membership, on-demand proofs, EPOCH_SEALED receipts, sealer locking, 300 s max-age |
+| [0026](0026-phase4-risk-engine-adaptive-sealing.md) | Phase 4: risk policy as data (TOML → digest), risk-v2 factors, policy-v2 (CRITICAL deny unless exception), risk-adaptive sealing, metrics |
+| [0027](0027-phase5-action-bound-human-approval.md) | Phase 5: action digest, approvals + single-use nonces, separate human auth, gateway-signed decisions, one-tx revalidation (supersedes parts of 0010) |
+| [0028](0028-phase6-blockchain-anchoring.md) | Phase 6: EpochAnchor.sol (recorderId, write-once contiguous epochs, seq tiling), write-ahead anchor worker, CRITICAL pre-action gate, chain-pinned verifier (supersedes parts of 0014 and 09 §7) |
+| [0029](0029-phase7-encryption-disclosure.md) | Phase 7: AES-256-GCM per-event DEKs (CBOR AAD), local/Vault KEK providers, MinIO blobs, field classification + redaction, sealed operational args, HPKE disclosure grants, retention/erasure, re-encryption migration, rotation (supersedes parts of 07, 0017) |

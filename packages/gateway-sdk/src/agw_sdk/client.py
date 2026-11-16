@@ -9,7 +9,10 @@ from typing import Any
 
 import httpx
 
-TERMINAL = frozenset({"DENIED", "PENDING_APPROVAL", "COMPLETED", "FAILED", "OUTCOME_UNKNOWN"})
+TERMINAL = frozenset(
+    {"DENIED", "PENDING_APPROVAL", "COMPLETED", "FAILED", "OUTCOME_UNKNOWN", "EXPIRED"}
+)
+FINAL = TERMINAL - {"PENDING_APPROVAL"}  # nothing more can happen to the action
 
 
 class GatewayError(Exception):
@@ -77,6 +80,7 @@ class Client:
         tool_version: str | None = None,
         idempotency_key: str | None = None,
         intent_summary: str | None = None,
+        delegation_depth: int | None = None,
     ) -> ActionResponse:
         body: dict[str, Any] = {
             "run_id": run_id,
@@ -88,6 +92,8 @@ class Client:
             body["tool_version"] = tool_version
         if intent_summary:
             body["intent"] = {"summary": intent_summary}
+        if delegation_depth is not None:  # agent-declared; can only raise risk
+            body["delegation"] = {"depth": delegation_depth}
         resp = self._http.post(
             "/v1/actions",
             json=body,
@@ -100,6 +106,22 @@ class Client:
 
     def get_action(self, action_id: str) -> dict[str, Any]:
         return self._check(self._http.get(f"/v1/actions/{action_id}"))
+
+    def wait_for_change(self, action_id: str, *, wait: float = 25.0) -> dict[str, Any]:
+        """Long-poll (``?wait=``): returns as soon as the status changes, or after ``wait``."""
+        return self._check(
+            self._http.get(f"/v1/actions/{action_id}", params={"wait": wait}, timeout=wait + 10.0)
+        )
+
+    def wait_for_final(self, action_id: str, *, timeout: float = 60.0) -> dict[str, Any]:
+        """Wait through PENDING_APPROVAL (a human decides) until nothing more can happen."""
+        deadline = time.monotonic() + timeout
+        action = self.get_action(action_id)
+        while action["status"] not in FINAL and time.monotonic() < deadline:
+            action = self.wait_for_change(
+                action_id, wait=max(0.5, min(25.0, deadline - time.monotonic()))
+            )
+        return action
 
     def wait_for_terminal(self, action_id: str, *, timeout: float = 15.0) -> dict[str, Any]:
         deadline = time.monotonic() + timeout

@@ -22,5 +22,33 @@ services:
       timeout: 3s
       retries: 30
 
+  # Phase 6 (ADR-0028): local chain for anchoring. Pinned Foundry image; Anvil's state lives
+  # only as long as the container (contracts/deploy-anvil.sh redeploys when needed).
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:v1.3.5
+    entrypoint: ["anvil"]
+    command: ["--host", "0.0.0.0", "--chain-id", "31337", "--block-time", "1", "--silent"]
+    ports:
+      - "127.0.0.1:${AGW_ANVIL_HOST_PORT:-8545}:8545"
+    healthcheck:
+      test: ["CMD", "cast", "chain-id", "--rpc-url", "http://127.0.0.1:8545"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Phase 7 (ADR-0029): object storage for large payload CIPHERTEXTS only. MinIO's own images
+  # are no longer pullable anonymously; this is Chainguard's MinIO build, pinned by digest.
+  minio:
+    image: cgr.dev/chainguard/minio@sha256:18c8fa28697b25e0f34c6faae171079e88a03efb8e76a21d3b5d07b4e3cbef3e
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${AGW_BLOB_ACCESS_KEY:?set AGW_BLOB_ACCESS_KEY in .env}
+      MINIO_ROOT_PASSWORD: ${AGW_BLOB_SECRET_KEY:?set AGW_BLOB_SECRET_KEY in .env}
+    ports:
+      - "127.0.0.1:${AGW_MINIO_HOST_PORT:-9000}:9000"
+    volumes:
+      - agw-blobs:/data
+
 volumes:
   agw-pgdata:
+  agw-blobs:

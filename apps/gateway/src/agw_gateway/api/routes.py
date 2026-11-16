@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -16,11 +18,13 @@ from agw_gateway.db import tables as t
 from agw_gateway.evidence.bundle import (
     EventNotFound,
     EventNotSealed,
+    anchor_claim,
     build_bundle,
     epoch_record,
     get_epoch,
 )
 from agw_gateway.execution.errors import EventNotSealedYet, NotFound, PayloadTooLarge
+from agw_gateway.keys import KeyUnavailable
 
 router = APIRouter(prefix="/v1")
 
@@ -54,8 +58,11 @@ def health() -> dict[str, str]:
 
 @router.get("/ready")
 def ready(request: Request) -> dict[str, str]:
-    with _state(request).engine.connect() as conn:
+    state = _state(request)
+    with state.engine.connect() as conn:
         conn.execute(text("SELECT 1"))
+    if state.key_provider is None:
+        raise KeyUnavailable("no KEK")  # -> 503 KEY_UNAVAILABLE (Phase 7)
     return {"status": "ready"}
 
 
@@ -82,8 +89,25 @@ async def post_action(
 
 
 @router.get("/actions/{action_id}")
-def get_action(request: Request, agent: Agent, action_id: UUID) -> dict[str, Any]:
-    engine = _state(request).engine
+async def get_action(
+    request: Request,
+    agent: Agent,
+    action_id: UUID,
+    wait: Annotated[float, Query(ge=0, le=120)] = 0,
+) -> dict[str, Any]:
+    """``?wait=N``: long-poll up to N seconds (capped by settings) until the status changes."""
+    state = _state(request)
+    view = await run_in_threadpool(_action_view, state, agent, action_id)
+    deadline = time.monotonic() + min(wait, state.settings.action_long_poll_max_seconds)
+    initial = view["status"]
+    while view["status"] == initial and time.monotonic() < deadline:
+        await asyncio.sleep(0.25)
+        view = await run_in_threadpool(_action_view, state, agent, action_id)
+    return view
+
+
+def _action_view(state: GatewayState, agent: AuthenticatedAgent, action_id: UUID) -> dict[str, Any]:
+    engine = state.engine
     with engine.connect() as conn:
         row = conn.execute(
             select(t.actions).where(
@@ -94,13 +118,24 @@ def get_action(request: Request, agent: Agent, action_id: UUID) -> dict[str, Any
         if row is None:
             raise NotFound
         evaluated = conn.execute(
-            select(t.evidence_events.c.body).where(
+            select(t.evidence_events.c.body)
+            .where(
                 t.evidence_events.c.action_id == action_id,
                 t.evidence_events.c.event_type == "POLICY_EVALUATED",
             )
+            .order_by(t.evidence_events.c.seq)
+            .limit(1)  # the request-time evaluation (a re-evaluation may follow, ADR-0027)
         ).scalar_one_or_none()
+        approval = conn.execute(
+            select(
+                t.approvals.c.approval_id,
+                t.approvals.c.state,
+                t.approvals.c.expires_at,
+                t.approvals.c.required_approvals,
+            ).where(t.approvals.c.action_id == action_id)
+        ).one_or_none()
     policy = (evaluated or {}).get("policy", {})
-    return {
+    view: dict[str, Any] = {
         "action_id": str(row.action_id),
         "run_id": str(row.run_id),
         "tool": {"id": row.tool_id, "version": row.tool_version},
@@ -119,6 +154,14 @@ def get_action(request: Request, agent: Agent, action_id: UUID) -> dict[str, Any
         "created_at": _iso(row.created_at),
         "updated_at": _iso(row.updated_at),
     }
+    if approval is not None:  # never the nonce: agents do not decide approvals
+        view["approval"] = {
+            "approval_id": str(approval.approval_id),
+            "state": approval.state,
+            "expires_at": _iso(approval.expires_at),
+            "required_approvals": approval.required_approvals,
+        }
+    return view
 
 
 @router.get("/tools")
@@ -149,6 +192,7 @@ def run_timeline(request: Request, agent: Agent, run_id: UUID) -> dict[str, Any]
                 t.evidence_events.c.occurred_at,
                 t.evidence_events.c.action_id,
                 t.evidence_events.c.body,
+                t.evidence_events.c.risk_level,
             )
             .where(
                 t.evidence_events.c.tenant_id == agent.tenant_id,
@@ -157,6 +201,25 @@ def run_timeline(request: Request, agent: Agent, run_id: UUID) -> dict[str, Any]
             )
             .order_by(t.evidence_events.c.seq)
         ).all()
+        epochs = (
+            conn.execute(
+                select(
+                    t.epochs.c.epoch_no,
+                    t.epochs.c.first_seq,
+                    t.epochs.c.last_seq,
+                    t.epochs.c.seal_reason,
+                    t.epochs.c.anchor_priority,
+                )
+                .where(
+                    t.epochs.c.tenant_id == agent.tenant_id,
+                    t.epochs.c.last_seq >= rows[0].seq,
+                    t.epochs.c.first_seq <= rows[-1].seq,
+                )
+                .order_by(t.epochs.c.epoch_no)
+            ).all()
+            if rows
+            else []
+        )
     events = []
     for r in rows:
         body = r.body
@@ -167,12 +230,44 @@ def run_timeline(request: Request, agent: Agent, run_id: UUID) -> dict[str, Any]
             "occurred_at": _iso(r.occurred_at),
             "action_id": str(r.action_id) if r.action_id else None,
             "tool": body.get("tool"),
+            "risk_level": r.risk_level,
+            # Which epoch sealed this event (None = not sealed yet). Derived from tiling.
+            "epoch": next(
+                (
+                    {
+                        "epoch_no": e.epoch_no,
+                        "seal_reason": e.seal_reason,
+                        "anchor_priority": e.anchor_priority,
+                    }
+                    for e in epochs
+                    if e.first_seq <= r.seq <= e.last_seq
+                ),
+                None,
+            ),
         }
         if "policy" in body:
             item["decision"] = body["policy"]["effect"]
             item["reasons"] = body["policy"]["reasons"]
+            item["matched_rules"] = body["policy"]["rules"]
+            item["controls"] = body["policy"]["controls"]
+        if "risk" in body:
+            item["risk"] = {
+                "level": body["risk"]["level"],
+                "score": body["risk"]["score"],
+                "rules": body["risk"]["rules"],
+                "reasons": body["risk"].get("reasons", []),
+            }
         if "outcome" in body:
             item["status"] = body["outcome"]["status"]
+            if "code" in body["outcome"]:
+                item["code"] = body["outcome"]["code"]
+        if "approval" in body:
+            ap = body["approval"]
+            item["approval"] = {
+                k: ap[k] for k in ("id", "dec", "votes", "req", "approver") if k in ap
+            }
+            if "decs" in ap:
+                item["approval"]["approvers"] = [d["approver"] for d in ap["decs"]]
         events.append(item)
     return {"run_id": str(run_id), "events": events}
 
@@ -267,9 +362,10 @@ def latest_epoch(
 ) -> dict[str, Any]:
     with _state(request).engine.connect() as conn:
         row = get_epoch(conn, _scoped_tenant(agent, tenant), None)
+        claim = anchor_claim(conn, row.tenant_id, int(row.epoch_no)) if row is not None else None
     if row is None:
         raise NotFound
-    return epoch_record(row)
+    return {**epoch_record(row), **({"anchor": claim} if claim else {})}
 
 
 @router.get("/epochs/{epoch_no}")
@@ -281,9 +377,10 @@ def get_epoch_by_no(
 ) -> dict[str, Any]:
     with _state(request).engine.connect() as conn:
         row = get_epoch(conn, _scoped_tenant(agent, tenant), epoch_no)
+        claim = anchor_claim(conn, row.tenant_id, int(row.epoch_no)) if row is not None else None
     if row is None:
         raise NotFound
-    return epoch_record(row)
+    return {**epoch_record(row), **({"anchor": claim} if claim else {})}
 
 
 @router.get("/events/{event_id}/proof")

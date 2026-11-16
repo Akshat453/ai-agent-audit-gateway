@@ -1,5 +1,5 @@
 # ADR-0010: Approvals bind the exact action tuple and are single-use
-Status: Accepted · Date: 2026-11-15 · Deciders: project owner (Phase 0)
+Status: Accepted, **superseded in part by [ADR-0027](0027-phase5-action-bound-human-approval.md)** (digest layout; policy change → re-evaluation, stricter wins) · Date: 2026-11-15 · Deciders: project owner (Phase 0)
 
 ## Context
 Paper A §2 lists "mismatch between an approved action and the executed action". Paper B §III-B(3) asks for a token binding the approver to the specific action.

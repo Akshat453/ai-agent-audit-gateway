@@ -1,0 +1,20 @@
+{
+  "address": "0x5fbdb2315678afecb367f032d93f642f64180aa3",
+  "block_number": 208,
+  "chain_id": 31337,
+  "compiler": {
+    "bytecode_hash": "none",
+    "cbor_metadata": false,
+    "evm_version": "cancun",
+    "optimizer_runs": 10000,
+    "solc": "0.8.28"
+  },
+  "contract": "EpochAnchor",
+  "creation_code_sha256": "df6ceb60ef856d36f8e7edf2666864f2969b1e39b47e3a221a5ff0e3fe18e6fa",
+  "deploy_tx": "0x2356ebcfa9223aec32eb961b661886ec9615bbed814bce0eb864513794c43bdf",
+  "deployer": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+  "owner": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+  "runtime_code_keccak256": "26ffd63e6ba7241826302a074a7286443884482397c937c6f554371cd51a2de2",
+  "runtime_code_sha256": "adb5dfbd1218901e5ffaf91fa8680776a5293bfdecf3ddf621ec427a2c056056",
+  "source": "contracts/src/EpochAnchor.sol"
+}

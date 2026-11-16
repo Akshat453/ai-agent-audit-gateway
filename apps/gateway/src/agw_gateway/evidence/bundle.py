@@ -7,7 +7,9 @@ Bundle = everything an offline verifier needs to check ONE event without trustin
      "proof": {"epoch_no", "tree_size", "leaf_index", "audit_path": [hex]},
      "epoch": <epoch record of the event's epoch>,
      "epoch_chain": [<epoch records epoch_no+1 .. latest sealed>],
-     "trust_root": {"epoch_no", "epoch_root", "source": "local-seal"}}   # informational only
+     "trust_root": {"epoch_no", "epoch_root", "source": "local-seal"},   # informational only
+     "anchor": {"chain_id", "contract", "recorder_id", "epoch_no", "status", "tx_hash",
+                "block_number"}}                       # Phase 6; informational, UNTRUSTED
 
 JSON Schema: packages/schemas/bundle/evidence-bundle.v1.schema.json. Proofs are computed on
 demand from the sealed rows (ADR-0025). ``trust_root`` is what THIS system claims; a verifier
@@ -24,6 +26,7 @@ from sqlalchemy import Connection, select
 
 from agw_gateway.crypto.merkle import audit_path
 from agw_gateway.db import tables as t
+from agw_gateway.evidence.payloads import PayloadStore, PayloadUnavailable
 
 BUNDLE_FORMAT = "agw-bundle/v1"
 EPOCHS_FORMAT = "agw-epochs/v1"
@@ -67,6 +70,7 @@ def build_bundle(
     *,
     tenant_id: str | None,
     include_payload: bool = False,
+    store: PayloadStore | None = None,
 ) -> dict[str, Any]:
     ev = t.evidence_events
     q = select(ev.c.tenant_id, ev.c.seq, ev.c.canonical_bytes).where(ev.c.event_id == event_id)
@@ -104,12 +108,16 @@ def build_bundle(
         "header": bytes(row.canonical_bytes).hex(),
     }
     if include_payload:
-        content = conn.execute(
-            select(t.evidence_payloads.c.content).where(t.evidence_payloads.c.event_id == event_id)
-        ).scalar_one_or_none()
-        if content is not None:
-            event["payload"] = bytes(content).hex()
-    return {
+        if store is None:
+            raise ValueError("include_payload needs a payload store (KEK)")
+        try:
+            content = store.load_payload(conn, event_id)
+        except PayloadUnavailable as exc:
+            event["payload_status"] = exc.code
+        else:
+            if content is not None:
+                event["payload"] = content.hex()
+    bundle: dict[str, Any] = {
         "format": BUNDLE_FORMAT,
         "bundle_version": 1,
         "tenant": tenant,
@@ -127,6 +135,32 @@ def build_bundle(
             "epoch_root": bytes(latest.epoch_root).hex(),
             "source": "local-seal",
         },
+    }
+    claim = anchor_claim(conn, tenant, int(epoch.epoch_no))
+    if claim is not None:
+        bundle["anchor"] = claim
+    return bundle
+
+
+def anchor_claim(conn: Connection, tenant: str, epoch_no: int) -> dict[str, Any] | None:
+    """Where THIS system says the epoch is anchored (Phase 6). Verifiers never trust it: they
+    compare it with their pinned trust roots (UNTRUSTED_ANCHOR on mismatch)."""
+    rec = conn.execute(
+        select(t.anchor_recorders).where(t.anchor_recorders.c.tenant_id == tenant)
+    ).one_or_none()
+    if rec is None:
+        return None
+    a = conn.execute(
+        select(t.anchors).where(t.anchors.c.tenant_id == tenant, t.anchors.c.epoch_no == epoch_no)
+    ).one_or_none()
+    return {
+        "chain_id": int(rec.chain_id),
+        "contract": rec.contract,
+        "recorder_id": bytes(rec.recorder_id).hex(),
+        "epoch_no": epoch_no,
+        "status": a.status if a is not None else "PENDING",
+        "tx_hash": bytes(a.tx_hash).hex() if a is not None and a.tx_hash is not None else None,
+        "block_number": int(a.block_number) if a is not None and a.block_number else None,
     }
 
 

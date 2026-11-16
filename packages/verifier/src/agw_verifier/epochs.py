@@ -1,6 +1,8 @@
 """Epoch-record and evidence-bundle verification (docs/gateway/06 §6-8, 10 §3 V1-V4, V8).
 
-Results (worst first): TAMPERED, INVALID_PROOF, INCOMPLETE, UNANCHORED, VERIFIED.
+Results (worst first): TAMPERED, INVALID_PROOF, UNTRUSTED_ANCHOR, INCOMPLETE, UNANCHORED,
+VERIFIED. UNTRUSTED_ANCHOR (Phase 6): anchor information could not be tied to the pinned trust
+roots (wrong chain, contract or recorder, or none pinned).
 
 * UNANCHORED: every check passed, but no external trust root was supplied, so the result only
   says the material is internally consistent ("locally sealed only"). A trusted root must come
@@ -18,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from agw_verifier import STATEMENT
+from agw_verifier.anchor import ChainView, bundle_claims_problem, check_against_chain
 from agw_verifier.cbor import NonCanonical, loads
 from agw_verifier.chain import Report, event_hash, payload_digest, verify_lines
 from agw_verifier.merkle import ZERO32, epoch_root, inclusion_ok, root_of
@@ -25,7 +28,7 @@ from agw_verifier.merkle import ZERO32, epoch_root, inclusion_ok, root_of
 EPOCHS_FORMAT = "agw-epochs/v1"
 BUNDLE_FORMAT = "agw-bundle/v1"
 LOCAL_ONLY = "locally sealed only: no external trust root was given"
-_ORDER = ["TAMPERED", "INVALID_PROOF", "INCOMPLETE", "UNANCHORED", "VERIFIED"]
+_ORDER = ["TAMPERED", "INVALID_PROOF", "UNTRUSTED_ANCHOR", "INCOMPLETE", "UNANCHORED", "VERIFIED"]
 
 
 @dataclass
@@ -40,6 +43,8 @@ class Result:
     last_epoch_root: str | None = None
     trusted_epoch: int | None = None
     unsealed_events: int | None = None
+    anchor: dict[str, Any] | None = None  # Phase 6: the on-chain anchor relied upon
+    chain_last_epoch: int | None = None
     notes: list[str] = field(default_factory=list)
     statement: str = STATEMENT
 
@@ -294,3 +299,31 @@ def verify_bundle(
 
 def sha256_file(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+# --------------------------------------------------------------------------- Phase 6: chain
+def verify_bundle_on_chain(bundle: Any, view: ChainView) -> Result:
+    """Offline bundle checks, then the anchor checks against the pinned chain (anchor.py)."""
+    res = verify_bundle(bundle)
+    if not res.ok:
+        return res
+    problem = bundle_claims_problem(bundle, view.trust)
+    if problem:
+        return res.fail("UNTRUSTED_ANCHOR", problem)
+    records = [bundle["epoch"], *bundle.get("epoch_chain", [])]
+    out: Result = check_against_chain(
+        res, records, view, min_epoch=bundle["epoch"]["epoch_no"], whole_export=False
+    )
+    return out
+
+
+def verify_epochs_on_chain(
+    epoch_lines: Iterable[str], view: ChainView, *, event_lines: Iterable[str] | None = None
+) -> Result:
+    lines = list(epoch_lines)
+    res = verify_epochs(lines, event_lines=event_lines)
+    if not res.ok:
+        return res
+    records = [json.loads(line) for line in lines[1:] if line.strip()]
+    out: Result = check_against_chain(res, records, view, min_epoch=None, whole_export=True)
+    return out

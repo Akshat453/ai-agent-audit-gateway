@@ -64,6 +64,21 @@
         "epoch_root": {"$ref": "#/$defs/hex32"},
         "source": {"enum": ["local-seal", "anchor"]}
       }
+    },
+    "anchor": {
+      "description": "Phase 6 (ADR-0028), optional and UNTRUSTED: where the producer says the event's epoch is anchored. Verifiers compare it with their pinned trust roots and report UNTRUSTED_ANCHOR on any mismatch; they never take trust roots from here.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chain_id", "contract", "recorder_id", "epoch_no", "status"],
+      "properties": {
+        "chain_id": {"$ref": "#/$defs/uint"},
+        "contract": {"type": "string", "pattern": "^0x[0-9a-f]{40}$"},
+        "recorder_id": {"$ref": "#/$defs/hex32"},
+        "epoch_no": {"$ref": "#/$defs/uint"},
+        "status": {"enum": ["PENDING", "SUBMITTED", "INCLUDED", "FINALIZED", "FAILED"]},
+        "tx_hash": {"oneOf": [{"$ref": "#/$defs/hex32"}, {"type": "null"}]},
+        "block_number": {"oneOf": [{"$ref": "#/$defs/uint"}, {"type": "null"}]}
+      }
     }
   }
 }

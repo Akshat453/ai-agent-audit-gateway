@@ -11,6 +11,9 @@ Nothing is "queued in memory".
 | Tx | Writes | Commits before |
 |---|---|---|
 | **tx1** (request) | `idempotency_keys`, `actions`, `ACTION_REQUESTED`, `POLICY_EVALUATED`, then one of: `ACTION_DENIED` / `APPROVAL_REQUIRED` / `ACTION_AUTHORIZED` + `outbox_jobs(DISPATCH)`; (Phase 3+) `outbox_jobs(SEAL)` for HIGH+ | HTTP response |
+| **decision** (Phase 5) | `approval_decisions` (signed), `APPROVAL_GRANTED`/`APPROVAL_DENIED`, `approvals.state` | — |
+| **authorize** (Phase 5) | under row locks (approval → action → chain head): `approval_uses(nonce)`, `approvals.state=CONSUMED`, `POLICY_EVALUATED` (re-evaluation), `ACTION_AUTHORIZED`, `outbox_jobs(DISPATCH)`; or `INVALIDATED` + `ACTION_DENIED` | executor claim |
+| **expire** (Phase 5) | `approvals.state=EXPIRED`, `APPROVAL_EXPIRED`, `actions.status=EXPIRED` | — |
 | **claim** | `outbox_jobs.status=CLAIMED`, `lease_expires_at` | dispatch tx |
 | **dispatch** | `ACTION_DISPATCHED`, `actions.status=DISPATCHED` | **adapter call** |
 | **result** | `ACTION_COMPLETED`/`ACTION_FAILED`, `actions.status`, `outbox_jobs.status=DONE` | — |
@@ -101,7 +104,7 @@ outbox table, so the row is the source of truth (Phase 1 prompt, item 7).
 | C4 | dispatch commit (DISPATCHED), before or during the adapter call | DISPATCHED, lease running | Lease expires → **ambiguous**. Non-idempotent tool: `ACTION_OUTCOME_UNKNOWN`, job FAILED, **never re-invoked** (ADR-0011). Idempotent tool (`is_idempotent` and adapter accepts `idempotency_token = action_id`): re-dispatch with a new `attempt` number. | unknown |
 | C5 | adapter returned, before result commit | same as C4 | same as C4 | happened, unrecorded |
 | C6 | result commit | COMPLETED/FAILED | none | recorded |
-| C7 | (Phase 6, CRITICAL) job WAITING_ANCHOR | AUTHORIZED, epoch sealed, anchor pending | Anchorer continues. Gate re-checked on restart. Timeout → `ACTION_FAILED(ANCHOR_TIMEOUT)`. | none |
+| C7 | (Phase 6, CRITICAL; implemented, ADR-0028 §5) job WAITING_ANCHOR | AUTHORIZED, epoch sealed, anchor pending | Anchorer continues. Gate re-checked on restart. Timeout → `ACTION_FAILED(ANCHOR_TIMEOUT)`. | none |
 
 Phase 1 test: a crash hook between dispatch commit and the adapter call, then the reconciler
 runs → status OUTCOME_UNKNOWN, spy adapter call count = 0. A second variant crashes after the

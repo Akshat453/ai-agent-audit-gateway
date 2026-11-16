@@ -1,5 +1,5 @@
 # ADR-0014: Append-only Solidity anchor registry; Foundry/Anvil local, Base Sepolia testnet; track submitted/included/finalized
-Status: Accepted · Date: 2026-11-15 · Deciders: project owner (Phase 0)
+Status: Accepted, **superseded in part by [ADR-0028](0028-phase6-blockchain-anchoring.md)** (contract `EpochAnchor`, salted recorderId instead of tenantKey, treeSize/lastSeq instead of prevRoot, no anchorBatch) · Date: 2026-11-15 · Deciders: project owner (Phase 0)
 
 ## Context
 Paper B §IV-A anchors `R_t` and `H(R_{t−1})` and treats the earlier-included duplicate as canonical (§III-D). Paper A §4 defines anchor time via inclusion and finality.

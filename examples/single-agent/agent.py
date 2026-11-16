@@ -1,11 +1,17 @@
-"""Phase 1 demo agent (14 §9 task 13).
+"""Demo agent (Phase 1, 14 §9 task 13; Phase 4 mixed-risk section).
 
-Default: a scripted, non-LLM agent that shows the four required outcomes:
+Default: a scripted, non-LLM agent. Phase 1 part shows the four required outcomes:
   1. public_doc_search  -> ALLOW -> COMPLETED
   2. unknown tool       -> DENIED (SYS-TOOL-UNKNOWN)
   3. delete_record      -> DENIED (deny-delete-record, deny-critical); the agent HAS the scope
   4. bad args           -> DENIED (SYS-ARGS-INVALID), adapter never called
 plus create_ticket -> COMPLETED and an idempotent replay.
+
+Phase 4 part (ADR-0026): mixed traffic in its own run. LOW actions are batched (not sealed),
+a HIGH action is sealed within a worker tick (seal_reason RISK_HIGH, together with the older
+pending events, which are never skipped), a CRITICAL action is DENIED and sealed at once
+(RISK_CRITICAL, anchor priority CRITICAL), and later LOW actions wait for the next batch.
+The run timeline shows risk level, reasons and the sealing epoch of every event.
 
 ``--llm`` (off by default, never in CI): Claude chooses tool calls; every call still goes
 through the gateway, which alone decides. Needs the ``anthropic`` package + credentials.
@@ -19,6 +25,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import uuid
 from typing import Any
 
@@ -101,8 +108,102 @@ def scripted(client: Client) -> int:
     for ev in client.timeline(run_id):
         extra = ev.get("decision") or ev.get("status") or ""
         print(f"  seq={ev['seq']:<5} {ev['type']:<24} {extra}")
+    failures += mixed_risk(client)
     print("DEMO OK" if failures == 0 else f"DEMO FAILED ({failures})")
     return 0 if failures == 0 else 1
+
+
+def _epoch(ev: dict[str, Any]) -> str:
+    e = ev.get("epoch")
+    if e is None:
+        return "pending (batched)"
+    return f"epoch {e['epoch_no']} {e['seal_reason']}/{e['anchor_priority']}"
+
+
+def _wait_sealed(client: Client, run_id: str, action_id: str, timeout: float = 15.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        evs = [e for e in client.timeline(run_id) if e["action_id"] == action_id]
+        if evs and all(e["epoch"] is not None for e in evs):
+            return True
+        time.sleep(0.25)
+    return False
+
+
+def mixed_risk(client: Client) -> int:
+    """Phase 4 acceptance: LOW batched, HIGH sealed by risk, CRITICAL denied (ADR-0026)."""
+    run_id = str(uuid.uuid4())
+    print(f"\nPhase 4 mixed-risk run {run_id}")
+    failures = 0
+
+    def act(label: str, expect: str, tool: str, args: dict[str, Any], **kw: Any) -> str:
+        nonlocal failures
+        sub = client.submit_action(run_id=run_id, tool=tool, args=args, **kw)
+        final = client.wait_for_terminal(sub.action_id)
+        _line(label, final)
+        if final["status"] != expect:
+            failures += 1
+            print(f"    !! expected {expect}")
+        return sub.action_id
+
+    for i in range(3):
+        act(f"LOW search #{i + 1}", "COMPLETED", "public_doc_search", {"query": f"q{i}"})
+    act(
+        "MEDIUM internal email",
+        "COMPLETED",
+        "send_email",
+        {"to": ["team@corp.example"], "subject": "status"},
+    )
+    time.sleep(2.5)  # > 2 sealer ticks: LOW/MEDIUM must still be pending (300 s / 60 s rules)
+    sealed = [e for e in client.timeline(run_id) if e["epoch"] is not None]
+    print(f"  after 2.5 s: {len(sealed)} of this run's events sealed (expected 0: batched)")
+    # Leftover LOW events of an earlier demo run may legitimately reach MAX_AGE/MAX_EVENTS and
+    # take these with them; anything else sealing LOW/MEDIUM early would be a bug.
+    failures += sum(e["epoch"]["seal_reason"] not in {"MAX_AGE", "MAX_EVENTS"} for e in sealed)
+
+    high = act(
+        "HIGH PII export (internal)",
+        "PENDING_APPROVAL",
+        "export_customer_data",
+        {"destination": "s3://exports.corp.example/q4", "limit": 10, "fields": ["id"]},
+    )
+    if not _wait_sealed(client, run_id, high):
+        failures += 1
+        print("    !! HIGH action was not sealed within 15 s (is the worker running?)")
+    crit = act(
+        "CRITICAL IAM change",
+        "DENIED",
+        "update_iam_role",
+        {"principal": "svc-build", "role": "admin"},
+    )
+    if not _wait_sealed(client, run_id, crit):
+        failures += 1
+        print("    !! CRITICAL action was not sealed within 15 s")
+    act("LOW search after", "COMPLETED", "public_doc_search", {"query": "after"})
+
+    print("timeline (seq, type, risk, decision/status, sealing, reasons):")
+    for ev in client.timeline(run_id):
+        what = ev.get("decision") or ev.get("status") or ""
+        why = ""
+        if "risk" in ev:
+            r = ev["risk"]
+            why = f"score={r['score']} rules={','.join(r['rules']) or '-'}"
+            if ev.get("reasons"):
+                why += f" policy={','.join(ev['reasons'])}"
+        print(
+            f"  {ev['seq']:<5} {ev['type']:<22} {ev['risk_level'] or '-':<8} {what:<17} "
+            f"{_epoch(ev):<36} {why}"
+        )
+    tl = client.timeline(run_id)
+    high_epochs = {e["epoch"]["seal_reason"] for e in tl if e["action_id"] == high}
+    crit_epochs = {e["epoch"]["anchor_priority"] for e in tl if e["action_id"] == crit}
+    last_low_pending = tl[-1]["epoch"] is None
+    ok = high_epochs == {"RISK_HIGH"} and crit_epochs == {"CRITICAL"} and last_low_pending
+    print(
+        "  checks: HIGH sealed by RISK_HIGH, CRITICAL epoch has anchor priority CRITICAL, "
+        f"trailing LOW still batched -> {'OK' if ok else 'FAILED'}"
+    )
+    return failures + (0 if ok else 1)
 
 
 def llm(client: Client, task: str) -> int:  # pragma: no cover - optional, needs credentials

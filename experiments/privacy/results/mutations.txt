@@ -1,0 +1,21 @@
+CAUGHT   payload AAD binds event/seq/digest         test_ciphertext_swap_between_events_fails
+CAUGHT   DEK wrap bound to its event                test_local_provider_wrap_unwrap_and_context_binding
+CAUGHT   KEK file must be 0600                      test_local_provider_refuses_insecure_or_in_repo_keys
+CAUGHT   no KEK -> fail closed                      test_no_kek_fails_closed
+CAUGHT   secret args redacted                       test_secret_fields_are_never_stored
+CAUGHT   secret results redacted                    test_secret_fields_are_never_stored
+CAUGHT   plaintext results only public/internal     test_secret_fields_are_never_stored
+CAUGHT   unvalidated args not stored                test_invalid_args_are_not_stored_only_keys_and_salted_digest
+CAUGHT   operational args sealed                    test_db_only_attacker_cannot_read_payloads
+CAUGHT   grant expiry enforced                      test_expired_grant_is_403_and_evidenced
+CAUGHT   only granted events exportable             test_grant_for_x_cannot_open_y_in_the_same_epoch
+CAUGHT   only the grantee exports                   test_grant_roles_separation_and_revocation
+CAUGHT   denied access is evidence                  test_expired_grant_is_403_and_evidenced
+CAUGHT   verifier rejects a swapped ciphertext      test_grant_for_x_cannot_open_y_in_the_same_epoch
+CAUGHT   legal hold blocks deletion                 test_retention_deletes_payload_header_and_chain_still_verify
+CAUGHT   deletion is evidence (PAYLOAD_DELETED)     test_retention_deletes_payload_header_and_chain_still_verify
+CAUGHT   0008 refuses while plaintext remains       test_reencrypt_phase2_plaintext_then_drop_it
+CAUGHT   migration checks digests                   test_reencrypt_phase2_plaintext_then_drop_it
+CAUGHT   adapter errors logged by type only         test_canary_never_leaks
+CAUGHT   validation errors name fields only         test_canary_never_leaks
+20/20 mutations caught

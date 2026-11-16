@@ -12,6 +12,7 @@ from uuid import UUID
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import Engine
 
+from agw_gateway.privacy.classification import FieldClasses
 from agw_gateway.tools.metadata import ToolMetadata
 
 
@@ -50,8 +51,14 @@ class ToolSpec:
     meta: ToolMetadata
     args_model: type[BaseModel]
     adapter: ToolAdapter
+    # Phase 7 (ADR-0029 §4): per-field classes; unlisted fields are "confidential".
+    classes: FieldClasses = field(default_factory=FieldClasses)
 
     def __post_init__(self) -> None:
+        try:
+            self.classes.check(self.meta.tool_id, self.args_model.model_fields)
+        except ValueError as exc:
+            raise ToolSpecError(str(exc)) from None
         cfg = self.args_model.model_config
         if cfg.get("extra") != "forbid" or cfg.get("strict") is not True:
             raise ToolSpecError(f"{self.meta.tool_id}: args model must be extra='forbid', strict")

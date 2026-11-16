@@ -3,7 +3,11 @@ name = "agw-worker"
 version = "0.1.0"
 description = "AGW long-running jobs (outbox executor + reconciler; later sealing, anchoring, monitoring)"
 requires-python = ">=3.12"
-dependencies = ["agw-gateway", "agw-schemas"]
+dependencies = [
+    "agw-gateway",
+    "agw-schemas",
+    "web3>=7.6,<8",
+]
 
 [tool.uv.sources]
 agw-gateway = { workspace = true }

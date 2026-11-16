@@ -5,6 +5,9 @@ description = "Thin Python client for the AGW gateway"
 requires-python = ">=3.12"
 dependencies = ["httpx>=0.27", "pydantic>=2.9"]
 
+[project.scripts]
+agw-approve = "agw_sdk.approve_cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -2,18 +2,22 @@
 
 Two steps, both durable in Postgres:
 
-``schedule()``  scans tenants with pending (unsealed) events and enqueues at most one open
-                ``outbox_jobs(kind='SEAL', up_to_seq, seal_reason)`` per tenant when a trigger
-                fires: pending >= max_events (seal exactly max_events) OR the oldest pending
-                non-receipt event is older than max_age (seal everything pending). Pending
-                EPOCH_SEALED receipts alone never trigger a seal ("no events -> no seal").
+``schedule()``  reads each tenant's pending (unsealed) window from durable rows, grouped by
+                the risk level recorded on each event (``evidence_events.risk_level``), asks
+                the pure ``policy.decide`` whether a seal is due (count / risk / age, see
+                ``sealing/policy.py``) and enqueues at most one open
+                ``outbox_jobs(kind='SEAL', up_to_seq, seal_reason)`` per tenant. A HIGH or
+                CRITICAL event is therefore sealed within one sealer tick, and the trigger is
+                as durable as the event itself (no in-memory signal). Pending EPOCH_SEALED
+                receipts alone never trigger a seal ("no events -> no seal").
 
 ``run_once()``  claims one SEAL job (``FOR UPDATE SKIP LOCKED``) and, in ONE transaction:
                 takes a per-tenant advisory lock (one sealer per tenant), locks
                 ``epoch_heads``, SELF-CHECKS the range (recomputes every event_hash from the
                 stored canonical bytes, checks seq and prev links back to the last sealed
                 event), builds the RFC 9162 tree, computes R_t, inserts the epoch (the DB
-                trigger re-checks tiling), advances ``epoch_heads``, appends an
+                trigger re-checks tiling; ``anchor_priority`` from the highest risk level in
+                the range), advances ``epoch_heads``, appends an
                 ``EPOCH_SEALED`` receipt to the tenant's chain (it lands in a LATER epoch) and
                 marks the job DONE.
 
@@ -29,7 +33,7 @@ tenant until an operator resolves it.
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -41,6 +45,14 @@ from agw_gateway.db import tables as t
 from agw_gateway.evidence import EvidenceWriter, NewEvent
 from agw_gateway.execution.crash import CrashPoints
 from agw_gateway.logs import log
+from agw_gateway.metrics import EPOCHS_SEALED, LEVELS, OLDEST_UNSEALED_AGE, PENDING_EVENTS
+from agw_worker.sealing.policy import (
+    PendingLevel,
+    PendingWindow,
+    SealPolicy,
+    anchor_priority,
+    decide,
+)
 
 logger = logging.getLogger("agw.worker.sealer")
 
@@ -59,6 +71,7 @@ class SealResult:
     prev_root: bytes
     epoch_root: bytes
     seal_reason: str
+    anchor_priority: str = "ROUTINE"
 
 
 class SelfCheckFailed(Exception):
@@ -77,12 +90,18 @@ class Sealer:
         crash: CrashPoints,
         max_events: int = 100,
         max_age_seconds: float = 300.0,
+        policy: SealPolicy | None = None,
     ) -> None:
         self._engine = engine
         self._writer = writer
         self._crash = crash
-        self.max_events = max_events
-        self.max_age_seconds = max_age_seconds
+        # Default: adaptive, with max_events / max_age_seconds as the LOW thresholds.
+        self.policy = policy or SealPolicy.adaptive(
+            low_max_events=max_events,
+            low_max_age_seconds=max_age_seconds,
+            medium_max_events=min(25, max_events),
+            medium_max_age_seconds=min(60.0, max_age_seconds),
+        )
         self.last_computed: SealResult | None = None  # for crash/determinism tests
 
     # ---------------------------------------------------------------- scheduling
@@ -93,31 +112,42 @@ class Sealer:
                 text(
                     """
                     SELECT ch.tenant_id, ch.last_seq, eh.sealed_up_to,
-                           EXTRACT(EPOCH FROM (now() - (
-                               SELECT min(e.occurred_at) FROM evidence_events e
-                                WHERE e.tenant_id = ch.tenant_id AND e.seq > eh.sealed_up_to
-                                  AND e.event_type <> 'EPOCH_SEALED'))) AS oldest_age
+                           COALESCE(e.risk_level, 'LOW') AS level,
+                           count(*) AS n,
+                           EXTRACT(EPOCH FROM (now() - min(e.occurred_at))) AS oldest_age,
+                           max(e.seq) AS max_seq
                       FROM chain_heads ch
                       JOIN epoch_heads eh ON eh.tenant_id = ch.tenant_id
+                      JOIN evidence_events e
+                        ON e.tenant_id = ch.tenant_id AND e.seq > eh.sealed_up_to
+                       AND e.event_type <> 'EPOCH_SEALED'
                      WHERE ch.last_seq > eh.sealed_up_to
                        AND NOT EXISTS (
                            SELECT 1 FROM outbox_jobs j
                             WHERE j.kind = 'SEAL' AND j.tenant_id = ch.tenant_id
                               AND j.status = 'FAILED' AND j.last_error_code = :failed)
+                     GROUP BY ch.tenant_id, ch.last_seq, eh.sealed_up_to,
+                              COALESCE(e.risk_level, 'LOW')
                     """
                 ),
                 {"failed": SELF_CHECK_FAILED},
             ).all()
+            windows: dict[str, PendingWindow] = {}
             for r in rows:
-                if r.oldest_age is None:  # only EPOCH_SEALED receipts pending
+                level = PendingLevel(r.level, int(r.n), float(r.oldest_age), int(r.max_seq))
+                w = windows.get(r.tenant_id)
+                windows[r.tenant_id] = PendingWindow(
+                    sealed_up_to=int(r.sealed_up_to),
+                    last_seq=int(r.last_seq),
+                    levels=(*(w.levels if w else ()), level),
+                )
+            self._observe(windows.values())
+            gates = self._gate_seals(conn)
+            for tenant_id, window in windows.items():
+                due = gates.get(tenant_id) or decide(window, self.policy)
+                if due is None:
                     continue
-                pending = r.last_seq - r.sealed_up_to
-                if pending >= self.max_events:
-                    up_to, reason = r.sealed_up_to + self.max_events, "MAX_EVENTS"
-                elif float(r.oldest_age) >= self.max_age_seconds:
-                    up_to, reason = r.last_seq, "MAX_AGE"
-                else:
-                    continue
+                up_to, reason = due
                 enqueued += conn.execute(
                     text(
                         """
@@ -129,12 +159,49 @@ class Sealer:
                         DO NOTHING
                         """
                     ),
-                    {"t": r.tenant_id, "u": up_to, "r": reason},
+                    {"t": tenant_id, "u": up_to, "r": reason},
                 ).rowcount
         return enqueued
 
+    @staticmethod
+    def _gate_seals(conn: Connection) -> dict[str, tuple[int, str]]:
+        """CRITICAL pre-action anchoring (09 §2/§5, ADR-0028): for the lowest unsealed
+        ``gate_seq`` s of a WAITING_ANCHOR job, seal [first_pending, s-1] first (if non-empty),
+        then [s, s] as its own one-leaf epoch. Takes precedence over the count/age/risk rules
+        (which would otherwise fold s into a larger epoch)."""
+        rows = conn.execute(
+            text(
+                """
+                SELECT j.tenant_id, min(j.gate_seq) AS s, max(eh.sealed_up_to) AS sealed
+                  FROM outbox_jobs j
+                  JOIN epoch_heads eh ON eh.tenant_id = j.tenant_id
+                 WHERE j.kind = 'DISPATCH' AND j.status = 'WAITING_ANCHOR'
+                   AND j.gate_seq > eh.sealed_up_to
+                 GROUP BY j.tenant_id
+                """
+            )
+        ).all()
+        out: dict[str, tuple[int, str]] = {}
+        for r in rows:
+            s, sealed = int(r.s), int(r.sealed)
+            out[r.tenant_id] = (s - 1 if s - 1 > sealed else s, "RISK_CRITICAL")
+        return out
+
+    @staticmethod
+    def _observe(windows: Iterable[PendingWindow]) -> None:
+        """Operational gauges only (counts and ages; no tenant labels, no payloads)."""
+        pending = dict.fromkeys(LEVELS, 0)
+        oldest = 0.0
+        for w in windows:
+            for lv in w.levels:
+                pending[lv.level] = pending.get(lv.level, 0) + lv.count
+                oldest = max(oldest, lv.oldest_age_seconds)
+        for level, n in pending.items():
+            PENDING_EVENTS.labels(level).set(n)
+        OLDEST_UNSEALED_AGE.set(oldest)
+
     def request_seal(self, tenant_id: str, up_to_seq: int, reason: str = "MANUAL") -> bool:
-        """Durably enqueue a seal (used by operators/tests; Phase 4 adds risk triggers)."""
+        """Durably enqueue a seal (operators/tests). Risk triggers come from ``schedule()``."""
         with self._engine.begin() as conn:
             n = conn.execute(
                 text(
@@ -154,6 +221,11 @@ class Sealer:
     # ---------------------------------------------------------------- sealing
     def run_once(self) -> SealResult | None:
         """Process at most one SEAL job. Returns the sealed epoch (None if nothing sealed)."""
+        return self._process_one()[1]
+
+    def _process_one(self) -> tuple[bool, SealResult | None]:
+        """(a job was taken off the queue, the epoch it produced). A job can be processed
+        without producing an epoch: its range is already sealed, or its self-check failed."""
         with self._engine.begin() as conn:
             job = conn.execute(
                 text(
@@ -167,13 +239,13 @@ class Sealer:
                 )
             ).one_or_none()
             if job is None:
-                return None
+                return False, None
             got = conn.execute(
                 text("SELECT pg_try_advisory_xact_lock(hashtextextended('agw-seal:' || :t, 0))"),
                 {"t": job.tenant_id},
             ).scalar_one()
             if not got:
-                return None  # another sealer holds this tenant; the job stays PENDING
+                return False, None  # another sealer holds this tenant; the job stays PENDING
             try:
                 result = self._seal(conn, job)
             except SelfCheckFailed as exc:
@@ -186,21 +258,26 @@ class Sealer:
                     job_id=job.job_id,
                     error_code=exc.reason,
                 )
-                return None
+                return True, None
             self._finish(conn, job.job_id, "DONE", None)
         if result is not None:
+            EPOCHS_SEALED.labels(result.seal_reason).inc()
             log(logger, logging.INFO, "epoch sealed", tenant_id=result.tenant_id, status="SEALED")
-        return result
+        return True, result
 
     def drain(self, max_epochs: int = 1000) -> list[SealResult]:
-        """Seal until nothing is due. Bounded so a scheduling bug can never spin forever."""
+        """Seal until nothing is due. Jobs are served FIFO by job id across tenants, and a
+        tenant's next job is only enqueued after its previous one finished, so a tenant with a
+        burst of urgent seals cannot starve the others. One tenant's stale or failed job never
+        ends the tick for the rest. Bounded so a scheduling bug can never spin forever."""
         out: list[SealResult] = []
         for _ in range(max_epochs):
             self.schedule()
-            r = self.run_once()
-            if r is None:
+            processed, result = self._process_one()
+            if not processed:
                 return out
-            out.append(r)
+            if result is not None:
+                out.append(result)
         log(logger, logging.ERROR, "sealer drain bound reached", error_code="DRAIN_BOUND")
         return out
 
@@ -221,6 +298,7 @@ class Sealer:
                 t.evidence_events.c.seq,
                 t.evidence_events.c.canonical_bytes,
                 t.evidence_events.c.event_hash,
+                t.evidence_events.c.risk_level,
             )
             .where(
                 t.evidence_events.c.tenant_id == tenant,
@@ -243,6 +321,7 @@ class Sealer:
             prev_root=prev,
             epoch_root=root,
             seal_reason=job.seal_reason,
+            anchor_priority=anchor_priority([r.risk_level for r in rows]),
         )
         self.last_computed = result
         self._crash.hit("seal_before_commit")
@@ -258,6 +337,7 @@ class Sealer:
                 epoch_root=root,
                 state="SEALED",
                 seal_reason=result.seal_reason,
+                anchor_priority=result.anchor_priority,
             )
         )
         conn.execute(

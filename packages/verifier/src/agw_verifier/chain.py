@@ -66,11 +66,28 @@ HEADER_KEYS = frozenset(
         "violation",
         "obs",
         "epoch",
+        "disclosure",  # Phase 7
+        "erasure",  # Phase 7
     }
 )
+# Phase 7: an export reports a payload it could not produce. Ciphertext that fails its AEAD
+# tag / stored SHA-256 was altered at rest -> TAMPERED; deleted (retention) or missing ->
+# INCOMPLETE (the header and proofs still verify).
+TAMPER_PAYLOAD_STATUS = frozenset({"DECRYPT_FAILED", "BLOB_CORRUPT"})
 REQUIRED_KEYS = ("v", "tenant", "seq", "prev", "id", "type", "ts", "class", "actor")
 PAYLOAD_KEYS = frozenset(
-    {"v", "salt", "event", "intent", "execution", "effects", "context", "delegation", "approval"}
+    {
+        "v",
+        "salt",
+        "event",
+        "intent",
+        "execution",
+        "effects",
+        "context",
+        "delegation",
+        "approval",
+        "disclosure",
+    }
 )
 
 
@@ -232,6 +249,8 @@ def verify_lines(
                 p_problem = _check_payload(rec, line["payload"])
                 if p_problem:
                     return report.tamper(seq, p_problem)
+            elif line.get("payload_status") in TAMPER_PAYLOAD_STATUS:
+                return report.tamper(seq, f"PAYLOAD_{line['payload_status']}")
             elif expect_payloads:
                 report.missing_payloads.append(seq)
         elif "payload" in line:
