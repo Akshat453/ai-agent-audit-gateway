@@ -29,12 +29,31 @@ uv pip install -q --python "$AV/bin/python" "./packages/verifier[disclosure]"
 AUDITOR_PUBLIC_KEY="$("$AV/bin/agw-verify" auditor-keygen --out "$AUD/auditor.key" | python3 -c 'import json,sys; print(json.load(sys.stdin)["public_key"])')"
 export AUDITOR_PUBLIC_KEY
 
+# Phase 8: delegation-token signing key (git-ignored secrets/), and the SMTP relay credential
+# that ONLY the gateway holds (random, created once; the compose mailpit sink accepts any).
+uv run python -m agw_gateway.admin gen-delegation-key --out secrets/delegation-signing.key --if-missing
+export AGW_DELEGATION_SIGNING_KEY_FILE=./secrets/delegation-signing.key
+[ -f secrets/smtp-relay.password ] || ( umask 077; python3 -c 'import secrets; print(secrets.token_urlsafe(24))' > secrets/smtp-relay.password )
+export AGW_SMTP_HOST=127.0.0.1 AGW_SMTP_PORT="${AGW_MAILPIT_SMTP_PORT:-1025}" AGW_SMTP_STARTTLS=false
+export AGW_SMTP_USERNAME=agw-relay AGW_SMTP_PASSWORD_FILE=./secrets/smtp-relay.password
+export AGW_SMTP_FROM=gateway@corp.example AGW_SMTP_ALLOWED_DOMAINS=corp.example,partner.example
+
 uv run python -m agw_gateway.admin seed-demo
 # The token is printed once by the admin CLI and kept only in this process's environment.
 AGW_AGENT_TOKEN="$(uv run python -m agw_gateway.admin create-agent-key --tenant demo --agent demo-agent --expires-days 1)"
 export AGW_AGENT_TOKEN
 AGW_IAM_AGENT_TOKEN="$(uv run python -m agw_gateway.admin create-agent-key --tenant demo --agent demo-iam-admin --expires-days 1)"
 export AGW_IAM_AGENT_TOKEN
+# Phase 8: planner + worker (multi-agent demo). The worker also gets an MCP-audience key and
+# the MCP adapter its own integration credential (no agent key passes through the adapter).
+AGW_PLANNER_TOKEN="$(uv run python -m agw_gateway.admin create-agent-key --tenant demo --agent demo-planner --expires-days 1)"
+AGW_WORKER_TOKEN="$(uv run python -m agw_gateway.admin create-agent-key --tenant demo --agent demo-worker --expires-days 1)"
+AGW_WORKER_AGENT_ID="$(uv run python -m agw_gateway.admin agent-id --tenant demo --agent demo-worker)"
+MCP_PORT="${AGW_MCP_PORT:-8765}"
+export AGW_MCP_URL="http://127.0.0.1:${MCP_PORT}/mcp"
+AGW_MCP_CLIENT_TOKEN="$(uv run python -m agw_gateway.admin create-integration-client --tenant demo --name demo-mcp --audience "$AGW_MCP_URL")"
+AGW_WORKER_MCP_TOKEN="$(uv run python -m agw_gateway.admin create-agent-key --tenant demo --agent demo-worker --expires-days 1 --audience "$AGW_MCP_URL")"
+export AGW_PLANNER_TOKEN AGW_WORKER_TOKEN AGW_WORKER_AGENT_ID AGW_WORKER_MCP_TOKEN
 
 # Phase 6: anchoring on the compose Anvil. Deployed with the Foundry script (record in
 # contracts/deployments/anvil-31337.json); dev keys/salt in git-ignored secrets/ (never printed).
@@ -54,7 +73,10 @@ uv run uvicorn agw_gateway.api.app:create_app --factory --host 127.0.0.1 --port 
 GW_PID=$!
 uv run python -m agw_worker >"$OUT/worker.log" 2>&1 &
 WK_PID=$!
-stop_stack() { kill "$GW_PID" "$WK_PID" 2>/dev/null || true; wait "$GW_PID" "$WK_PID" 2>/dev/null || true; }
+AGW_MCP_CLIENT_TOKEN="$AGW_MCP_CLIENT_TOKEN" AGW_MCP_RESOURCE_URL="$AGW_MCP_URL" \
+  uv run agw-mcp --port "$MCP_PORT" >"$OUT/mcp.log" 2>&1 &
+MCP_PID=$!
+stop_stack() { kill "$GW_PID" "$WK_PID" "$MCP_PID" 2>/dev/null || true; wait "$GW_PID" "$WK_PID" "$MCP_PID" 2>/dev/null || true; }
 trap stop_stack EXIT
 
 for _ in $(seq 1 50); do
@@ -64,9 +86,15 @@ done
 curl -fsS "$AGW_GATEWAY_URL/v1/ready" >/dev/null || { echo "gateway not ready; log: $OUT/gateway.log"; cat "$OUT/gateway.log"; exit 1; }
 
 uv run python examples/single-agent/agent.py "$@"
+echo "--- Phase 8: LLM tool-calling agent (AGW_LLM_PROVIDER=${AGW_LLM_PROVIDER:-mock}) ---"
+uv run python examples/single-agent/llm_agent.py
 uv run python examples/single-agent/approval_demo.py
 uv run python examples/single-agent/anchor_demo.py "$OUT"
 uv run python examples/single-agent/disclosure_demo.py "$OUT"
+echo "--- Phase 8: planner delegates to worker; LangGraph (SDK tools), then MCP ---"
+uv run python examples/multi-agent/run.py --transport sdk --out "$OUT"
+uv run python examples/multi-agent/run.py --transport mcp --out "$OUT"
+curl -fsS "http://127.0.0.1:${AGW_MAILPIT_HTTP_PORT:-8025}/api/v1/messages" | python3 -c 'import json,sys; m=json.load(sys.stdin)["messages"]; s=[x for x in m if x["Subject"].startswith("Your escalation")]; print(f"SMTP sink received {len(s)} approved email(s) from the gateway"); sys.exit(0 if len(s) >= 2 else 1)'
 uv run python examples/single-agent/fetch_bundle.py "$OUT"
 echo "--- gateway risk metrics (operational counters only) ---"
 curl -fsS "$AGW_GATEWAY_URL/metrics" | grep -E '^agw_(risk_decisions|approval_[a-z_]+)_total' || true
@@ -111,6 +139,8 @@ echo "agw-verify epochs (on-chain anchors)  exit=$rc"; [ "$rc" -eq 0 ] || exit 1
 python3 -c "import json,sys; d=json.load(open(sys.argv[1])); d['contract']='0x'+'de'*20; json.dump(d,open(sys.argv[2],'w'))" "$OUT/pinned-trust.json" "$OUT/wrong-trust.json"
 rc=0; uv run agw-verify event --bundle "$OUT/bundle.json" --trust-config "$OUT/wrong-trust.json" >/dev/null || rc=$?
 echo "agw-verify event  (auditor pinned a different contract) exit=$rc (5 = UNTRUSTED_ANCHOR)"; [ "$rc" -eq 5 ] || exit 1
+echo "--- Phase 8: every multi-agent event, offline, against the on-chain anchors ---"
+uv run python examples/multi-agent/verify_offline.py "$OUT" "$OUT/pinned-trust.json"
 echo "--- Phase 7: the auditor, in her own venv, with ONLY bundles + her key + pinned trust roots ---"
 cp "$OUT/pinned-trust.json" "$AUD/"
 ( cd "$AUD"

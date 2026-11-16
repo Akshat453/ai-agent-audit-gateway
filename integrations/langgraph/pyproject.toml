@@ -1,0 +1,13 @@
+[project]
+name = "agw-langgraph"
+version = "0.1.0"
+description = "LangGraph adapter: every tool invocation goes through the AGW gateway (agw-sdk)"
+requires-python = ">=3.12"
+dependencies = ["agw-sdk", "langgraph>=1.2", "langchain-core>=1.8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agw_langgraph"]

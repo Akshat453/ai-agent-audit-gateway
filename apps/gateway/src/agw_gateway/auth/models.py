@@ -16,3 +16,6 @@ class AuthenticatedAgent:
     scopes: frozenset[str]
     active: bool = True
     trust_tier: str | None = None  # trusted | standard | untrusted; None = missing (worst)
+    # Phase 8 (ADR-0030): set when the call arrived through an integration (e.g. "mcp:<name>")
+    # with an exchanged token. Recorded in the request's context provenance; never authority.
+    via: str | None = None

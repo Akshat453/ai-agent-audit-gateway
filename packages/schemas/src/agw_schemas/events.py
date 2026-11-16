@@ -12,7 +12,9 @@ execution              ACTION_DISPATCHED payload ``execution.params``
 effects                ACTION_COMPLETED / FAILED / OUTCOME_UNKNOWN payload ``effects``
 context provenance     ACTION_REQUESTED payload ``context`` (sources + digests) + header ``env``
 code provenance        header ``code`` {gw commit, adapter@version, agent-declared version}
-delegation provenance  ACTION_REQUESTED payload ``delegation`` (present, null until later)
+delegation provenance  ACTION_REQUESTED header ``delegation`` + ``refs.parent`` (Phase 8,
+                       ADR-0030: gateway-verified token chain) and payload ``delegation``;
+                       DELEGATION_CREATED / DELEGATION_REVOKED (A2A)
 =====================  =============================================================
 
 No chain-of-thought or agent "reasoning" field exists anywhere, by design (Paper B §III-B).
@@ -190,10 +192,40 @@ class Erasure(_M):
     policy: Annotated[str, Field(max_length=64)] | None = None
 
 
+class DelegationRef(_M):
+    """Phase 8 (ADR-0030). On DELEGATION_CREATED: the issued token's non-secret claims. On
+    DELEGATION_REVOKED: id, depth, th. On a child's ACTION_REQUESTED: id, depth, th, from (the
+    direct issuer), root (the chain's root agent), ev (the DELEGATION_CREATED event id); the
+    header's ``refs.parent`` is that event's hash, so the link is hash-bound, not just by id."""
+
+    id: Bytes16  # delegation id
+    depth: Annotated[int, Field(ge=1, le=8)]
+    th: Bytes32  # token hash SHA-256(TAG("AGW/delegation-token/v1") || claims || sig)
+    from_: Bytes16 | None = Field(default=None, alias="from")  # issuing agent
+    to: Bytes16 | None = None  # child agent
+    root: Bytes16 | None = None  # root agent of the chain
+    par: Bytes16 | None = None  # parent delegation id (depth > 1)
+    ev: Bytes16 | None = None  # DELEGATION_CREATED event id
+    sc: Annotated[list[Annotated[str, Field(max_length=128)]], Field(max_length=64)] | None = None
+    tl: Annotated[list[Annotated[str, Field(max_length=64)]], Field(max_length=64)] | None = None
+    mr: RiskLevelName | None = None  # max risk level
+    exp: UInt | None = None  # expiry, us
+    mu: UInt | None = None  # max uses
+    kid: Annotated[str, Field(max_length=32)] | None = None  # signing key id
+
+
+class Refs(_M):
+    """Hash references to earlier events (05 §4; Paper A §4 declared dependency)."""
+
+    parent: Bytes32
+
+
 class Violation(_M):
     # AGENT_ON_HUMAN_ENDPOINT: an agent credential presented to a human-only endpoint
     # (approvals); ``claimed`` then names the endpoint, never request content.
-    kind: Literal["AGENT_ID_MISMATCH", "AGENT_ON_HUMAN_ENDPOINT"]
+    # DELEGATION_REFUSED (Phase 8): a delegation request that would exceed the issuer's
+    # authority (``claimed`` = the refusal code, never request content).
+    kind: Literal["AGENT_ID_MISMATCH", "AGENT_ON_HUMAN_ENDPOINT", "DELEGATION_REFUSED"]
     claimed: Annotated[str, Field(max_length=128)]
 
 
@@ -230,6 +262,8 @@ class EventHeader(_M):
     epoch: EpochRef | None = None  # EPOCH_SEALED only (ADR-0025)
     disclosure: Disclosure | None = None  # DISCLOSURE_* only (Phase 7)
     erasure: Erasure | None = None  # PAYLOAD_DELETED only (Phase 7)
+    delegation: DelegationRef | None = None  # Phase 8: DELEGATION_* and delegated requests
+    refs: Refs | None = None  # Phase 8: hash link to the event this one depends on
     obs: UInt | None = None  # observed_at, µs: when the executor/reconciler observed it
 
     def model_post_init(self, _context: Any) -> None:
@@ -275,6 +309,8 @@ EpochSealed = _header("EPOCH_SEALED", "SYS", ("epoch",))
 DisclosureGranted = _header("DISCLOSURE_GRANTED", "A2H", ("disclosure", "payload"))
 DisclosureAccessed = _header("DISCLOSURE_ACCESSED", "A2H", ("disclosure", "outcome"))
 PayloadDeleted = _header("PAYLOAD_DELETED", "SYS", ("erasure",))
+DelegationCreated = _header("DELEGATION_CREATED", "A2A", ("delegation", "payload"))
+DelegationRevoked = _header("DELEGATION_REVOKED", "A2A", ("delegation",))
 
 HEADER_MODELS: Final[dict[str, type[EventHeader]]] = {
     m.TYPE: m
@@ -296,6 +332,8 @@ HEADER_MODELS: Final[dict[str, type[EventHeader]]] = {
         DisclosureGranted,
         DisclosureAccessed,
         PayloadDeleted,
+        DelegationCreated,
+        DelegationRevoked,
     )
 }
 # Types that have a model but may not be written yet. Empty since Phase 5 (ADR-0027).
@@ -327,7 +365,10 @@ class Payload(_M):
     effects: dict[str, Any] | None = None  # {"result": ...} | {"result_json": ...}, "error"
     context: dict[str, Any] | None = None  # {"sources": [{uri, digest}]}
     approval: dict[str, Any] | None = None  # {"record": signed decision record, "comment"}
-    delegation: dict[str, Any] | None = None  # {"from", "parent", "scope"} (later)
+    # ACTION_REQUESTED: {"depth", "declared_by": "agent"} (Phase 4) or, for a verified chain
+    # (Phase 8), {"id", "chain": [ids root..leaf], "depth", "declared_by": "gateway"};
+    # DELEGATION_CREATED: {"purpose"}. Explicit null on direct calls (Paper B field 8).
+    delegation: dict[str, Any] | None = None
     disclosure: dict[str, Any] | None = None  # {"purpose", "event_ids"} (Phase 7)
 
     def to_record(self, *, delegation_present: bool = False) -> dict[str, Any]:

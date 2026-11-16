@@ -487,6 +487,20 @@ def signing_key_file() -> Path:
     return _SIGNING_KEY[0]
 
 
+_DELEGATION_KEY: list[Path] = []
+
+
+def delegation_key_file() -> Path:
+    """One dev Ed25519 delegation-signing key for the whole test session (Phase 8)."""
+    if not _DELEGATION_KEY:
+        from agw_gateway.delegation.service import generate_delegation_key_file
+
+        path = Path(tempfile.mkdtemp(prefix="agw-test-")) / "delegation-signing.key"
+        generate_delegation_key_file(path)
+        _DELEGATION_KEY.append(path)
+    return _DELEGATION_KEY[0]
+
+
 _KEK_DIR: list[Path] = []
 
 
@@ -504,6 +518,7 @@ def kek_dir() -> Path:
 def make_settings(app_url: str, tmp_path: Path, **overrides: Any) -> Any:
     values: dict[str, Any] = {
         "approval_signing_key_file": signing_key_file(),
+        "delegation_signing_key_file": delegation_key_file(),
         "kek_dir": kek_dir(),
         "kek_id": "test",
         "env": "test",

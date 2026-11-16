@@ -1,0 +1,18 @@
+# Build context hygiene (Phase 8 containment images): no local envs, secrets or caches.
+.git
+.venv
+.env
+.env.*
+secrets
+.sandbox
+**/__pycache__
+**/.pytest_cache
+.mypy_cache
+.ruff_cache
+.hypothesis
+.coverage
+contracts/out
+contracts/cache
+contracts/broadcast
+docs/gateway/papers
+node_modules

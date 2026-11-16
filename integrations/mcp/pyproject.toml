@@ -1,0 +1,16 @@
+[project]
+name = "agw-mcp"
+version = "0.1.0"
+description = "MCP server adapter (spec 2026-07-28, streamable HTTP): exposes an agent's permitted gateway tools"
+requires-python = ">=3.12"
+dependencies = ["agw-sdk", "mcp>=2.3,<3", "httpx>=0.27", "uvicorn>=0.30", "anyio>=4"]
+
+[project.scripts]
+agw-mcp = "agw_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agw_mcp"]

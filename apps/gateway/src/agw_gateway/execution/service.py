@@ -24,7 +24,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Final, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from sqlalchemy import Engine, Row, func, insert, select, text
 from sqlalchemy.exc import IntegrityError
 
@@ -34,6 +34,8 @@ from agw_gateway.approvals.service import ApprovalConfig, NewApproval
 from agw_gateway.auth.models import AuthenticatedAgent
 from agw_gateway.crypto.canonical import ZERO32, args_digest, profile_value
 from agw_gateway.db import tables as t
+from agw_gateway.delegation.constraint import DelegationConstraint
+from agw_gateway.delegation.service import DelegationService, Resolved
 from agw_gateway.evidence import EvidenceWriter, NewEvent
 from agw_gateway.evidence.records import policy_evaluated_fields
 from agw_gateway.evidence.writer import GATEWAY_ACTOR_ID
@@ -89,9 +91,18 @@ class Context(_Envelope):
 
 
 class Delegation(_Envelope):
-    """Agent-DECLARED delegation (unauthenticated). It can only raise risk (ADR-0026)."""
+    """Either an agent-DECLARED depth (unauthenticated; can only raise risk, ADR-0026) or,
+    Phase 8 (ADR-0030), a gateway-signed delegation ``token`` whose whole chain the gateway
+    verifies. Exactly one of the two."""
 
-    depth: int = Field(ge=0, le=32)
+    depth: int | None = Field(default=None, ge=0, le=32)
+    token: str | None = Field(default=None, min_length=16, max_length=4096)
+
+    @model_validator(mode="after")
+    def _exactly_one(self) -> Delegation:
+        if (self.depth is None) == (self.token is None):
+            raise ValueError("exactly one of depth / token")
+        return self
 
 
 class ActionRequest(_Envelope):
@@ -135,7 +146,9 @@ class ActionService:
         gate: GatePolicy | None = None,
         cipher: EnvelopeCipher | None = None,
         minimizer: Minimizer | None = None,
+        delegations: DelegationService | None = None,
     ) -> None:
+        self._delegations = delegations
         self._gate = gate or GatePolicy(frozenset(), 0.0)
         self._cipher_obj = cipher
         self._minimizer_obj = minimizer
@@ -188,34 +201,44 @@ class ActionService:
         if existing is not None:
             return self._replay(existing, fingerprint)
 
-        spec, decision, validated, policy = self._evaluate(agent, req)
-        binding = _binding(agent, req, spec, decision, validated, policy)
-        approval = (
-            NewApproval.create(binding, decision.risk.level.name, self._approval_config)
-            if decision.effect == "REQUIRE_APPROVAL" and binding is not None
-            else None
-        )
-        try:
-            result = self._tx1(
-                agent,
-                req,
-                idempotency_key,
-                fingerprint,
-                spec,
-                decision,
-                validated,
-                binding,
-                approval,
+        for attempt in (1, 2):
+            resolved = self._resolve_delegation(agent, req)
+            spec, decision, validated, policy = self._evaluate(agent, req, resolved)
+            binding = _binding(agent, req, spec, decision, validated, policy, resolved)
+            approval = (
+                NewApproval.create(binding, decision.risk.level.name, self._approval_config)
+                if decision.effect == "REQUIRE_APPROVAL" and binding is not None
+                else None
             )
-        except IntegrityError as exc:
-            if not _is_idempotency_conflict(exc):
-                raise
-            # A concurrent duplicate committed first: replay or 409.
-            with self._engine.connect() as conn:
-                existing = self._read_key(conn, agent.agent_id, idempotency_key)
-            if existing is None:  # pragma: no cover - the winner's row is committed
-                raise
-            return self._replay(existing, fingerprint)
+            try:
+                result = self._tx1(
+                    agent,
+                    req,
+                    idempotency_key,
+                    fingerprint,
+                    spec,
+                    decision,
+                    validated,
+                    binding,
+                    approval,
+                    resolved,
+                )
+                break
+            except _DelegationRace:
+                # A concurrent request used the last delegation use (or it was revoked)
+                # between resolve and tx1: re-evaluate; the second pass sees it and DENYs.
+                if attempt == 2:  # pragma: no cover - the second resolve sees the change
+                    raise
+                continue
+            except IntegrityError as exc:
+                if not _is_idempotency_conflict(exc):
+                    raise
+                # A concurrent duplicate committed first: replay or 409.
+                with self._engine.connect() as conn:
+                    existing = self._read_key(conn, agent.agent_id, idempotency_key)
+                if existing is None:  # pragma: no cover - the winner's row is committed
+                    raise
+                return self._replay(existing, fingerprint)
 
         RISK_DECISIONS.labels(decision.risk.level.name, decision.effect).inc()
         self._crash.hit("after_tx1_commit")
@@ -266,8 +289,16 @@ class ActionService:
         with self._engine.connect() as conn:
             return load_active_policy(conn, ACTIVE_POLICY_ID)
 
+    def _resolve_delegation(self, agent: AuthenticatedAgent, req: ActionRequest) -> Resolved | None:
+        if req.delegation is None or req.delegation.token is None:
+            return None
+        if self._delegations is None:  # no signing key: nothing verifies (fail closed)
+            return Resolved(DelegationConstraint.failed("DELEGATION_INVALID"))
+        with self._engine.connect() as conn:
+            return self._delegations.resolve(conn, agent, req.delegation.token)
+
     def _evaluate(
-        self, agent: AuthenticatedAgent, req: ActionRequest
+        self, agent: AuthenticatedAgent, req: ActionRequest, resolved: Resolved | None = None
     ) -> tuple[ToolSpec | None, Decision, BaseModel | None, StoredPolicy]:
         try:
             spec = self._registry.resolve(req.tool, req.tool_version)
@@ -285,6 +316,7 @@ class ActionService:
             policy=policy.document,
             now=datetime.now(UTC),
             delegation_depth=req.delegation.depth if req.delegation else None,
+            delegation=resolved.constraint if resolved is not None else None,
         )
         return spec, decision, validated, policy
 
@@ -299,8 +331,10 @@ class ActionService:
         validated: BaseModel | None,
         binding: bytes | None,
         approval: NewApproval | None,
+        resolved: Resolved | None = None,
     ) -> SubmitResult:
         action_id = uuid7()
+        verified = _verified(resolved)
         status = _STATUS_FOR_EFFECT[decision.effect]
         tool_version = spec.meta.version if spec else req.tool_version
         body = _response_body(action_id, req.run_id, status, decision, approval)
@@ -308,6 +342,13 @@ class ActionService:
 
         with self._engine.begin() as conn:
             conn.execute(text(f"SET LOCAL statement_timeout = {self._timeout_ms}"))
+            if (
+                verified is not None
+                and decision.effect != "DENY"
+                and self._delegations is not None
+                and not self._delegations.consume(conn, verified.chain)
+            ):
+                raise _DelegationRace  # rolls back tx1; submit() re-evaluates
             conn.execute(
                 insert(t.idempotency_keys).values(
                     agent_id=agent.agent_id,
@@ -348,8 +389,9 @@ class ActionService:
                         if pending and validated is not None
                         else None
                     ),
-                    delegation_depth=req.delegation.depth if req.delegation else None,
+                    delegation_depth=_depth(req, resolved),
                     risk_policy_digest=decision.risk.policy_digest,
+                    delegation_id=verified.delegation_id if verified is not None else None,
                 )
             )
             approval_map = (
@@ -382,6 +424,7 @@ class ActionService:
                 intent_args,
                 self._build_commit,
                 approval_map,
+                resolved,
             )
             stored = self._writer.append(conn, agent.tenant_id, events)
             if decision.effect == "ALLOW":
@@ -447,6 +490,7 @@ def _binding(
     decision: Decision,
     validated: BaseModel | None,
     policy: StoredPolicy,
+    resolved: Resolved | None = None,
 ) -> bytes | None:
     """Action digest (ADR-0027), computed once at request time. None if args are invalid or
     the tool is unknown (such requests are DENIED and can never be approved)."""
@@ -465,8 +509,25 @@ def _binding(
         policy_digest=policy_digest(policy.raw),
         risk_policy_digest=decision.risk.policy_digest,
         risk_level=decision.risk.level.name,
-        delegation_depth=req.delegation.depth if req.delegation else None,
+        delegation_depth=_depth(req, resolved),
+        delegation_id=ok.delegation_id if (ok := _verified(resolved)) else None,
+        delegation_hash=ok.token_hash if ok else None,
     ).digest()
+
+
+def _verified(resolved: Resolved | None) -> Resolved | None:
+    return resolved if resolved is not None and resolved.constraint.failure is None else None
+
+
+class _DelegationRace(Exception):
+    """tx1 could not consume a delegation use that resolve() saw as available."""
+
+
+def _depth(req: ActionRequest, resolved: Resolved | None) -> int | None:
+    """Depth recorded on the action: the verified chain's, else the agent-declared one."""
+    if resolved is not None:
+        return resolved.constraint.depth if resolved.constraint.failure is None else None
+    return req.delegation.depth if req.delegation else None
 
 
 def _response_body(
@@ -514,6 +575,7 @@ def _tx1_events(
     intent_args: dict[str, Any],
     build_commit: str,
     approval_map: dict[str, Any] | None = None,
+    resolved: Resolved | None = None,
 ) -> list[NewEvent]:
     tool: dict[str, str] = {"id": req.tool}
     code: dict[str, str] = {"gw": build_commit}
@@ -536,15 +598,28 @@ def _tx1_events(
     }
     risk = decision.risk
     level = risk.level.name
-    payload: dict[str, Any] = {"intent": intent, "context": {"sources": sources}}
-    if req.delegation is not None:
+    context: dict[str, Any] = {"sources": sources}
+    if agent.via is not None:
+        context["via"] = agent.via  # Phase 8: the integration that relayed the call (MCP)
+    payload: dict[str, Any] = {"intent": intent, "context": context}
+    requested: dict[str, Any] = {"tool": tool, "env": req.environment, "code": dict(code)}
+    if resolved is not None and resolved.constraint.failure is None:
+        # Delegation provenance (Paper B field 8), gateway-verified (ADR-0030): the header
+        # names the chain and hash-links the DELEGATION_CREATED event it was issued by.
+        requested["delegation"] = resolved.header_ref()
+        assert resolved.created_event_hash is not None  # noqa: S101
+        requested["refs"] = {"parent": resolved.created_event_hash}
+        payload["delegation"] = resolved.payload_section()
+    elif resolved is not None:
+        payload["delegation"] = {"declared_by": "gateway", "failure": resolved.constraint.failure}
+    elif req.delegation is not None:
         payload["delegation"] = {"depth": req.delegation.depth, "declared_by": "agent"}
     events = [
         NewEvent(
             type="ACTION_REQUESTED",
             actor_kind="agent",
             actor_id=str(agent.agent_id),
-            fields={"tool": tool, "env": req.environment, "code": dict(code)},
+            fields=requested,
             payload=payload,
             delegation_present=req.delegation is None,
             risk_level=level,

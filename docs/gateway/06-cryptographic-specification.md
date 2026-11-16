@@ -57,6 +57,9 @@ hash input can collide in type with a Merkle leaf or node input (first byte 0x00
 | `AGW/recorder/v1` | `0f 4147572f7265636f726465722f7631` | On-chain recorder id (salted; §10) | ADR-0028 §2 |
 | `AGW/request/v1` | `0e 4147572f726571756573742f7631` | Idempotency request fingerprint | 08 §5 |
 | `AGW/apikey/v1` | `0d 4147572f6170696b65792f7631` | API key digest | 11 §3 |
+| `AGW/delegation-sig/v1` | `15 4147572f64656c65676174696f6e2d7369672f7631` | Ed25519 message prefix for delegation tokens | ADR-0030 §1 |
+| `AGW/delegation-token/v1` | `17 4147572f64656c65676174696f6e2d746f6b656e2f7631` | Delegation token hash (`claims_cbor ‖ sig`) | ADR-0030 §1 |
+| `AGW/integration-key/v1` | `16 4147572f696e746567726174696f6e2d6b65792f7631` | Integration client (MCP adapter) credential digest | ADR-0030 §6 |
 | `AGW/bundle/v1` | `0d 4147572f62756e646c652f7631` | Evidence bundle manifest digest | 10 §2 |
 
 AEAD associated-data labels (not hash inputs, but same encoding): `AGW/payload-aad/v1`,

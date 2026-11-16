@@ -5,6 +5,9 @@
     python -m agw_gateway.admin revoke-key --key-id <16 hex>
     python -m agw_gateway.admin create-human --tenant demo --username alice --roles approver
     python -m agw_gateway.admin gen-signing-key --out secrets/approval-signing.key
+    python -m agw_gateway.admin gen-delegation-key --out secrets/delegation-signing.key
+    python -m agw_gateway.admin create-agent-key --tenant demo --agent w --audience URI
+    python -m agw_gateway.admin create-integration-client --tenant demo --name mcp --audience URI
 
 ``create-agent-key`` prints the token exactly once on stdout; only its digest is stored.
 ``create-human`` reads the password from ``AGW_NEW_HUMAN_PASSWORD`` or prompts for it; it is
@@ -29,10 +32,12 @@ from sqlalchemy.dialects.postgresql import insert
 
 from agw_gateway.api.app import load_blob_store, load_key_provider
 from agw_gateway.approvals.signing import generate_key_file
+from agw_gateway.auth.exchange import new_integration_token
 from agw_gateway.auth.tokens import issue_token
 from agw_gateway.config import Settings, load_settings
 from agw_gateway.db import create_db_engine
 from agw_gateway.db import tables as t
+from agw_gateway.delegation.service import generate_delegation_key_file
 from agw_gateway.evidence import EvidenceWriter
 from agw_gateway.evidence.bundle import build_bundle, export_epochs
 from agw_gateway.evidence.export import export_chain
@@ -64,6 +69,22 @@ DEMO_AGENTS: dict[str, tuple[str, ...]] = {
     # Phase 6 demo: holds iam:admin, so update_iam_role in dev is the CRITICAL exception
     # (REQUIRE_APPROVAL by two approvers, then pre-action anchoring before dispatch).
     "demo-iam-admin": ("tools:update_iam_role", "iam:admin"),
+    # Phase 8 (ADR-0030) multi-agent demo: the planner delegates "create ticket + email
+    # summary" to the worker. Both hold the scopes (a delegation can only NARROW); the worker
+    # acts only under the planner's token, which limits tools, risk, uses and time.
+    "demo-planner": (
+        "tools:public_doc_search",
+        "tools:create_ticket",
+        "tools:send_email_smtp",
+        "tools:public_api_get",
+    ),
+    "demo-worker": (
+        "tools:public_doc_search",
+        "tools:create_ticket",
+        "tools:send_email_smtp",
+        "tools:public_api_get",
+        "tools:delete_record",
+    ),
 }
 DEMO_RECORDS = ("alpha record", "beta record", "gamma record")
 # Demo humans (Phase 5). Created by seed-demo only when AGW_DEMO_APPROVER_PASSWORD is set.
@@ -150,7 +171,11 @@ def ensure_human(
 
 
 def create_key(
-    engine: Engine, tenant_id: str, agent_name: str, expires_in: timedelta | None = None
+    engine: Engine,
+    tenant_id: str,
+    agent_name: str,
+    expires_in: timedelta | None = None,
+    audience: str | None = None,
 ) -> str:
     issued = issue_token()
     with engine.begin() as conn:
@@ -161,16 +186,40 @@ def create_key(
         ).scalar_one_or_none()
         if agent_id is None:
             raise SystemExit(f"unknown agent {tenant_id}/{agent_name}")
+        values: dict[str, Any] = {
+            "credential_id": uuid7(),
+            "agent_id": agent_id,
+            "key_id": issued.key_id,
+            "key_digest": issued.digest,
+            "expires_at": (datetime.now(UTC) + expires_in) if expires_in else None,
+        }
+        if audience is not None:  # Phase 8: bound to one resource (an MCP adapter)
+            values["audience"] = audience
+        conn.execute(insert(t.agent_credentials).values(**values))
+    return issued.token
+
+
+def create_integration_client(engine: Engine, tenant_id: str, name: str, audience: str) -> str:
+    """Register (or re-key) a confidential integration client; prints its token once."""
+    key_id, token, digest = new_integration_token()
+    with engine.begin() as conn:
         conn.execute(
-            insert(t.agent_credentials).values(
-                credential_id=uuid7(),
-                agent_id=agent_id,
-                key_id=issued.key_id,
-                key_digest=issued.digest,
-                expires_at=(datetime.now(UTC) + expires_in) if expires_in else None,
+            insert(t.integration_clients)
+            .values(
+                client_id=uuid7(),
+                tenant_id=tenant_id,
+                name=name,
+                audience=audience,
+                key_id=key_id,
+                key_digest=digest,
+                status="active",
+            )
+            .on_conflict_do_update(
+                index_elements=["tenant_id", "name"],
+                set_={"audience": audience, "key_id": key_id, "key_digest": digest},
             )
         )
-    return issued.token
+    return token
 
 
 def revoke_key(engine: Engine, key_id: str) -> bool:
@@ -309,6 +358,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     ck.add_argument("--tenant", required=True)
     ck.add_argument("--agent", required=True)
     ck.add_argument("--expires-days", type=int, default=None)
+    ck.add_argument("--audience", default=None, help="bind the key to one resource (MCP URI)")
+    ic = sub.add_parser("create-integration-client", help="MCP adapter credential (printed once)")
+    ic.add_argument("--tenant", required=True)
+    ic.add_argument("--name", required=True)
+    ic.add_argument("--audience", required=True, help="the adapter's canonical URI")
+    ai = sub.add_parser("agent-id", help="print an agent's id (not a secret)")
+    ai.add_argument("--tenant", required=True)
+    ai.add_argument("--agent", required=True)
+    gd = sub.add_parser("gen-delegation-key", help="write a dev Ed25519 delegation-signing key")
+    gd.add_argument("--out", required=True)
+    gd.add_argument("--if-missing", action="store_true")
     ch = sub.add_parser("create-human", help="create/reset an approver/auditor/admin (no agent)")
     ch.add_argument("--tenant", required=True)
     ch.add_argument("--username", required=True)
@@ -390,6 +450,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"wrote approval signing key {key_id} to {args.out} (mode 0600)", file=sys.stderr)
         return 0
 
+    if args.cmd == "gen-delegation-key":  # no database needed
+        if args.if_missing and Path(args.out).exists():
+            return 0
+        try:
+            kid = generate_delegation_key_file(Path(args.out))
+        except FileExistsError:
+            print(f"{args.out} exists; refusing to overwrite", file=sys.stderr)
+            return 1
+        print(f"wrote delegation signing key {kid} to {args.out} (mode 0600)", file=sys.stderr)
+        return 0
+
     settings = load_settings()
     if settings.migrator_database_url is None:
         print("AGW_MIGRATOR_DATABASE_URL (missing)", file=sys.stderr)
@@ -409,7 +480,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"human {args.tenant}/{args.username} = {human_id}")
         elif args.cmd == "create-agent-key":
             expires = timedelta(days=args.expires_days) if args.expires_days else None
-            print(create_key(engine, args.tenant, args.agent, expires))
+            print(create_key(engine, args.tenant, args.agent, expires, args.audience))
+        elif args.cmd == "agent-id":
+            with engine.connect() as conn:
+                print(
+                    conn.execute(
+                        select(t.agents.c.agent_id).where(
+                            t.agents.c.tenant_id == args.tenant, t.agents.c.name == args.agent
+                        )
+                    ).scalar_one()
+                )
+        elif args.cmd == "create-integration-client":
+            print(create_integration_client(engine, args.tenant, args.name, args.audience))
         elif args.cmd == "chain-head":
             with engine.connect() as conn:
                 head = conn.execute(

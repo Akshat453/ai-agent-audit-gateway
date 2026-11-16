@@ -63,6 +63,7 @@ agent_credentials = Table(
     Column("created_at", DateTime(timezone=True)),
     Column("expires_at", DateTime(timezone=True)),
     Column("revoked_at", DateTime(timezone=True)),
+    Column("audience", Text),  # Phase 8: NULL = gateway API; else the one resource it is for
 )
 
 tool_registry = Table(
@@ -123,6 +124,7 @@ actions = Table(
     Column("request_args_sealed", LargeBinary),
     Column("delegation_depth", Integer),
     Column("risk_policy_digest", LargeBinary),
+    Column("delegation_id", UUID(as_uuid=True)),  # Phase 8 (ADR-0030)
 )
 
 evidence_events = Table(
@@ -471,4 +473,65 @@ legal_holds = Table(
     Column("created_by", Text, nullable=False),
     Column("created_at", DateTime(timezone=True)),
     Column("released_at", DateTime(timezone=True)),
+)
+
+
+# --------------------------------------------------------------------------- Phase 8 (ADR-0030)
+delegation_signing_keys = Table(
+    "delegation_signing_keys",
+    metadata,
+    Column("key_id", Text, primary_key=True),
+    Column("algorithm", Text, nullable=False),
+    Column("public_key", LargeBinary, nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+)
+
+delegations = Table(
+    "delegations",
+    metadata,
+    Column("delegation_id", UUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", Text, nullable=False),
+    Column("issuer_agent_id", UUID(as_uuid=True), nullable=False),
+    Column("child_agent_id", UUID(as_uuid=True), nullable=False),
+    Column("parent_delegation_id", UUID(as_uuid=True)),
+    Column("depth", SmallInteger, nullable=False),
+    Column("scopes", ARRAY(Text), nullable=False),
+    Column("tools", ARRAY(Text), nullable=False),
+    Column("max_risk", Text, nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("max_uses", Integer, nullable=False),
+    Column("uses", Integer, nullable=False),
+    Column("token_hash", LargeBinary, nullable=False),
+    Column("key_id", Text, nullable=False),
+    Column("created_event_id", UUID(as_uuid=True), nullable=False),
+    Column("created_event_hash", LargeBinary, nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+    Column("revoked_at", DateTime(timezone=True)),
+    Column("revoked_by", Text),
+)
+
+integration_clients = Table(
+    "integration_clients",
+    metadata,
+    Column("client_id", UUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", Text, nullable=False),
+    Column("name", Text, nullable=False),
+    Column("audience", Text, nullable=False),
+    Column("key_id", Text, nullable=False),
+    Column("key_digest", LargeBinary, nullable=False),
+    Column("status", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+)
+
+exchanged_tokens = Table(
+    "exchanged_tokens",
+    metadata,
+    Column("token_id", UUID(as_uuid=True), primary_key=True),
+    Column("key_id", Text, nullable=False),
+    Column("key_digest", LargeBinary, nullable=False),
+    Column("agent_id", UUID(as_uuid=True), nullable=False),
+    Column("subject_credential_id", UUID(as_uuid=True), nullable=False),
+    Column("client_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
 )

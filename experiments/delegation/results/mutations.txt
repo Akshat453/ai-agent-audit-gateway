@@ -1,0 +1,26 @@
+CAUGHT   token signature verified                         test_widened_scopes_resigned_with_another_key_is_rejected
+CAUGHT   token must be the issued one (hash)              test_tampered_and_forged_tokens_denied
+CAUGHT   token only for its child agent (claims + chain)  test_token_presented_by_another_agent_denied
+CAUGHT   revocation (any ancestor)                        test_root_revocation_cascades_to_subdelegation
+CAUGHT   expiry (any link)                                test_expired_token_denied
+CAUGHT   use count checked at resolve                     test_over_used_token_denied
+CAUGHT   use consumed atomically in tx1                   test_concurrent_over_use_never_exceeds_max_uses
+CAUGHT   depth limit at use                               test_depth_limit_at_issue_and_at_use
+CAUGHT   depth limit at issue                             test_depth_limit_at_issue_and_at_use
+CAUGHT   issuers' CURRENT scopes intersected              test_parent_scope_reduced_child_loses_it_immediately
+CAUGHT   never expansion at issue                         test_parent_cannot_delegate_a_scope_it_lacks
+CAUGHT   refused delegation is evidence                   test_parent_cannot_delegate_a_scope_it_lacks
+CAUGHT   policy: chain must cover the scope               test_child_using_a_scope_the_chain_lacks_is_denied
+CAUGHT   policy: tool allowlist                           test_tool_outside_allowlist_and_risk_above_cap_denied
+CAUGHT   policy: max risk cap                             test_tool_outside_allowlist_and_risk_above_cap_denied
+CAUGHT   pre-dispatch chain re-check                      test_parent_scope_reduced_child_loses_it_immediately
+CAUGHT   approval-time chain re-check                     test_revocation_while_pending_approval_blocks_authorization
+CAUGHT   child request hash-linked to DELEGATION_CREATED  test_evidence_links_child_actions_to_the_delegation
+CAUGHT   gateway refuses audience-bound (MCP) keys        test_only_tokens_for_this_resource_are_accepted
+CAUGHT   exchange checks the token's audience             test_only_tokens_for_this_resource_are_accepted
+CAUGHT   exchanged token dies with its subject key        test_revoked_agent_key_stops_immediately
+CAUGHT   MCP: pending approval is an error result         test_call_completed_denied_and_pending_approval
+CAUGHT   SDK: one idempotency key per logical call        test_retry_after_lost_response_replays_one_action
+CAUGHT   public_api_get allowlist at validation           test_public_api_get_off_allowlist_denied_without_io
+CAUGHT   public_api_get never follows redirects           test_public_api_get_does_not_follow_redirects_and_caps_size
+25/25 mutations caught

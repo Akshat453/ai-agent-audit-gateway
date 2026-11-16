@@ -26,6 +26,7 @@ _SECRET_FIELDS = (
     "vault_token",
     "blob_access_key",
     "blob_secret_key",
+    "smtp_password",
 )
 
 
@@ -130,10 +131,36 @@ class Settings(BaseSettings):
     blob_secure: bool = True
     retention_sweep_seconds: float = Field(default=3600.0, gt=0)
     disclosure_max_events: int = Field(default=200, ge=1, le=1000)
+    # Delegation (Phase 8, ADR-0030). No key -> issuing returns 503 and every presented token
+    # is DENIED (DELEGATION_INVALID): fail closed.
+    delegation_signing_key_file: Path | None = None
+    delegation_max_depth: int = Field(default=2, ge=1, le=8)
+    delegation_max_ttl_seconds: int = Field(default=86_400, ge=60, le=30 * 86_400)
+    # Integrations (Phase 8): lifetime of a token obtained by RFC 8693 exchange (<= 15 min).
+    exchange_token_ttl_seconds: int = Field(default=300, ge=30, le=900)
+    # Real external adapters (Phase 8). Unset -> the tool is not registered (DENY, unknown).
+    # public_api_get: exact host[:port] allowlist; http:// only for hosts in http_allow_plain.
+    http_allowlist: Annotated[tuple[str, ...], NoDecode] = ()
+    http_allow_plain: Annotated[tuple[str, ...], NoDecode] = ()
+    http_max_response_bytes: int = Field(default=64 * 1024, ge=1024, le=1024 * 1024)
+    # send_email_smtp: SMTP relay credentials live ONLY here (never in agents or the SDK).
+    smtp_host: str | None = None
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_starttls: bool = True
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_from: str = Field(default="agw-gateway@localhost", max_length=254)
+    smtp_allowed_domains: Annotated[tuple[str, ...], NoDecode] = ()  # empty = any domain
     # Code provenance: gateway build commit. If unset, resolved from git at startup.
     build_commit: str | None = Field(default=None, pattern=r"^[0-9a-zA-Z.+_-]{1,64}$")
 
-    @field_validator("pre_anchor_rules", mode="before")
+    @field_validator(
+        "pre_anchor_rules",
+        "http_allowlist",
+        "http_allow_plain",
+        "smtp_allowed_domains",
+        mode="before",
+    )
     @classmethod
     def _split_rules(cls, value: Any) -> Any:
         if isinstance(value, str):

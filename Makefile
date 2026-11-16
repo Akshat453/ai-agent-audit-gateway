@@ -1,9 +1,9 @@
 # Phase 1 targets (docs/gateway/00 §8).
 SHELL := /bin/bash
 UV ?= uv
-COV_PKGS := */agw_gateway/policies/*,*/agw_gateway/auth/*,*/agw_gateway/tools/*,*/agw_gateway/execution/*,*/agw_gateway/approvals/*,*/agw_gateway/humans/*,*/agw_gateway/anchoring/*,*/agw_worker/anchoring/*,*/agw_gateway/privacy/*,*/agw_gateway/keys/*
+COV_PKGS := */agw_gateway/policies/*,*/agw_gateway/auth/*,*/agw_gateway/tools/*,*/agw_gateway/execution/*,*/agw_gateway/approvals/*,*/agw_gateway/humans/*,*/agw_gateway/anchoring/*,*/agw_worker/anchoring/*,*/agw_gateway/privacy/*,*/agw_gateway/keys/*,*/agw_gateway/delegation/*,*/agw_gateway/auth/*,*/agw_sdk/*,*/agw_langgraph/*,*/agw_mcp/*
 
-.PHONY: up down migrate test lint demo sync vectors verify-isolated bench tamper risk-eval seal-compare dev-keys approval-attacks approval-mutations contracts-test contracts-check contracts-gas contracts-slither anchor-deploy-anvil anchor-gas anchor-mutations dev-kek privacy-mutations
+.PHONY: up down migrate test lint demo sync vectors verify-isolated bench tamper risk-eval seal-compare dev-keys approval-attacks approval-mutations contracts-test contracts-check contracts-gas contracts-slither anchor-deploy-anvil anchor-gas anchor-mutations dev-kek privacy-mutations containment injection-corpus delegation-mutations dev-delegation-key integration-latency
 
 .env:
 	cp .env.example .env
@@ -23,7 +23,7 @@ migrate: .env sync
 lint: sync
 	$(UV) run ruff check .
 	$(UV) run ruff format --check .
-	$(UV) run mypy apps/gateway/src apps/worker/src packages/gateway-sdk/src packages/schemas/src packages/verifier/src
+	$(UV) run mypy apps/gateway/src apps/worker/src packages/gateway-sdk/src packages/schemas/src packages/verifier/src integrations/langgraph/src integrations/mcp/src
 	$(UV) run lint-imports
 
 test: lint
@@ -117,3 +117,24 @@ dev-kek: .env sync
 # Phase 7: remove each encryption / minimization / disclosure guard; its named test must fail.
 privacy-mutations: sync
 	$(UV) run python experiments/privacy/mutation_check.py
+
+# Phase 8 (ADR-0030): dev delegation-token signing key (git-ignored secrets/; never overwritten).
+dev-delegation-key: sync
+	$(UV) run python -m agw_gateway.admin gen-delegation-key --out secrets/delegation-signing.key --if-missing
+
+# Phase 8: agent container whose ONLY route is the gateway; probes run inside it.
+containment:
+	bash examples/containment/run.sh
+
+# Phase 8: prompt-injection corpus (>= 10 docs x 2 modes) -> results table, 0 unauthorized executions.
+injection-corpus: sync
+	AGW_INJECTION_TABLE_OUT=experiments/injection/results/injection-table.md $(UV) run pytest -q apps/gateway/tests/e2e/test_prompt_injection.py
+	cat experiments/injection/results/injection-table.md
+
+# Phase 8: remove each delegation / integration guard in turn; its named test must fail.
+delegation-mutations: sync
+	$(UV) run python experiments/delegation/mutation_check.py
+
+# Phase 8: added latency per tool call (direct adapter vs SDK vs LangGraph vs MCP) + adapter LOC.
+integration-latency: sync
+	$(UV) run python experiments/integrations/measure.py

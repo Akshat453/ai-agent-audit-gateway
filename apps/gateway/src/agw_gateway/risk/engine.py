@@ -65,6 +65,7 @@ class RequestContext:
     volume: int | None = 1
     delegation_depth: int | None = 0
     delegation_declared: bool = False
+    delegation_verified: bool = False  # Phase 8: depth from a verified token chain
     agent_trust_tier: str | None = None
     scope_present: bool = True
 
@@ -102,11 +103,13 @@ def build_context(
     agent_scopes: frozenset[str],
     agent_trust_tier: str | None,
     delegation_depth: int | None = None,
+    delegation_verified: bool = False,
 ) -> RequestContext:
     """Pure mapping from (tool metadata, validated args, request, agent) to the context.
 
-    ``delegation_depth`` is agent-declared and can only RAISE risk: absent means a direct call
-    (depth 0, the gateway authenticated the caller itself).
+    ``delegation_depth`` is either agent-declared (can only RAISE risk) or, with
+    ``delegation_verified``, the depth of a gateway-verified delegation chain (ADR-0030).
+    Absent means a direct call (depth 0, the gateway authenticated the caller itself).
     """
     if tool is None:
         return RequestContext(
@@ -131,7 +134,8 @@ def build_context(
         external_effect=tool.external_effect,
         volume=_volume(args, tool.volume_field),
         delegation_depth=0 if delegation_depth is None else delegation_depth,
-        delegation_declared=delegation_depth is not None,
+        delegation_declared=delegation_depth is not None and not delegation_verified,
+        delegation_verified=delegation_verified,
         agent_trust_tier=agent_trust_tier,
         scope_present=tool.required_scope in agent_scopes,
     )
@@ -337,6 +341,8 @@ def evaluate(ctx: RequestContext, policy: RiskPolicy) -> RiskResult:
     reasons.append(f"BASE_RISK:{base.name}")
     if ctx.delegation_declared:
         reasons.append("DELEGATION_SELF_DECLARED")
+    if ctx.delegation_verified:
+        reasons.append("DELEGATION_VERIFIED")
 
     matched: list[str] = []
     forcing: list[str] = []

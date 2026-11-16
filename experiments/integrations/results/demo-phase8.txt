@@ -1,0 +1,54 @@
+--- Phase 8: LLM tool-calling agent (AGW_LLM_PROVIDER=mock) ---
+llm agent (mock) run 23267613-09c2-46af-8a6b-647747568810:
+  public_doc_search    COMPLETED         action=01a1e398-2e4f-77af-9adf-1b49c67db9a8
+  create_ticket        COMPLETED         action=01a1e398-308a-77e5-b6a3-26c405ca07a6
+  final: done: Find our guidance on evidence retention, then open a low-priority ticket summarizing it.
+
+--- Phase 8: planner delegates to worker; LangGraph (SDK tools), then MCP ---
+  planner -> DELEGATION_CREATED 01a1e399-5d93-7879-96dd-fb4d711bf9f8 depth=1 tools=['create_ticket', 'send_email_smtp'] max_risk=HIGH uses=3
+  planner run b8bd5b35-4630-4cec-8211-77ca1d5fcc47: public_doc_search, delegate_task
+  human sees: tool=send_email_smtp risk=HIGH agent=demo-worker delegation_depth=1
+  human APPROVED 01a1e399-5f18-7cf9-9a02-be190a67e778
+  worker  run 067afeca-c8a6-404c-979d-615be3ab6ede via sdk: 6 messages
+  delegation timeline (planner's view of 01a1e399-5d93-7879-96dd-fb4d711bf9f8):
+    211   DELEGATION_CREATED                     run=b8bd5b35 delegation.ev=-…
+    212   ACTION_REQUESTED                       run=067afeca delegation.ev=01a1e3995d95… refs.parent=7572fe2fc030…
+    213   POLICY_EVALUATED     ALLOW             run=067afeca 
+    214   ACTION_AUTHORIZED                      run=067afeca 
+    215   ACTION_DISPATCHED                      run=067afeca 
+    216   ACTION_COMPLETED     COMPLETED         run=067afeca 
+    218   ACTION_REQUESTED                       run=067afeca delegation.ev=01a1e3995d95… refs.parent=7572fe2fc030…
+    219   POLICY_EVALUATED     REQUIRE_APPROVAL  run=067afeca 
+    220   APPROVAL_REQUIRED    PENDING_APPROVAL  run=067afeca 
+    221   APPROVAL_GRANTED                       run=067afeca 
+    222   POLICY_EVALUATED     REQUIRE_APPROVAL  run=067afeca 
+    223   ACTION_AUTHORIZED                      run=067afeca 
+    224   ACTION_DISPATCHED                      run=067afeca 
+    225   ACTION_COMPLETED     COMPLETED         run=067afeca 
+MULTI-AGENT (sdk) OK
+  planner -> DELEGATION_CREATED 01a1e399-66a5-7ad2-beca-5869a65b53bf depth=1 tools=['create_ticket', 'send_email_smtp'] max_risk=HIGH uses=3
+  planner run bc5f6e35-f41e-4a6b-9b52-208c08ab8bef: public_doc_search, delegate_task
+  human sees: tool=send_email_smtp risk=HIGH agent=demo-worker delegation_depth=1
+  human APPROVED 01a1e399-6ca5-78f0-914a-a977e7cedd55
+  worker  run 8df41d5f-8ec5-492c-ab8b-44719d476d63 via mcp: 8 messages
+  delegation timeline (planner's view of 01a1e399-66a5-7ad2-beca-5869a65b53bf):
+    232   DELEGATION_CREATED                     run=bc5f6e35 delegation.ev=-…
+    234   ACTION_REQUESTED                       run=8df41d5f delegation.ev=01a1e39966a8… refs.parent=68c0c40eed7f…
+    235   POLICY_EVALUATED     ALLOW             run=8df41d5f 
+    236   ACTION_AUTHORIZED                      run=8df41d5f 
+    237   ACTION_DISPATCHED                      run=8df41d5f 
+    238   ACTION_COMPLETED     COMPLETED         run=8df41d5f 
+    239   ACTION_REQUESTED                       run=8df41d5f delegation.ev=01a1e39966a8… refs.parent=68c0c40eed7f…
+    240   POLICY_EVALUATED     REQUIRE_APPROVAL  run=8df41d5f 
+    241   APPROVAL_REQUIRED    PENDING_APPROVAL  run=8df41d5f 
+    242   APPROVAL_GRANTED                       run=8df41d5f 
+    243   POLICY_EVALUATED     REQUIRE_APPROVAL  run=8df41d5f 
+    244   ACTION_AUTHORIZED                      run=8df41d5f 
+    245   ACTION_DISPATCHED                      run=8df41d5f 
+    246   ACTION_COMPLETED     COMPLETED         run=8df41d5f 
+MULTI-AGENT (mcp) OK
+SMTP sink received 2 approved email(s) from the gateway
+--- Phase 8: every multi-agent event, offline, against the on-chain anchors ---
+  exported 38 bundles from 2 multi-agent runs: {'ACTION_REQUESTED': 6, 'POLICY_EVALUATED': 8, 'ACTION_AUTHORIZED': 6, 'ACTION_DISPATCHED': 6, 'ACTION_COMPLETED': 6, 'DELEGATION_CREATED': 2, 'APPROVAL_REQUIRED': 2, 'APPROVAL_GRANTED': 2}
+  agw-verify (on-chain anchors, pinned trust): {'ACTION_AUTHORIZED:VERIFIED': 6, 'ACTION_COMPLETED:VERIFIED': 6, 'ACTION_DISPATCHED:VERIFIED': 6, 'ACTION_REQUESTED:VERIFIED': 6, 'APPROVAL_GRANTED:VERIFIED': 2, 'APPROVAL_REQUIRED:VERIFIED': 2, 'DELEGATION_CREATED:VERIFIED': 2, 'POLICY_EVALUATED:VERIFIED': 8}
+MULTI-AGENT OFFLINE VERIFICATION OK (38/38 VERIFIED)

@@ -28,6 +28,7 @@ from uuid import UUID
 from pydantic import BaseModel
 from sqlalchemy import Connection, Engine, func, select, text, update
 
+from agw_gateway.auth.models import AuthenticatedAgent
 from agw_gateway.crypto.canonical import args_digest, json_or_profile, profile_value
 from agw_gateway.db import tables as t
 from agw_gateway.evidence import EvidenceWriter, NewEvent
@@ -74,7 +75,9 @@ class Executor:
         worker_id: str | None = None,
         cipher: EnvelopeCipher | None = None,
         minimizer: Minimizer | None = None,
+        delegations: Any | None = None,  # DelegationService (Phase 8, ADR-0030)
     ) -> None:
+        self._delegations = delegations
         self._cipher_obj = cipher
         self._minimizer_obj = minimizer
         self._engine = engine
@@ -207,6 +210,31 @@ class Executor:
             .with_for_update()
         ).one()
 
+    def _delegation_live(self, conn: Connection, action: Any, spec: ToolSpec) -> bool:
+        """The chain still covers this exact action right before dispatch (ADR-0030 §4)."""
+        if self._delegations is None:
+            return False
+        agent_row = conn.execute(
+            select(t.agents).where(t.agents.c.agent_id == action.agent_id)
+        ).one()
+        if agent_row.status != "active":
+            return False
+        agent = AuthenticatedAgent(
+            tenant_id=agent_row.tenant_id,
+            agent_id=agent_row.agent_id,
+            name=agent_row.name,
+            scopes=frozenset(agent_row.scopes),
+            trust_tier=agent_row.trust_tier,
+        )
+        c = self._delegations.recheck(conn, action.delegation_id, agent).constraint
+        levels = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
+        return bool(
+            c.failure is None
+            and spec.meta.required_scope in (c.scopes & agent.scopes)
+            and spec.meta.tool_id in c.tools
+            and levels.index(action.risk_level) <= levels.index(c.max_risk)
+        )
+
     def _dispatch_tx(self, job: ClaimedJob) -> tuple[ToolSpec, BaseModel] | None:
         with self._engine.begin() as conn:
             j = self._lock_job(conn, job)
@@ -219,6 +247,9 @@ class Executor:
                     t.actions.c.tool_version,
                     t.actions.c.run_id,
                     t.actions.c.agent_id,
+                    t.actions.c.tenant_id,
+                    t.actions.c.risk_level,
+                    t.actions.c.delegation_id,
                 )
                 .where(t.actions.c.action_id == job.action_id)
                 .with_for_update()
@@ -254,6 +285,13 @@ class Executor:
                     "TOOL_UNAVAILABLE" if spec is None else "ARGS_INVALID_AT_DISPATCH",
                     None,
                     now_us(),
+                )
+                return None
+            if action.delegation_id is not None and not self._delegation_live(conn, action, spec):
+                # Phase 8: the parent revoked / narrowed the delegation after authorization.
+                # Never reached the adapter: a definite failure without side effect.
+                self._record_result(
+                    conn, job, action, "FAILED", "DELEGATION_INVALID", None, now_us()
                 )
                 return None
 

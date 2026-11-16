@@ -57,6 +57,12 @@ def test_reencrypt_phase2_plaintext_then_drop_it(tmp_path: Path) -> None:
     container = start_postgres()
     try:
         urls = init_database(container, revision="0007_phase7_encryption")
+        # Shim: the CURRENT gateway code reads two Phase 8 columns (ADR-0030). They are added
+        # early here only so this test can use today's gateway to create Phase-6-shaped rows
+        # on a 0007 schema; 0009 adds them with IF NOT EXISTS.
+        with psycopg.connect(urls.superuser, autocommit=True) as conn:
+            conn.execute("ALTER TABLE agent_credentials ADD COLUMN audience text NULL")
+            conn.execute("ALTER TABLE actions ADD COLUMN delegation_id uuid NULL")
         app = create_db_engine(urls.app, pool_size=5)
         mig = create_db_engine(urls.migrator, pool_size=2)
         tenant = "t-migrate"
@@ -65,8 +71,9 @@ def test_reencrypt_phase2_plaintext_then_drop_it(tmp_path: Path) -> None:
         world = World(tenant, uuid.uuid4(), create_key(mig, tenant, "demo-agent"),
                       uuid.uuid4(), "", uuid.uuid4(), "", "", "", "")  # fmt: skip
         spies = make_spies()
-        state = build_state(make_settings(urls.app, tmp_path), engine=app,
-                            registry=make_registry(spies))  # fmt: skip
+        # No delegation key: the Phase 8 tables do not exist on a 0007 schema.
+        settings = make_settings(urls.app, tmp_path, delegation_signing_key_file=None)
+        state = build_state(settings, engine=app, registry=make_registry(spies))
         state.sync()
         with TestClient(create_app(state, sync_registry=False)) as client:
             gw = Gw(state=state, client=client, spies=spies, world=world, engine=app)

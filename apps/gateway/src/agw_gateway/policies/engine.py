@@ -3,7 +3,8 @@
 Order:
 
 1. System checks (not overridable): unknown tool, invalid args, forbidden environment,
-   missing scope, disabled agent -> DENY.
+   missing scope, disabled agent -> DENY. Phase 8 (ADR-0030): a presented delegation that is
+   unusable, or that does not cover the tool's scope or the tool -> DENY.
 2. Three sources each propose an effect; the MOST RESTRICTIVE wins (DENY > REQUIRE_APPROVAL >
    ALLOW), so no source can loosen another:
    a. the risk policy's mandatory rules (``risk.forced_effect``);
@@ -11,7 +12,9 @@ Order:
    c. the per-level default: LOW allow; MEDIUM per tool config (``medium_effect``, missing ->
       approval); HIGH approval (unless the Phase 1 idempotent exemption applies); CRITICAL
       DENY unless a matching ``critical_exception`` rule exists (then still approval).
-3. ``matched_rule_ids`` lists every contributing rule so an auditor sees all reasons;
+3. Phase 8: a delegated call whose risk level exceeds the chain's ``max_risk`` -> DENY
+   (applied last, so neither the policy document nor an approval can lift it).
+4. ``matched_rule_ids`` lists every contributing rule so an auditor sees all reasons;
    ``reasons`` lists the reason of every source that produced the final effect.
 
 Pure function of its explicit inputs: re-running it on recorded inputs reproduces the decision.
@@ -26,6 +29,7 @@ from enum import StrEnum
 from typing import Any, Final, Literal
 
 from agw_gateway.auth.models import AuthenticatedAgent
+from agw_gateway.delegation.constraint import DelegationConstraint
 from agw_gateway.policies.models import PolicyDocument, PolicyRule
 from agw_gateway.risk import RiskLevel, RiskResult
 from agw_gateway.tools.metadata import ToolMetadata
@@ -51,6 +55,17 @@ class ReasonCode(StrEnum):
     CRITICAL_DENIED = "CRITICAL_DENIED"
     RISK_RULE_DENY = "RISK_RULE_DENY"
     RISK_RULE_REQUIRES_APPROVAL = "RISK_RULE_REQUIRES_APPROVAL"
+    # Phase 8 (ADR-0030): delegation.
+    DELEGATION_INVALID = "DELEGATION_INVALID"
+    DELEGATION_NOT_FOR_AGENT = "DELEGATION_NOT_FOR_AGENT"
+    DELEGATION_EXPIRED = "DELEGATION_EXPIRED"
+    DELEGATION_REVOKED = "DELEGATION_REVOKED"
+    DELEGATION_EXHAUSTED = "DELEGATION_EXHAUSTED"
+    DELEGATION_DEPTH_EXCEEDED = "DELEGATION_DEPTH_EXCEEDED"
+    DELEGATION_ISSUER_INACTIVE = "DELEGATION_ISSUER_INACTIVE"
+    DELEGATION_SCOPE_MISSING = "DELEGATION_SCOPE_MISSING"
+    DELEGATION_TOOL_NOT_ALLOWED = "DELEGATION_TOOL_NOT_ALLOWED"
+    DELEGATION_RISK_EXCEEDED = "DELEGATION_RISK_EXCEEDED"
 
 
 @dataclass(frozen=True)
@@ -63,6 +78,8 @@ class EvaluationInput:
     policy: PolicyDocument  # exact immutable version
     risk: RiskResult
     now: datetime  # approval expiry (Phase 5); unused by v2 rules
+    # Phase 8: the resolved delegation chain the agent presented (None = direct call).
+    delegation: DelegationConstraint | None = None
 
 
 @dataclass(frozen=True)
@@ -89,6 +106,14 @@ def _system_check(inp: EvaluationInput) -> tuple[str, ReasonCode] | None:
         return "SYS-SCOPE-MISSING", ReasonCode.SCOPE_MISSING
     if not inp.agent.active:
         return "SYS-AGENT-DISABLED", ReasonCode.AGENT_DISABLED
+    d = inp.delegation
+    if d is not None:
+        if d.failure is not None:
+            return "SYS-DELEGATION", ReasonCode(d.failure)
+        if inp.tool.required_scope not in d.scopes:
+            return "SYS-DELEGATION-SCOPE", ReasonCode.DELEGATION_SCOPE_MISSING
+        if inp.tool.tool_id not in d.tools:
+            return "SYS-DELEGATION-TOOL", ReasonCode.DELEGATION_TOOL_NOT_ALLOWED
     return None
 
 
@@ -110,6 +135,7 @@ def _matches(rule: PolicyRule, inp: EvaluationInput, tool: ToolMetadata) -> bool
 
 
 _RANK: Final[dict[str, int]] = {"ALLOW": 0, "REQUIRE_APPROVAL": 1, "DENY": 2}
+_LEVELS: Final = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 
 
 def _level_default(
@@ -204,6 +230,10 @@ def evaluate(inp: EvaluationInput) -> Decision:
     controls = tuple(
         dict.fromkeys([*risk.control_ids, *(c for r in matched for c in r.control_ids)])
     )
+    d = inp.delegation
+    if d is not None and _LEVELS.index(risk.level.name) > _LEVELS.index(d.max_risk):
+        final, reasons = "DENY", [ReasonCode.DELEGATION_RISK_EXCEEDED]
+        rule_ids.append("SYS-DELEGATION-RISK")
     return Decision(
         effect=final,
         policy_id=policy.policy_id,

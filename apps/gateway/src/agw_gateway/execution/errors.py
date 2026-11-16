@@ -119,3 +119,31 @@ class DisclosureDenied(GatewayError):
     def __init__(self, code: str) -> None:
         super().__init__(code)
         self.code = code
+
+
+# --------------------------------------------------------------------------- Phase 8
+class DelegationRefused(GatewayError):
+    """POST /v1/delegations refused: the requested delegation would exceed what the issuer
+    holds (scopes, tools, risk, expiry, depth) or names an unusable parent/child. Nothing is
+    issued. ``code`` is one of api/errors.MESSAGES (fixed strings, no request values)."""
+
+    http_status = 403
+
+    def __init__(self, code: str, http_status: int = 403) -> None:
+        super().__init__(code)
+        self.code = code
+        self.http_status = http_status
+
+
+class DelegationUnavailable(GatewayError):
+    """No usable delegation signing key: nothing can be issued or verified (fail closed)."""
+
+    code = "DELEGATION_UNAVAILABLE"
+    http_status = 503
+
+
+class ExchangeRefused(GatewayError):
+    """RFC 8693 token exchange refused (one fixed code, no oracle about which check failed)."""
+
+    code = "INVALID_GRANT"
+    http_status = 400

@@ -35,3 +35,7 @@ SEALED_OPS_TAG: Final = "AGW/sealed-ops/v1"
 REDACT_TAG: Final = "AGW/redact/v1"
 DISCLOSURE_TAG: Final = "AGW/disclosure/v1"
 DISCLOSURE_IDS_TAG: Final = "AGW/disclosure-ids/v1"
+# Phase 8 (ADR-0030): delegation tokens and integration (MCP) credentials.
+DELEGATION_SIG_TAG: Final = "AGW/delegation-sig/v1"
+DELEGATION_TOKEN_TAG: Final = "AGW/delegation-token/v1"  # noqa: S105
+INTEGRATION_KEY_TAG: Final = "AGW/integration-key/v1"

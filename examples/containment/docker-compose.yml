@@ -1,0 +1,83 @@
+# Phase 8 containment demo (ADR-0030 §9). Three networks, all `internal: true` (no route to
+# the internet; Docker does not NAT them):
+#   agentnet: agent <-> gateway                 (the ONLY thing the agent can reach)
+#   toolnet:  gateway <-> tools (SMTP sink, "public" API)
+#   dbnet:    gateway <-> postgres
+# Tool credentials (the SMTP relay password) are mounted into the gateway only.
+# Run: make containment  (builds, probes from inside the agent container, tears down).
+name: agw-containment
+
+networks:
+  agentnet: { internal: true }
+  toolnet: { internal: true }
+  dbnet: { internal: true }
+
+volumes:
+  agent-creds:
+
+secrets:
+  smtp_password:
+    file: ./secrets/smtp_password   # created by `make containment` (random, git-ignored)
+
+services:
+  postgres:
+    image: postgres:16
+    networks: [dbnet]
+    environment:
+      POSTGRES_DB: agw
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${CT_PG_PASSWORD:?}
+      AGW_MIGRATOR_PASSWORD: ${CT_MIGRATOR_PASSWORD:?}
+      AGW_APP_PASSWORD: ${CT_APP_PASSWORD:?}
+    volumes:
+      - ../../infra/docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ../../infra/docker/postgres/roles.sql:/agw/roles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U postgres -d agw -tAc \"SELECT 1 FROM pg_roles WHERE rolname='agw_app'\" | grep -q 1"]
+      interval: 1s
+      retries: 60
+
+  mailpit:   # SMTP sink standing in for a real relay (approved-write tool)
+    image: axllent/mailpit@sha256:e22dce5b36f93c77082e204a3942fb6b283b7896e057458400a4c88344c3df68
+    networks: [toolnet]
+    environment: { MP_SMTP_AUTH_ACCEPT_ANY: "1", MP_SMTP_AUTH_ALLOW_INSECURE: "1" }
+
+  public-api:  # stands in for an allowlisted public HTTP API (read-only tool)
+    image: python@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+    networks: [toolnet]
+    command: ["python", "-m", "http.server", "8000", "--directory", "/srv"]
+    volumes: ["./public-api:/srv:ro"]
+
+  gateway:
+    build: { context: ../.., dockerfile: infra/docker/gateway/Dockerfile, target: gateway }
+    networks: [agentnet, toolnet, dbnet]
+    depends_on: { postgres: { condition: service_healthy } }
+    secrets: [smtp_password]
+    volumes: ["agent-creds:/creds"]
+    environment:
+      AGW_APP_PASSWORD: ${CT_APP_PASSWORD:?}
+      AGW_MIGRATOR_PASSWORD: ${CT_MIGRATOR_PASSWORD:?}
+      AGW_ENV: dev
+      AGW_EXECUTOR_MODE: inprocess
+      AGW_PRE_ANCHOR_RULES: ""          # no chain in this demo (anchoring: Phase 6 demo)
+      AGW_HTTP_ALLOWLIST: public-api:8000
+      AGW_HTTP_ALLOW_PLAIN: public-api:8000
+      AGW_SMTP_HOST: mailpit
+      AGW_SMTP_PORT: "1025"
+      AGW_SMTP_STARTTLS: "false"
+      AGW_SMTP_USERNAME: agw-relay
+      AGW_SMTP_PASSWORD_FILE: /run/secrets/smtp_password
+      AGW_SMTP_FROM: gateway@corp.example
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/v1/ready')"]
+      interval: 1s
+      retries: 120
+
+  agent:
+    build: { context: ../.., dockerfile: infra/docker/gateway/Dockerfile, target: agent }
+    networks: [agentnet]
+    depends_on: { gateway: { condition: service_healthy } }
+    volumes: ["agent-creds:/creds:ro"]
+    environment:
+      AGW_GATEWAY_URL: http://gateway:8080
+    profiles: ["agent"]   # run on demand: docker compose run --rm agent [extra targets]

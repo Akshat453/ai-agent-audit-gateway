@@ -51,6 +51,22 @@ MESSAGES: Final[dict[str, str]] = {
     "GRANT_REVOKED": "The disclosure grant was revoked. The attempt was recorded.",
     "NOT_GRANTEE": "This grant belongs to another auditor. The attempt was recorded.",
     "EVENT_NOT_GRANTED": "An event is outside this grant. The attempt was recorded.",
+    # Phase 8 (ADR-0030)
+    "DELEGATION_UNAVAILABLE": "Delegation signing key unavailable. Nothing was issued.",
+    "DELEGATION_EXCEEDS_PARENT": "A delegation cannot exceed what its issuer currently holds.",
+    "DELEGATION_CHILD_INVALID": "The child agent is unknown, inactive or the issuer itself.",
+    "DELEGATION_TOOL_INVALID": "A delegated tool is unknown or not covered by the scopes.",
+    "DELEGATION_EXPIRY_INVALID": "expires_at must be in the future and within the limit.",
+    "DELEGATION_INVALID": "The parent delegation token is invalid.",
+    "DELEGATION_NOT_FOR_AGENT": "The parent delegation token was issued to another agent.",
+    "DELEGATION_EXPIRED": "The parent delegation has expired.",
+    "DELEGATION_REVOKED": "The parent delegation was revoked.",
+    "DELEGATION_EXHAUSTED": "The parent delegation has no uses left.",
+    "DELEGATION_DEPTH_EXCEEDED": "The delegation chain would exceed the depth limit.",
+    "DELEGATION_ISSUER_INACTIVE": "An agent earlier in the delegation chain is inactive.",
+    "DELEGATION_NOT_REVOCABLE": "Only an issuer in the delegation's chain may revoke it.",
+    "INVALID_GRANT": "The token exchange was refused.",
+    "INVALID_CLIENT": "Client authentication failed.",
 }
 
 

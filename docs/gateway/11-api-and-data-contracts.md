@@ -165,5 +165,15 @@ Exact Phase 1 tables: [14-phase-1-handoff.md §3](14-phase-1-handoff.md). Later 
 - `POST /v1/disclosures/{id}/export`
 - `GET /v1/auth/me`
 
-All human sessions only; an agent key gets 403 AGENT_NOT_PERMITTED. Evidence tables (`evidence_events`, `policies`,
+All human sessions only; an agent key gets 403 AGENT_NOT_PERMITTED.
+
+*(Phase 8, ADR-0030; agent credentials)* `POST /v1/delegations {child_agent_id, scopes, tools,
+max_risk_level, expires_at, max_uses, purpose, parent_token?, run_id?}` -> token (once);
+`POST /v1/delegations/{id}/revoke`; `GET /v1/delegations/{id}/timeline`;
+`GET /v1/delegation-signing-keys`. `POST /v1/actions` accepts `delegation: {token}` (exclusive
+with the Phase 4 declared `depth`). `POST /v1/oauth/token` (RFC 8693 token exchange; integration
+client credential `agwi_…`): exchanges an agent key bound to an MCP adapter's audience for a
+short-lived `agwx_…` gateway token. The gateway API refuses audience-bound keys (401).
+Tables (migration 0009): `delegations`, `delegation_signing_keys`, `integration_clients`,
+`exchanged_tokens`; `actions.delegation_id`, `agent_credentials.audience`. Evidence tables (`evidence_events`, `policies`,
 `evidence_payloads`) are append-only (08 §2).

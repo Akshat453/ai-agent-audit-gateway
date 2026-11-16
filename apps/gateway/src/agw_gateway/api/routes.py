@@ -261,6 +261,10 @@ def run_timeline(request: Request, agent: Agent, run_id: UUID) -> dict[str, Any]
             item["status"] = body["outcome"]["status"]
             if "code" in body["outcome"]:
                 item["code"] = body["outcome"]["code"]
+        if "delegation" in body:  # Phase 8: delegation provenance (hash-linked via refs)
+            item["delegation"] = body["delegation"]
+        if "refs" in body:
+            item["refs"] = body["refs"]
         if "approval" in body:
             ap = body["approval"]
             item["approval"] = {

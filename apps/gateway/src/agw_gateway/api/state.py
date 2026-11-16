@@ -10,7 +10,9 @@ from sqlalchemy import Engine
 from agw_gateway.anchoring import AnchorGate
 from agw_gateway.approvals.service import ApprovalService
 from agw_gateway.auth import Authenticator
+from agw_gateway.auth.exchange import TokenExchange
 from agw_gateway.config import Settings
+from agw_gateway.delegation.service import DelegationService
 from agw_gateway.evidence.blobs import BlobStore, BlobUnavailable, BucketNotPrivate, S3BlobStore
 from agw_gateway.evidence.payloads import PayloadStore
 from agw_gateway.execution.crash import CrashPoints
@@ -51,6 +53,9 @@ class GatewayState:
     minimizer: Minimizer | None = None
     disclosure: DisclosureService | None = None
     retention: RetentionJob | None = None
+    # Phase 8 (ADR-0030); always built (a missing signing key fails closed inside)
+    delegations: DelegationService = None  # type: ignore[assignment]
+    exchange: TokenExchange = None  # type: ignore[assignment]
 
     def sync(self) -> None:
         """Startup sync: tool registry + configured risk policy (both fail closed on drift)
@@ -58,6 +63,8 @@ class GatewayState:
         self.registry.sync(self.engine)
         sync_risk_policy(self.engine, self.settings.risk_policy_file)
         self.approvals.sync_signing_key()
+        if self.delegations is not None:
+            self.delegations.sync_signing_key()
         if isinstance(self.blobs, S3BlobStore):
             try:
                 self.blobs.ensure_private_bucket()  # refuses a bucket with any (public) policy

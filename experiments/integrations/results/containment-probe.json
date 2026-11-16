@@ -1,0 +1,40 @@
+bash examples/containment/run.sh
+{
+  "credential_env_vars": [],
+  "creds_dir": [
+    "agent.token"
+  ],
+  "gateway_calls": {
+    "delete_record": {
+      "reasons": [
+        "POLICY_RULE_DENY",
+        "CRITICAL_DENIED"
+      ],
+      "status": "DENIED"
+    },
+    "public_api_get": {
+      "body": {
+        "service": "public-api",
+        "status": "ok"
+      },
+      "status": "COMPLETED"
+    }
+  },
+  "reachable": {
+    "gateway:8080": "CONNECTED"
+  },
+  "result": "CONTAINED",
+  "unreachable": {
+    "1.1.1.1:443": "ENETUNREACH",
+    "172.25.0.2:5432": "ENETUNREACH",
+    "172.26.0.2:8000": "ENETUNREACH",
+    "172.26.0.3:1025": "ENETUNREACH",
+    "172.26.0.4:8080": "ENETUNREACH",
+    "8.8.8.8:53": "ENETUNREACH",
+    "mailpit:1025": "NO_DNS",
+    "mailpit:8025": "NO_DNS",
+    "one.one.one.one:443": "NO_DNS",
+    "postgres:5432": "NO_DNS",
+    "public-api:8000": "NO_DNS"
+  }
+}

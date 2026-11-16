@@ -86,6 +86,21 @@ class ActionBinding:
     risk_policy_digest: bytes
     risk_level: str
     delegation_depth: int | None
+    # Phase 8 (ADR-0030): a gateway-verified delegation is bound by id + token hash.
+    delegation_id: UUID | None = None
+    delegation_hash: bytes | None = None
+
+    def _delegation_ref(self) -> dict[str, Any] | None:
+        if self.delegation_id is not None and self.delegation_hash is not None:
+            return {
+                "id": self.delegation_id.bytes,
+                "th": self.delegation_hash,
+                "depth": self.delegation_depth,
+                "declared_by": "gateway",
+            }
+        if self.delegation_depth is None:
+            return None
+        return {"depth": self.delegation_depth, "declared_by": "agent"}
 
     def record(self) -> dict[str, Any]:
         return {
@@ -102,11 +117,7 @@ class ActionBinding:
             "policy_digest": self.policy_digest,
             "risk_policy_digest": self.risk_policy_digest,
             "risk_level": self.risk_level,
-            "delegation_ref": (
-                None
-                if self.delegation_depth is None
-                else {"depth": self.delegation_depth, "declared_by": "agent"}
-            ),
+            "delegation_ref": self._delegation_ref(),
         }
 
     def digest(self) -> bytes:

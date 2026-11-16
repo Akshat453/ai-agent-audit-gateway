@@ -3,7 +3,10 @@
 name = "agw-workspace"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["agw-gateway", "agw-worker", "agw-sdk", "agw-schemas", "agw-verifier"]
+dependencies = [
+    "agw-gateway", "agw-worker", "agw-sdk", "agw-schemas", "agw-verifier",
+    "agw-langgraph", "agw-mcp",
+]
 
 [tool.uv]
 package = false
@@ -19,7 +22,10 @@ dev-dependencies = [
 ]
 
 [tool.uv.workspace]
-members = ["apps/gateway", "apps/worker", "packages/gateway-sdk", "packages/schemas", "packages/verifier"]
+members = [
+    "apps/gateway", "apps/worker", "packages/gateway-sdk", "packages/schemas", "packages/verifier",
+    "integrations/langgraph", "integrations/mcp",
+]
 
 [tool.uv.sources]
 agw-gateway = { workspace = true }
@@ -27,6 +33,8 @@ agw-worker = { workspace = true }
 agw-sdk = { workspace = true }
 agw-schemas = { workspace = true }
 agw-verifier = { workspace = true }
+agw-langgraph = { workspace = true }
+agw-mcp = { workspace = true }
 
 # ---------------------------------------------------------------- ruff
 [tool.ruff]
@@ -46,7 +54,7 @@ ignore = ["PLR0913", "PLR0917", "PLR2004", "PLR0911", "PLR0912", "PLR0915"]
 "examples/**" = ["S101", "T201", "PLC0415"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["agw_gateway", "agw_worker", "agw_sdk", "agw_schemas", "agw_verifier"]
+known-first-party = ["agw_gateway", "agw_worker", "agw_sdk", "agw_schemas", "agw_verifier", "agw_langgraph", "agw_mcp"]
 
 # ---------------------------------------------------------------- mypy
 [tool.mypy]
@@ -58,6 +66,7 @@ explicit_package_bases = true
 mypy_path = [
     "apps/gateway/src", "apps/worker/src", "packages/gateway-sdk/src",
     "packages/schemas/src", "packages/verifier/src",
+    "integrations/langgraph/src", "integrations/mcp/src",
 ]
 
 [[tool.mypy.overrides]]
@@ -83,11 +92,12 @@ filterwarnings = [
     "error::pytest.PytestUnraisableExceptionWarning",
     "ignore:Using `httpx` with `starlette.testclient` is deprecated",
     "ignore:websockets.legacy is deprecated:DeprecationWarning",  # imported by web3, unused
+    "ignore:You should not use the 'timeout' argument with the TestClient",  # SDK long-poll in tests
 ]
 
 [tool.coverage.run]
 branch = true
-source = ["agw_gateway", "agw_schemas", "agw_verifier", "agw_worker"]
+source = ["agw_gateway", "agw_schemas", "agw_verifier", "agw_worker", "agw_sdk", "agw_langgraph", "agw_mcp"]
 
 [tool.coverage.report]
 show_missing = true
@@ -95,7 +105,7 @@ skip_covered = false
 
 # ---------------------------------------------------------------- import-linter (00 §3, ADR-0002, ADR-0016)
 [tool.importlinter]
-root_packages = ["agw_gateway", "agw_worker", "agw_sdk", "agw_schemas", "agw_verifier"]
+root_packages = ["agw_gateway", "agw_worker", "agw_sdk", "agw_schemas", "agw_verifier", "agw_langgraph", "agw_mcp"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -115,6 +125,18 @@ name = "sdk has no server internals"
 type = "forbidden"
 source_modules = ["agw_sdk"]
 forbidden_modules = ["agw_gateway", "agw_worker", "agw_verifier"]
+
+[[tool.importlinter.contracts]]
+name = "integrations talk to the gateway only through the SDK (ADR-0030): no server internals"
+type = "forbidden"
+source_modules = ["agw_langgraph", "agw_mcp"]
+forbidden_modules = ["agw_gateway", "agw_worker", "agw_schemas", "agw_verifier", "sqlalchemy", "psycopg"]
+
+[[tool.importlinter.contracts]]
+name = "the gateway core does not depend on any agent framework (ADR-0030)"
+type = "forbidden"
+source_modules = ["agw_gateway", "agw_worker", "agw_sdk"]
+forbidden_modules = ["agw_langgraph", "agw_mcp", "langgraph", "langchain_core", "mcp"]
 
 [[tool.importlinter.contracts]]
 name = "gateway does not import worker or verifier"

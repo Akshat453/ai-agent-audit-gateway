@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Any
 
 from agw_gateway.auth.models import AuthenticatedAgent
+from agw_gateway.delegation.constraint import DelegationConstraint
 from agw_gateway.policies.engine import Decision, EvaluationInput, evaluate
 from agw_gateway.policies.models import PolicyDocument
 from agw_gateway.risk import RiskPolicy, build_context
@@ -30,17 +31,28 @@ def decide_action(
     policy: PolicyDocument,
     now: datetime,
     delegation_depth: int | None = None,
+    delegation: DelegationConstraint | None = None,
 ) -> Decision:
-    """``args`` are the VALIDATED args (JSON mode), or None if validation failed."""
+    """``args`` are the VALIDATED args (JSON mode), or None if validation failed.
+
+    ``delegation_depth`` is the agent-DECLARED depth (no token; can only raise risk).
+    ``delegation`` is a gateway-VERIFIED chain (ADR-0030): its depth feeds the risk factor and
+    its intersection of scopes is what the risk engine sees as the caller's scopes."""
+    if delegation is not None and delegation_depth is not None:
+        raise ValueError("declared depth and a verified delegation are exclusive")
+    scopes = agent.scopes
+    if delegation is not None and delegation.failure is None:
+        scopes = agent.scopes & delegation.scopes
     risk = evaluate_risk(
         build_context(
             tool_id=tool_id,
             tool=tool,
             args=args,
             environment=environment,
-            agent_scopes=agent.scopes,
+            agent_scopes=scopes,
             agent_trust_tier=agent.trust_tier,
-            delegation_depth=delegation_depth,
+            delegation_depth=delegation.depth if delegation is not None else delegation_depth,
+            delegation_verified=delegation is not None,
         ),
         risk_policy,
     )
@@ -54,5 +66,6 @@ def decide_action(
             policy=policy,
             risk=risk,
             now=now,
+            delegation=delegation,
         )
     )

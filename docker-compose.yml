@@ -49,6 +49,17 @@ services:
     volumes:
       - agw-blobs:/data
 
+  # Phase 8 (ADR-0030): SMTP sink for the approved-write tool send_email_smtp. Pinned by digest.
+  # The relay credential lives only in the gateway's environment (AGW_SMTP_PASSWORD[_FILE]).
+  mailpit:
+    image: axllent/mailpit@sha256:e22dce5b36f93c77082e204a3942fb6b283b7896e057458400a4c88344c3df68
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    ports:
+      - "127.0.0.1:${AGW_MAILPIT_SMTP_PORT:-1025}:1025"
+      - "127.0.0.1:${AGW_MAILPIT_HTTP_PORT:-8025}:8025"
+
 volumes:
   agw-pgdata:
   agw-blobs:

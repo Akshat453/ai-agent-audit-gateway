@@ -175,7 +175,9 @@ class ApprovalService:
         gate: GatePolicy | None = None,
         cipher: EnvelopeCipher | None = None,
         minimizer: Minimizer | None = None,
+        delegations: Any | None = None,  # DelegationService (Phase 8); Any avoids an import cycle
     ) -> None:
+        self._delegations = delegations
         self._gate = gate or GatePolicy(frozenset(), 0.0)
         self._cipher = cipher
         self._minimizer = minimizer
@@ -598,6 +600,16 @@ class ApprovalService:
         if spec is None or validated is None or stored_policy is None:
             return self._deny(conn, ap, action, "APPROVAL_BINDING_MISMATCH", None)
         args_json = validated.model_dump(mode="json")
+        # Phase 8: a delegated action is bound to its delegation (id + token hash).
+        delegation_hash = None
+        if action.delegation_id is not None:
+            delegation_hash = conn.execute(
+                select(t.delegations.c.token_hash).where(
+                    t.delegations.c.delegation_id == action.delegation_id
+                )
+            ).scalar_one_or_none()
+            if delegation_hash is None:
+                return self._deny(conn, ap, action, "APPROVAL_BINDING_MISMATCH", None)
         binding = ActionBinding(
             tenant=action.tenant_id,
             agent_id=action.agent_id,
@@ -612,6 +624,8 @@ class ApprovalService:
             risk_policy_digest=bytes(action.risk_policy_digest or b""),
             risk_level=action.risk_level,
             delegation_depth=action.delegation_depth,
+            delegation_id=action.delegation_id,
+            delegation_hash=bytes(delegation_hash) if delegation_hash is not None else None,
         ).digest()
         if not (
             hmac.compare_digest(binding, bytes(ap.action_digest))
@@ -634,6 +648,13 @@ class ApprovalService:
         current = load_active_policy(conn)
         # The CURRENT registry: a tool disabled since the approval is unknown -> DENY.
         resolved = self._registry.resolve(action.tool_id, action.tool_version)
+        # Phase 8: the delegation chain must STILL be live and covering (a parent's
+        # revocation or scope reduction since the request takes effect here).
+        constraint = None
+        if action.delegation_id is not None:
+            if self._delegations is None:
+                return self._deny(conn, ap, action, "DELEGATION_INVALID", None)
+            constraint = self._delegations.recheck(conn, action.delegation_id, agent).constraint
         decision = decide_action(
             agent=agent,
             tool_id=action.tool_id,
@@ -643,7 +664,8 @@ class ApprovalService:
             risk_policy=self._risk_policies.active(),
             policy=current.document,
             now=datetime.now(UTC),
-            delegation_depth=action.delegation_depth,
+            delegation_depth=action.delegation_depth if constraint is None else None,
+            delegation=constraint,
         )
         if decision.effect == "DENY":
             return self._deny(conn, ap, action, "POLICY_REEVALUATION_DENIED", decision)

@@ -15,6 +15,7 @@ from sqlalchemy import Engine
 from agw_gateway import __version__
 from agw_gateway.anchoring import AnchorGate, Finality, GatePolicy
 from agw_gateway.api.approval_routes import router as approval_router
+from agw_gateway.api.delegation_routes import router as delegation_router
 from agw_gateway.api.disclosure_routes import router as disclosure_router
 from agw_gateway.api.errors import install_error_handlers, unexpected_error_response
 from agw_gateway.api.routes import router
@@ -22,8 +23,10 @@ from agw_gateway.api.state import GatewayState
 from agw_gateway.approvals.service import ApprovalConfig, ApprovalService
 from agw_gateway.approvals.signing import DecisionSigner, SigningKeyUnavailable
 from agw_gateway.auth import Authenticator
+from agw_gateway.auth.exchange import TokenExchange
 from agw_gateway.config import Settings, get_settings
 from agw_gateway.db import create_db_engine
+from agw_gateway.delegation.service import DelegationService, load_delegation_signer
 from agw_gateway.evidence import EvidenceWriter
 from agw_gateway.evidence.blobs import BlobStore, S3BlobStore
 from agw_gateway.evidence.payloads import EncryptedPayloadStore, NoPayloadStore, PayloadStore
@@ -42,6 +45,7 @@ from agw_gateway.privacy.minimize import Minimizer
 from agw_gateway.privacy.retention import RetentionJob
 from agw_gateway.provenance import resolve_build_commit
 from agw_gateway.risk_store import RiskPolicyStore
+from agw_gateway.tools.adapters.external import external_tool_specs
 from agw_gateway.tools.demo import demo_tool_specs
 from agw_gateway.tools.registry import ToolRegistry
 
@@ -112,7 +116,7 @@ def build_state(
         settings.database_url.get_secret_value(),
         connect_timeout=settings.db_connect_timeout_seconds,
     )
-    registry = registry or ToolRegistry(demo_tool_specs())
+    registry = registry or ToolRegistry([*demo_tool_specs(), *external_tool_specs(settings)])
     crash = crash or CrashPoints(settings.env)
     provider = load_key_provider(settings) if key_provider is None else key_provider
     blobs = load_blob_store(settings) if blob_store is None else blob_store
@@ -136,6 +140,14 @@ def build_state(
         else None
     )
     build_commit = resolve_build_commit(settings.build_commit)
+    delegations = DelegationService(
+        engine=engine,
+        writer=writer,
+        registry=registry,
+        signer=load_delegation_signer(settings.delegation_signing_key_file),
+        max_depth=settings.delegation_max_depth,
+        max_ttl=timedelta(seconds=settings.delegation_max_ttl_seconds),
+    )
     executor = Executor(
         engine=engine,
         registry=registry,
@@ -148,6 +160,7 @@ def build_state(
         batch=settings.executor_batch,
         cipher=cipher,
         minimizer=minimizer,
+        delegations=delegations,
     )
     reconciler = Reconciler(engine=engine, registry=registry, writer=writer)
     retention = (
@@ -180,6 +193,7 @@ def build_state(
         gate=gate_policy,
         cipher=cipher,
         minimizer=minimizer,
+        delegations=delegations,
     )
     runner = None
     if settings.executor_mode == "inprocess":
@@ -212,6 +226,7 @@ def build_state(
         gate=gate_policy,
         cipher=cipher,
         minimizer=minimizer,
+        delegations=delegations,
         approval_config=ApprovalConfig(
             ttl_seconds={
                 "LOW": settings.approval_ttl_seconds_medium,
@@ -244,6 +259,8 @@ def build_state(
         blobs=blobs,
         cipher=cipher,
         minimizer=minimizer,
+        delegations=delegations,
+        exchange=TokenExchange(engine, timedelta(seconds=settings.exchange_token_ttl_seconds)),
     )
 
 
@@ -279,6 +296,7 @@ def create_app(state: GatewayState | None = None, *, sync_registry: bool = True)
     app.include_router(router)
     app.include_router(approval_router)
     app.include_router(disclosure_router)
+    app.include_router(delegation_router)
 
     @app.get("/metrics", include_in_schema=False)
     def metrics() -> Response:

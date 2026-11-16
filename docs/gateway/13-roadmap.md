@@ -7,6 +7,9 @@ Status: Accepted (Phase 0). One phase per session. Each phase ends with a report
 > **5 approvals (ADR-0027)**. The table below is the Phase 0 plan (approvals as 4, encryption
 > as 5). Reconciling the two is an open owner decision; `probe()`/manual reconcile from row 4
 > is not yet implemented.
+> **Phase 8 note (ADR-0030).** The Phase 8 prompt delivered delegation tokens, A2A delegation
+> evidence and the MCP front-end (row 10 below) plus the SDK/LangGraph integrations. Row 8's
+> experiments + `_monitor` stream remain unscheduled.
 Features specified for a later phase MUST NOT be implemented early. Earlier phases leave only
 interfaces.
 
