@@ -141,6 +141,10 @@ class HumanAuthenticator:
                 t.humans.c.username,
                 t.humans.c.roles,
                 t.humans.c.status,
+                t.human_sessions.c.stepped_up_at,
+                func.extract("epoch", func.now() - t.human_sessions.c.stepped_up_at).label(
+                    "step_age"
+                ),
             )
             .join(t.humans, t.humans.c.human_id == t.human_sessions.c.human_id)
             .where(t.human_sessions.c.session_id == m.group(1))
@@ -161,7 +165,34 @@ class HumanAuthenticator:
             human_id=row.human_id,
             username=row.username,
             roles=frozenset(row.roles) & ROLES,
+            stepped_up_at=row.stepped_up_at,
+            stepped_up_age_seconds=float(row.step_age) if row.step_age is not None else None,
         )
+
+    def step_up(self, human: AuthenticatedHuman, authorization: str | None, password: str) -> None:
+        """Re-authenticate the CURRENT session with the password (CRITICAL decisions)."""
+        token = _session_token(authorization)
+        with self._engine.connect() as conn:
+            stored = conn.execute(
+                select(t.humans.c.password_hash).where(t.humans.c.human_id == human.human_id)
+            ).scalar_one_or_none()
+        ok: bool
+        try:
+            ok = bool(_HASHER.verify(stored or _DUMMY_HASH, password))
+        except (VerifyMismatchError, VerificationError, InvalidHashError):
+            ok = False
+        if not ok or stored is None or token is None:
+            raise HumanAuthFailed
+        with self._engine.begin() as conn:
+            conn.execute(
+                update(t.human_sessions)
+                .where(
+                    t.human_sessions.c.token_digest == session_digest(token),
+                    t.human_sessions.c.human_id == human.human_id,
+                    t.human_sessions.c.revoked_at.is_(None),
+                )
+                .values(stepped_up_at=func.now())
+            )
 
 
 def _session_token(authorization: str | None) -> str | None:

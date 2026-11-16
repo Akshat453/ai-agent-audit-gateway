@@ -1,0 +1,235 @@
+{
+ "uid": "agw-overview",
+ "title": "AGW gateway: enforcement, evidence, monitoring",
+ "schemaVersion": 39,
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "refresh": "30s",
+ "tags": [
+  "agw",
+  "phase9"
+ ],
+ "panels": [
+  {
+   "id": 1,
+   "type": "timeseries",
+   "title": "Decisions by effect and risk (rate)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "agw-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (effect, level) (rate(agw_risk_decisions_total[5m]))",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "agw-prometheus"
+     }
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "type": "timeseries",
+   "title": "Monitor runs by result (rate)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "agw-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (result) (rate(agw_monitor_runs_total[15m]))",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "agw-prometheus"
+     }
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "type": "bargauge",
+   "title": "Monitor alerts by kind",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "agw-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 8,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (kind) (increase(agw_monitor_alerts_total[1h]))",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "agw-prometheus"
+     }
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "type": "stat",
+   "title": "Oldest unsealed event",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "agw-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 8,
+    "w": 6,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "agw_monitor_oldest_unsealed_seconds",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "agw-prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 5,
+   "type": "stat",
+   "title": "Oldest unanchored epoch",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "agw-prometheus"
+   },
+   "gridPos": {
+    "x": 18,
+    "y": 8,
+    "w": 6,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "agw_monitor_oldest_unanchored_seconds",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "agw-prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 6,
+   "type": "stat",
+   "title": "OUTCOME_UNKNOWN actions",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "agw-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 16,
+    "w": 6,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "agw_monitor_outcome_unknown_actions",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "agw-prometheus"
+     }
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "type": "stat",
+   "title": "Oldest pending approval",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "agw-prometheus"
+   },
+   "gridPos": {
+    "x": 18,
+    "y": 16,
+    "w": 6,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "agw_monitor_oldest_pending_approval_seconds",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "agw-prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 8,
+   "type": "timeseries",
+   "title": "Approval decisions (rate)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "agw-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 16,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (decision) (rate(agw_approval_decisions_total[15m]))",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "agw-prometheus"
+     }
+    }
+   ]
+  }
+ ],
+ "description": "Phase 9 (ADR-0031). Operational counters only; evidence integrity is shown by the monitor's verification results, and independent verification uses agw-verify."
+}

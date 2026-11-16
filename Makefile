@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV ?= uv
 COV_PKGS := */agw_gateway/policies/*,*/agw_gateway/auth/*,*/agw_gateway/tools/*,*/agw_gateway/execution/*,*/agw_gateway/approvals/*,*/agw_gateway/humans/*,*/agw_gateway/anchoring/*,*/agw_worker/anchoring/*,*/agw_gateway/privacy/*,*/agw_gateway/keys/*,*/agw_gateway/delegation/*,*/agw_gateway/auth/*,*/agw_sdk/*,*/agw_langgraph/*,*/agw_mcp/*
 
-.PHONY: up down migrate test lint demo sync vectors verify-isolated bench tamper risk-eval seal-compare dev-keys approval-attacks approval-mutations contracts-test contracts-check contracts-gas contracts-slither anchor-deploy-anvil anchor-gas anchor-mutations dev-kek privacy-mutations containment injection-corpus delegation-mutations dev-delegation-key integration-latency
+.PHONY: up down migrate test lint demo sync vectors verify-isolated bench tamper risk-eval seal-compare dev-keys approval-attacks approval-mutations contracts-test contracts-check contracts-gas contracts-slither anchor-deploy-anvil anchor-gas anchor-mutations dev-kek privacy-mutations containment injection-corpus delegation-mutations dev-delegation-key integration-latency dashboard-api dashboard-check dashboard-e2e ui-up ui-screenshots monitoring-mutations
 
 .env:
 	cp .env.example .env
@@ -138,3 +138,35 @@ delegation-mutations: sync
 # Phase 8: added latency per tool call (direct adapter vs SDK vs LangGraph vs MCP) + adapter LOC.
 integration-latency: sync
 	$(UV) run python experiments/integrations/measure.py
+
+# Phase 9 (ADR-0031): dashboard. The typed client is generated from the gateway's OpenAPI.
+dashboard-api: sync
+	$(UV) run python -m agw_gateway.openapi --out apps/dashboard/openapi.json
+	cd apps/dashboard && npm run gen:api
+
+# Fails if the committed OpenAPI / generated types drifted from the code, or TS does not check.
+DRIFT := $(shell python3 -c "import tempfile;print(tempfile.gettempdir())")/agw-openapi-check
+dashboard-check: sync
+	cd apps/dashboard && npm ci --no-audit --no-fund >/dev/null
+	mkdir -p $(DRIFT)
+	$(UV) run python -m agw_gateway.openapi --out $(DRIFT)/openapi.json
+	diff -q $(DRIFT)/openapi.json apps/dashboard/openapi.json
+	cd apps/dashboard && npx openapi-typescript openapi.json -o $(DRIFT)/schema.d.ts >/dev/null
+	diff -q $(DRIFT)/schema.d.ts apps/dashboard/lib/api/schema.d.ts
+	cd apps/dashboard && npm run typecheck
+
+# Playwright against a real gateway + seeded tenant + the production dashboard build.
+dashboard-e2e: .env sync
+	cd apps/dashboard && npm ci --no-audit --no-fund >/dev/null && npx playwright install chromium >/dev/null
+	bash apps/dashboard/e2e/run.sh
+
+# Whole stack in containers + Phase 8 demo data + dashboard on http://localhost:3000.
+ui-up: .env
+	docker compose --profile ui up -d --build
+
+ui-screenshots:
+	cd apps/dashboard && AGW_SHOT_PASSWORD="$$(grep '^AGW_UI_DEMO_PASSWORD=' ../../.env | cut -d= -f2-)" node scripts/screenshots.mjs
+
+# Phase 9: remove each dashboard-API / step-up / reconcile / monitor / tracing guard in turn.
+monitoring-mutations: sync
+	$(UV) run python experiments/monitoring/mutation_check.py

@@ -57,12 +57,14 @@ def test_reencrypt_phase2_plaintext_then_drop_it(tmp_path: Path) -> None:
     container = start_postgres()
     try:
         urls = init_database(container, revision="0007_phase7_encryption")
-        # Shim: the CURRENT gateway code reads two Phase 8 columns (ADR-0030). They are added
+        # Shim: the CURRENT gateway code reads Phase 8/9 columns (ADR-0030, ADR-0031). They are added
         # early here only so this test can use today's gateway to create Phase-6-shaped rows
         # on a 0007 schema; 0009 adds them with IF NOT EXISTS.
         with psycopg.connect(urls.superuser, autocommit=True) as conn:
             conn.execute("ALTER TABLE agent_credentials ADD COLUMN audience text NULL")
             conn.execute("ALTER TABLE actions ADD COLUMN delegation_id uuid NULL")
+            conn.execute("ALTER TABLE human_sessions ADD COLUMN stepped_up_at timestamptz NULL")
+            conn.execute("GRANT UPDATE (stepped_up_at) ON human_sessions TO agw_app")
         app = create_db_engine(urls.app, pool_size=5)
         mig = create_db_engine(urls.migrator, pool_size=2)
         tenant = "t-migrate"

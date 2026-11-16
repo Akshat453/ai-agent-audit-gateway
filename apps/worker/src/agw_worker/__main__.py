@@ -23,6 +23,7 @@ from agw_gateway.logs import configure_logging
 from agw_worker.anchoring import Anchorer, AnchorerConfig
 from agw_worker.anchoring.admin import read_key
 from agw_worker.anchoring.evm import EvmAnchorBackend
+from agw_worker.monitoring import Monitor, MonitorConfig
 from agw_worker.sealing import Sealer
 from agw_worker.sealing.policy import SealPolicy
 
@@ -59,6 +60,30 @@ def build_anchorer(settings: Settings, state: GatewayState) -> Anchorer | None:
     )
 
 
+def build_monitor(settings: Settings, state: GatewayState) -> Monitor:
+    return Monitor(
+        engine=state.engine,
+        writer=state.writer,
+        config=MonitorConfig(
+            max_events=settings.monitor_max_events,
+            unanchored_alert_seconds=settings.monitor_unanchored_alert_seconds,
+            unsealed_alert_seconds=settings.monitor_unsealed_alert_seconds,
+            approval_queue_alert_seconds=settings.monitor_approval_queue_alert_seconds,
+            alert_cooldown_seconds=settings.monitor_alert_cooldown_seconds,
+            webhook_url=settings.monitor_webhook_url,
+            webhook_secret=(
+                settings.monitor_webhook_secret.get_secret_value()
+                if settings.monitor_webhook_secret is not None
+                else None
+            ),
+            chain_rpc_url=(
+                settings.anchor_rpc_url.get_secret_value() if settings.anchor_rpc_url else None
+            ),
+            finality=settings.anchor_finality,
+        ),
+    )
+
+
 def main() -> None:
     settings = get_settings()
     configure_logging(settings.log_level)
@@ -90,6 +115,10 @@ def main() -> None:
         periodic.append((settings.retention_sweep_seconds, state.retention.run_once))
     if state.anchor_gate is not None:
         periodic.append((settings.anchor_gate_sweep_seconds, state.anchor_gate.sweep_timeouts))
+    # Phase 9 (ADR-0031): monitoring evidence stream; dashboard requests are picked up fast.
+    monitor = build_monitor(settings, state)
+    periodic.append((1.0, monitor.process_requests))
+    periodic.append((settings.monitor_interval_seconds, monitor.run_once))
     anchorer = build_anchorer(settings, state)
     if anchorer is not None:
         periodic.append((settings.anchor_poll_seconds, anchorer.tick))

@@ -3,7 +3,7 @@
 Status: **Phase 0 (design), Phase 1 (core gateway), Phase 2 (flight recorder), Phase 3
 (Merkle epochs + offline verifier), Phase 4 (risk engine + risk-adaptive sealing), Phase 5
 (action-bound human approval) and Phase 6 (blockchain anchoring, on Anvil; Base Sepolia pending a
-funded key) Phase 7 (encryption, key management, selective disclosure) and Phase 8 (agent integrations: SDK, LangGraph, MCP; delegation tokens; containment) implemented,
+funded key) Phase 7 (encryption, key management, selective disclosure) Phase 8 (agent integrations: SDK, LangGraph, MCP; delegation tokens; containment) and Phase 9 (audit dashboard, monitoring evidence stream, reconciliation) implemented,
 2026-11-16.** Per-phase records: [phases/](phases/).
 Phase numbers follow the phase prompts, which differ from [13-roadmap.md](13-roadmap.md) (see
 the note there).

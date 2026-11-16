@@ -67,6 +67,9 @@ MESSAGES: Final[dict[str, str]] = {
     "DELEGATION_NOT_REVOCABLE": "Only an issuer in the delegation's chain may revoke it.",
     "INVALID_GRANT": "The token exchange was refused.",
     "INVALID_CLIENT": "Client authentication failed.",
+    # Phase 9 (ADR-0031)
+    "STEP_UP_REQUIRED": "Re-authenticate (step-up) before approving an action of this risk.",
+    "RECONCILE_INVALID": "Only an OUTCOME_UNKNOWN action can be reconciled, once.",
 }
 
 

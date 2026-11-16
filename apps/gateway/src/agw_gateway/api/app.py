@@ -15,6 +15,7 @@ from sqlalchemy import Engine
 from agw_gateway import __version__
 from agw_gateway.anchoring import AnchorGate, Finality, GatePolicy
 from agw_gateway.api.approval_routes import router as approval_router
+from agw_gateway.api.dashboard_routes import router as dashboard_router
 from agw_gateway.api.delegation_routes import router as delegation_router
 from agw_gateway.api.disclosure_routes import router as disclosure_router
 from agw_gateway.api.errors import install_error_handlers, unexpected_error_response
@@ -32,6 +33,7 @@ from agw_gateway.evidence.blobs import BlobStore, S3BlobStore
 from agw_gateway.evidence.payloads import EncryptedPayloadStore, NoPayloadStore, PayloadStore
 from agw_gateway.execution.crash import CrashPoints
 from agw_gateway.execution.executor import Executor
+from agw_gateway.execution.manual_reconcile import ManualReconciliation
 from agw_gateway.execution.reconciler import Reconciler
 from agw_gateway.execution.runner import BackgroundRunner
 from agw_gateway.execution.service import ActionService
@@ -48,6 +50,8 @@ from agw_gateway.risk_store import RiskPolicyStore
 from agw_gateway.tools.adapters.external import external_tool_specs
 from agw_gateway.tools.demo import demo_tool_specs
 from agw_gateway.tools.registry import ToolRegistry
+from agw_gateway.tracing import configure as configure_tracing
+from agw_gateway.tracing import set_attrs, span
 
 logger = logging.getLogger("agw.api.access")
 
@@ -182,7 +186,19 @@ def build_state(
     anchor_gate = AnchorGate(
         engine=engine, writer=writer, finality_label=Finality.parse(settings.anchor_finality).label
     )
+    approval_config = ApprovalConfig(
+        ttl_seconds={
+            "LOW": settings.approval_ttl_seconds_medium,
+            "MEDIUM": settings.approval_ttl_seconds_medium,
+            "HIGH": settings.approval_ttl_seconds_high,
+            "CRITICAL": settings.approval_ttl_seconds_critical,
+        },
+        four_eyes_critical=settings.approval_four_eyes_critical,
+        step_up_levels=frozenset(settings.step_up_levels),
+        step_up_window_seconds=settings.step_up_window_seconds,
+    )
     approvals = ApprovalService(
+        config=approval_config,
         engine=engine,
         registry=registry,
         writer=writer,
@@ -227,15 +243,7 @@ def build_state(
         cipher=cipher,
         minimizer=minimizer,
         delegations=delegations,
-        approval_config=ApprovalConfig(
-            ttl_seconds={
-                "LOW": settings.approval_ttl_seconds_medium,
-                "MEDIUM": settings.approval_ttl_seconds_medium,
-                "HIGH": settings.approval_ttl_seconds_high,
-                "CRITICAL": settings.approval_ttl_seconds_critical,
-            },
-            four_eyes_critical=settings.approval_four_eyes_critical,
-        ),
+        approval_config=approval_config,
     )
     return GatewayState(
         settings=settings,
@@ -260,6 +268,8 @@ def build_state(
         cipher=cipher,
         minimizer=minimizer,
         delegations=delegations,
+        reconciliation=ManualReconciliation(engine, writer),
+        writer=writer,
         exchange=TokenExchange(engine, timedelta(seconds=settings.exchange_token_ttl_seconds)),
     )
 
@@ -268,6 +278,7 @@ def create_app(state: GatewayState | None = None, *, sync_registry: bool = True)
     if state is None:
         settings = get_settings()
         configure_logging(settings.log_level)
+        configure_tracing(enabled=settings.otel_enabled, endpoint=settings.otel_endpoint)
         state = build_state(settings)
 
     @asynccontextmanager
@@ -297,6 +308,7 @@ def create_app(state: GatewayState | None = None, *, sync_registry: bool = True)
     app.include_router(approval_router)
     app.include_router(disclosure_router)
     app.include_router(delegation_router)
+    app.include_router(dashboard_router)
 
     @app.get("/metrics", include_in_schema=False)
     def metrics() -> Response:
@@ -311,10 +323,20 @@ def create_app(state: GatewayState | None = None, *, sync_registry: bool = True)
         rid = str(uuid7())
         request.state.request_id = rid
         started = time.perf_counter()
-        try:
-            response = await call_next(request)
-        except Exception as exc:  # fail closed: DB down -> 503, anything else -> 500, no details
-            response = unexpected_error_response(request, exc)
+        # Phase 9: one span per request; allowlisted attributes only (tracing.py).
+        with span("http.request", http_method=request.method, agw_request_id=rid) as sp:
+            try:
+                response = await call_next(request)
+            except Exception as exc:  # fail closed: DB down -> 503, else 500, no details
+                response = unexpected_error_response(request, exc)
+            route = request.scope.get("route")
+            set_attrs(
+                sp,
+                http_route=getattr(route, "path", None),
+                http_status_code=response.status_code,
+                agw_agent_id=getattr(request.state, "agent_id", None),
+                agw_human_id=getattr(request.state, "human_id", None),
+            )
         response.headers["X-Request-Id"] = rid
         log(
             logger,

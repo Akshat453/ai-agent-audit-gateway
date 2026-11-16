@@ -1,0 +1,14 @@
+CAUGHT   CRITICAL approve needs step-up                     test_critical_approval_needs_step_up
+CAUGHT   step-up window enforced                            test_critical_approval_needs_step_up
+CAUGHT   bundle download: auditor/admin only                test_auditor_cannot_approve_and_approver_cannot_read_payloads
+CAUGHT   verifier job: auditor/admin only                   test_dashboard_requested_run
+CAUGHT   run timeline tenant-scoped                         test_tenant_scoping
+CAUGHT   reconcile: admin only                              test_reconcile_outcome_unknown
+CAUGHT   reconcile: only OUTCOME_UNKNOWN, once              test_reconcile_outcome_unknown
+CAUGHT   monitor: chain result counts                       test_tamper_in_unsealed_tail_detected_by_chain
+CAUGHT   monitor: alert delivered to webhook                test_db_tamper_detected_within_one_cycle_and_alerted
+CAUGHT   monitor: anchor root compared                      test_anchor_root_mismatch_alert
+CAUGHT   monitor: report digest in the header               test_clean_tenant_verifies_and_report_is_evidence
+CAUGHT   monitor: age thresholds in ms                      test_no_age_alerts_below_thresholds
+CAUGHT   tracing: exporter drops non-allowlisted attributes test_tracing_allowlist
+13/13 mutations caught

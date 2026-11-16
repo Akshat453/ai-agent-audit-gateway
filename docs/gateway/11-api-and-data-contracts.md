@@ -175,5 +175,14 @@ with the Phase 4 declared `depth`). `POST /v1/oauth/token` (RFC 8693 token excha
 client credential `agwi_…`): exchanges an agent key bound to an MCP adapter's audience for a
 short-lived `agwx_…` gateway token. The gateway API refuses audience-bound keys (401).
 Tables (migration 0009): `delegations`, `delegation_signing_keys`, `integration_clients`,
-`exchanged_tokens`; `actions.delegation_id`, `agent_credentials.audience`. Evidence tables (`evidence_events`, `policies`,
+`exchanged_tokens`; `actions.delegation_id`, `agent_credentials.audience`.
+
+*(Phase 9, ADR-0031; human sessions)* `GET /v1/dashboard/{config, overview, runs, runs/{id},
+events, events/{id}/bundle, epochs, policies, incidents, incidents/export, verifications,
+verifications/{id}, alerts}` (tenant-scoped; never payloads; bundles/exports and
+`POST /v1/dashboard/verifications` need auditor/admin), `POST /v1/actions/{id}/reconcile`
+(admin; OUTCOME_UNKNOWN only), `POST /v1/auth/step-up` (CRITICAL approvals need a step-up
+within 300 s, else 403 STEP_UP_REQUIRED). OpenAPI: `python -m agw_gateway.openapi` (not served).
+Tables (migration 0010): `monitor_reports`, `monitor_alerts`, `monitor_requests`;
+`human_sessions.stepped_up_at`; reserved tenant `_monitor`. Evidence tables (`evidence_events`, `policies`,
 `evidence_payloads`) are append-only (08 §2).

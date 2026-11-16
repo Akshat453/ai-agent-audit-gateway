@@ -113,6 +113,12 @@ def run(argv: Sequence[str] | None = None, client_factory: ClientFactory = httpx
                 if answer.strip().lower() != "y":
                     print("aborted", file=sys.stderr)
                     return 1
+            if decision == "APPROVE" and shown["action"]["risk"]["level"] == "CRITICAL":
+                # Phase 9: CRITICAL approvals need a fresh re-authentication (step-up).
+                password = os.environ.get("AGW_APPROVER_PASSWORD") or getpass.getpass(
+                    "re-enter password (step-up for a CRITICAL approval): "
+                )
+                _check(http.post("/v1/auth/step-up", json={"password": password}))
             result = _check(
                 http.post(
                     f"/v1/approvals/{args.approval_id}/decision",

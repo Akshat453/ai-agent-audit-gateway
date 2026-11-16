@@ -257,6 +257,7 @@ human_sessions = Table(
     Column("created_at", DateTime(timezone=True)),
     Column("expires_at", DateTime(timezone=True), nullable=False),
     Column("revoked_at", DateTime(timezone=True)),
+    Column("stepped_up_at", DateTime(timezone=True)),  # Phase 9: re-authentication time
 )
 
 approvals = Table(
@@ -534,4 +535,46 @@ exchanged_tokens = Table(
     Column("client_id", UUID(as_uuid=True), nullable=False),
     Column("created_at", DateTime(timezone=True)),
     Column("expires_at", DateTime(timezone=True), nullable=False),
+)
+
+
+# --------------------------------------------------------------------------- Phase 9 (ADR-0031)
+monitor_reports = Table(
+    "monitor_reports",
+    metadata,
+    Column("report_id", UUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", Text, nullable=False),
+    Column("result", Text, nullable=False),
+    Column("first_seq", BigInteger),
+    Column("last_seq", BigInteger),
+    Column("report", JSONB, nullable=False),
+    Column("report_digest", LargeBinary, nullable=False),
+    Column("event_id", UUID(as_uuid=True)),
+    Column("trigger", Text, nullable=False),
+    Column("requested_by", Text),
+    Column("created_at", DateTime(timezone=True)),
+)
+
+monitor_alerts = Table(
+    "monitor_alerts",
+    metadata,
+    Column("alert_id", UUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", Text, nullable=False),
+    Column("report_id", UUID(as_uuid=True)),
+    Column("kind", Text, nullable=False),
+    Column("severity", Text, nullable=False),
+    Column("detail", JSONB, nullable=False),
+    Column("delivered", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+)
+
+monitor_requests = Table(
+    "monitor_requests",
+    metadata,
+    Column("request_id", UUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", Text, nullable=False),
+    Column("requested_by", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+    Column("picked_at", DateTime(timezone=True)),
+    Column("report_id", UUID(as_uuid=True)),
 )

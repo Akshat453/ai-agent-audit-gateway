@@ -104,6 +104,23 @@ def logout(
     return Response(status_code=204)
 
 
+class StepUpRequest(_Body):
+    password: str = Field(min_length=1, max_length=1024)
+
+
+@router.post("/auth/step-up")
+async def step_up(
+    request: Request,
+    human: Human,
+    body: StepUpRequest,
+    authorization: Annotated[str | None, Header()] = None,
+) -> dict[str, Any]:
+    """Re-authenticate this session (Phase 9): CRITICAL approvals need it within the window."""
+    state = _state(request)
+    await run_in_threadpool(state.humans.step_up, human, authorization, body.password)
+    return {"stepped_up": True, "valid_seconds": state.settings.step_up_window_seconds}
+
+
 @router.get("/approvals")
 def list_approvals(
     request: Request,

@@ -48,7 +48,17 @@ GATEWAY_ACTOR_ID: Final = "agw-gateway"
 # "delegation" carries the agent-DECLARED depth since Phase 4 (ADR-0026); otherwise it is
 # written as an explicit null (Paper B field 8: present, unknown).
 PAYLOAD_SECTIONS: Final = frozenset(
-    {"intent", "execution", "effects", "context", "approval", "delegation", "disclosure"}
+    {
+        "intent",
+        "execution",
+        "effects",
+        "context",
+        "approval",
+        "delegation",
+        "disclosure",
+        "report",
+        "reconciliation",
+    }
 )
 
 

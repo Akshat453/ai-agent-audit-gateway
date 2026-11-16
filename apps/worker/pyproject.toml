@@ -6,12 +6,15 @@ requires-python = ">=3.12"
 dependencies = [
     "agw-gateway",
     "agw-schemas",
+    "agw-verifier",  # Phase 9: the monitor runs the INDEPENDENT verifier over live exports
     "web3>=7.6,<8",
+    "httpx>=0.27",
 ]
 
 [tool.uv.sources]
 agw-gateway = { workspace = true }
 agw-schemas = { workspace = true }
+agw-verifier = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

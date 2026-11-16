@@ -35,7 +35,8 @@ Bytes16 = Annotated[bytes, Field(min_length=16, max_length=16)]
 Bytes32 = Annotated[bytes, Field(min_length=32, max_length=32)]
 Bytes64 = Annotated[bytes, Field(min_length=64, max_length=64)]
 Text = Annotated[str, Field(max_length=1024)]
-TenantId = Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9-]{0,62}$")]
+# ``_monitor`` is the one reserved system tenant (ADR-0019, Phase 9 monitoring stream).
+TenantId = Annotated[str, Field(pattern=r"^(?:_monitor|[a-z0-9][a-z0-9-]{0,62})$")]
 EventClass = Literal["A2S", "A2A", "A2H", "SYS"]
 RiskLevelName = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 
@@ -214,6 +215,22 @@ class DelegationRef(_M):
     kid: Annotated[str, Field(max_length=32)] | None = None  # signing key id
 
 
+class VerificationReportRef(_M):
+    """Phase 9 (ADR-0031): one monitor run over another tenant's evidence. The full report is
+    in the payload and in ``monitor_reports``; the header commits to its digest."""
+
+    tenant: TenantId  # the tenant whose evidence was verified
+    first: UInt | None = None
+    last: UInt | None = None
+    result: Literal[
+        "VERIFIED", "TAMPERED", "INCOMPLETE", "UNANCHORED", "INVALID_PROOF",
+        "UNTRUSTED_ANCHOR", "ERROR",
+    ]  # fmt: skip
+    digest: Bytes32  # SHA-256(TAG("AGW/monitor-report/v1") || cbor(report))
+    alerts: UInt
+    trigger: Literal["schedule", "manual"]
+
+
 class Refs(_M):
     """Hash references to earlier events (05 §4; Paper A §4 declared dependency)."""
 
@@ -264,6 +281,7 @@ class EventHeader(_M):
     erasure: Erasure | None = None  # PAYLOAD_DELETED only (Phase 7)
     delegation: DelegationRef | None = None  # Phase 8: DELEGATION_* and delegated requests
     refs: Refs | None = None  # Phase 8: hash link to the event this one depends on
+    report: VerificationReportRef | None = None  # Phase 9: VERIFICATION_REPORT only
     obs: UInt | None = None  # observed_at, µs: when the executor/reconciler observed it
 
     def model_post_init(self, _context: Any) -> None:
@@ -311,6 +329,9 @@ DisclosureAccessed = _header("DISCLOSURE_ACCESSED", "A2H", ("disclosure", "outco
 PayloadDeleted = _header("PAYLOAD_DELETED", "SYS", ("erasure",))
 DelegationCreated = _header("DELEGATION_CREATED", "A2A", ("delegation", "payload"))
 DelegationRevoked = _header("DELEGATION_REVOKED", "A2A", ("delegation",))
+VerificationReport = _header("VERIFICATION_REPORT", "SYS", ("report", "payload"))
+# Operator-recorded outcome of an OUTCOME_UNKNOWN action (never a retry).
+ActionReconciled = _header("ACTION_RECONCILED", "A2H", ("action", "outcome", "payload"))
 
 HEADER_MODELS: Final[dict[str, type[EventHeader]]] = {
     m.TYPE: m
@@ -334,6 +355,8 @@ HEADER_MODELS: Final[dict[str, type[EventHeader]]] = {
         PayloadDeleted,
         DelegationCreated,
         DelegationRevoked,
+        VerificationReport,
+        ActionReconciled,
     )
 }
 # Types that have a model but may not be written yet. Empty since Phase 5 (ADR-0027).
@@ -370,6 +393,8 @@ class Payload(_M):
     # DELEGATION_CREATED: {"purpose"}. Explicit null on direct calls (Paper B field 8).
     delegation: dict[str, Any] | None = None
     disclosure: dict[str, Any] | None = None  # {"purpose", "event_ids"} (Phase 7)
+    report: dict[str, Any] | None = None  # VERIFICATION_REPORT: the full report (Phase 9)
+    reconciliation: dict[str, Any] | None = None  # {"observed", "justification"} (Phase 9)
 
     def to_record(self, *, delegation_present: bool = False) -> dict[str, Any]:
         record = self.model_dump(mode="python", exclude_none=True)

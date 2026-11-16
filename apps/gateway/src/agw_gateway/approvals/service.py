@@ -66,6 +66,7 @@ from agw_gateway.execution.errors import (
     DependencyUnavailable,
     Forbidden,
     NotFound,
+    StepUpRequired,
 )
 from agw_gateway.humans.models import AuthenticatedHuman
 from agw_gateway.ids import uuid7
@@ -104,6 +105,9 @@ def approval_event_level(action_level: str) -> str:
 class ApprovalConfig:
     ttl_seconds: Mapping[str, int]  # by action risk level; default 900 s
     four_eyes_critical: bool = True
+    # Phase 9 (ADR-0031): APPROVING an action of these levels needs a recent step-up.
+    step_up_levels: frozenset[str] = frozenset({"CRITICAL"})
+    step_up_window_seconds: int = 300
 
     def ttl(self, level: str) -> timedelta:
         return timedelta(seconds=self.ttl_seconds.get(level, 900))
@@ -176,7 +180,9 @@ class ApprovalService:
         cipher: EnvelopeCipher | None = None,
         minimizer: Minimizer | None = None,
         delegations: Any | None = None,  # DelegationService (Phase 8); Any avoids an import cycle
+        config: ApprovalConfig | None = None,
     ) -> None:
+        self._config = config or ApprovalConfig(ttl_seconds={})
         self._delegations = delegations
         self._gate = gate or GatePolicy(frozenset(), 0.0)
         self._cipher = cipher
@@ -432,6 +438,10 @@ class ApprovalService:
                 ).scalar_one_or_none()
                 if prior is not None:
                     raise ApprovalAlreadyDecided
+                if decision == "APPROVE" and action.risk_level in self._config.step_up_levels:
+                    age = human.stepped_up_age_seconds
+                    if age is None or age > self._config.step_up_window_seconds:
+                        raise StepUpRequired
                 outcome = self._record_decision(conn, signer, human, ap, action, decision, reason)
         if expired:
             APPROVALS_EXPIRED.inc()

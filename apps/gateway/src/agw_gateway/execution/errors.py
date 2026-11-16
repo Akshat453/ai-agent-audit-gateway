@@ -147,3 +147,18 @@ class ExchangeRefused(GatewayError):
 
     code = "INVALID_GRANT"
     http_status = 400
+
+
+# --------------------------------------------------------------------------- Phase 9
+class StepUpRequired(GatewayError):
+    """Approving this risk level needs a recent re-authentication (POST /v1/auth/step-up)."""
+
+    code = "STEP_UP_REQUIRED"
+    http_status = 403
+
+
+class ReconcileInvalid(GatewayError):
+    """Only an OUTCOME_UNKNOWN action can be reconciled, once, by an admin."""
+
+    code = "RECONCILE_INVALID"
+    http_status = 409

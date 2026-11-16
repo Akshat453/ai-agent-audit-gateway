@@ -1,0 +1,7 @@
+node_modules/
+.next/
+e2e/.fixture.json
+e2e/.results/
+playwright-report/
+test-results/
+*.tsbuildinfo

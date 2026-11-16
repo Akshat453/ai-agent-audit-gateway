@@ -13,10 +13,12 @@ from agw_gateway.auth import Authenticator
 from agw_gateway.auth.exchange import TokenExchange
 from agw_gateway.config import Settings
 from agw_gateway.delegation.service import DelegationService
+from agw_gateway.evidence import EvidenceWriter
 from agw_gateway.evidence.blobs import BlobStore, BlobUnavailable, BucketNotPrivate, S3BlobStore
 from agw_gateway.evidence.payloads import PayloadStore
 from agw_gateway.execution.crash import CrashPoints
 from agw_gateway.execution.executor import Executor
+from agw_gateway.execution.manual_reconcile import ManualReconciliation
 from agw_gateway.execution.reconciler import Reconciler
 from agw_gateway.execution.runner import BackgroundRunner
 from agw_gateway.execution.service import ActionService
@@ -56,6 +58,8 @@ class GatewayState:
     # Phase 8 (ADR-0030); always built (a missing signing key fails closed inside)
     delegations: DelegationService = None  # type: ignore[assignment]
     exchange: TokenExchange = None  # type: ignore[assignment]
+    reconciliation: ManualReconciliation = None  # type: ignore[assignment]  # Phase 9
+    writer: EvidenceWriter = None  # type: ignore[assignment]  # the shared evidence writer
 
     def sync(self) -> None:
         """Startup sync: tool registry + configured risk policy (both fail closed on drift)

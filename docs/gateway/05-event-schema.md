@@ -69,6 +69,8 @@ waits for reconciliation, which may be manual.
 | `DELEGATION_CREATED` (Phase 8, replaces DELEGATION_ISSUED, ADR-0030) | A2A | 8 | issue tx | `delegation {id, depth, th, from, to, sc, tl, mr, exp, mu, kid, par?, root?}`, `run`, `refs.parent` (parent delegation's event) | `{purpose}` |
 | `DELEGATION_REVOKED` (Phase 8) | A2A | 8 | revoke tx | `delegation {id, depth, th}`, `refs.parent` | — |
 | `MONITOR_REPORT` | SYS | 8 | `_monitor` tenant | checked range, result | full report |
+| `VERIFICATION_REPORT` (Phase 9, replaces MONITOR_REPORT, ADR-0031) | SYS | 9 | `_monitor` tenant | `report {tenant, first, last, result, digest, alerts, trigger}` | `{report}` (full) |
+| `ACTION_RECONCILED` (Phase 9, operator-recorded) | A2H | 9 | reconcile tx | actor human; `outcome {COMPLETED\|FAILED, RECONCILED_<observed>}` | `{reconciliation: {observed, justification, by}}` |
 | `PAYLOAD_ERASED` | SYS | 5 | erasure tx | erased event id, legal-basis code, requester | — |
 | `PAYLOAD_DELETED` (Phase 7, replaces PAYLOAD_ERASED) | SYS | 7 | retention / erasure tx | `erasure {event, seq, reason RETENTION\|ERASURE_REQUEST, policy}` | — |
 | `KEY_DISCLOSED` | SYS | 7 | export tx | disclosed event ids, recipient id, purpose code | — |
@@ -111,6 +113,7 @@ Optional fields are **omitted** when absent and are never encoded as `null`.
 | `refs` | map {`parent`: bstr(32), `causes`: [bstr(32)]} | opt | Hash references to earlier events (Paper A §4 declared dependency) |
 | `code` | map {`gw`: tstr, `adapter`: tstr, `policy`: bstr(32)} | opt | Code provenance |
 | `violation` | map {`kind`: tstr, `claimed`: tstr} | opt | SECURITY_VIOLATION only (Phase 8 adds kind `DELEGATION_REFUSED`) |
+| `report` | map (ADR-0031 §3) | opt | Phase 9: VERIFICATION_REPORT only (the `_monitor` tenant) |
 | `delegation` | map (ADR-0030 §3) | opt | Phase 8: DELEGATION_* events; on a delegated ACTION_REQUESTED `{id, depth, th, from, root, ev}` (gateway-verified chain) |
 
 **Unknown keys** are rejected by the v1 encoder and by the verifier. New fields require

@@ -42,6 +42,7 @@ from agw_gateway.privacy.classification import FieldClasses
 from agw_gateway.privacy.minimize import Minimizer
 from agw_gateway.tools.registry import ToolRegistry
 from agw_gateway.tools.spec import ExecutionContext, ToolResult, ToolSpec
+from agw_gateway.tracing import span
 
 logger = logging.getLogger("agw.execution.executor")
 
@@ -194,6 +195,15 @@ class Executor:
                 error_code=type(exc).__name__,
             )
         observed = now_us()  # when the executor observed the adapter's outcome
+        with span(
+            "action.dispatch",
+            agw_tenant_id=job.tenant_id,
+            agw_action_id=str(job.action_id),
+            agw_tool_id=spec.meta.tool_id,
+            agw_status=outcome[0],
+            agw_error_code=outcome[1] if isinstance(outcome[1], str) else None,
+        ):
+            pass
         self._crash.hit("after_adapter_return")
         self._result_tx(job, spec, outcome, observed)
 

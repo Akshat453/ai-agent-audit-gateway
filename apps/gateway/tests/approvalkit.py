@@ -30,11 +30,12 @@ class Humans:
         return {"Authorization": f"Session {self.sessions[name]}"}
 
 
-def make_humans(migrator: Engine, client: Any, tenant: str) -> Humans:
+def make_humans(migrator: Engine, client: Any, tenant: str, *, step_up: bool = True) -> Humans:
     ids = {
         "alice": ensure_human(migrator, tenant, "alice", PASSWORD, ["approver"]),
         "bob": ensure_human(migrator, tenant, "bob", PASSWORD, ["approver"]),
         "audrey": ensure_human(migrator, tenant, "audrey", PASSWORD, ["auditor"]),
+        "adam": ensure_human(migrator, tenant, "adam", PASSWORD, ["admin"]),  # Phase 7/9
     }
     humans = Humans(tenant=tenant, ids=ids)
     for name in ids:
@@ -43,6 +44,11 @@ def make_humans(migrator: Engine, client: Any, tenant: str) -> Humans:
         )
         assert r.status_code == 200, r.text
         humans.sessions[name] = r.json()["session_token"]
+        if step_up:  # Phase 9: CRITICAL approvals need a recent re-authentication
+            s = client.post(
+                "/v1/auth/step-up", json={"password": PASSWORD}, headers=humans.headers(name)
+            )
+            assert s.status_code == 200, s.text
     return humans
 
 

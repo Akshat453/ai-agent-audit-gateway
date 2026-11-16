@@ -39,3 +39,4 @@ DISCLOSURE_IDS_TAG: Final = "AGW/disclosure-ids/v1"
 DELEGATION_SIG_TAG: Final = "AGW/delegation-sig/v1"
 DELEGATION_TOKEN_TAG: Final = "AGW/delegation-token/v1"  # noqa: S105
 INTEGRATION_KEY_TAG: Final = "AGW/integration-key/v1"
+MONITOR_REPORT_TAG: Final = "AGW/monitor-report/v1"

@@ -69,6 +69,7 @@ HEADER_KEYS = frozenset(
         "disclosure",  # Phase 7
         "erasure",  # Phase 7
         "delegation",  # Phase 8 (ADR-0030); "refs" (05 §4) is written from Phase 8 on
+        "report",  # Phase 9 (ADR-0031): VERIFICATION_REPORT
     }
 )
 # Phase 7: an export reports a payload it could not produce. Ciphertext that fails its AEAD
@@ -88,6 +89,8 @@ PAYLOAD_KEYS = frozenset(
         "delegation",
         "approval",
         "disclosure",
+        "report",
+        "reconciliation",
     }
 )
 

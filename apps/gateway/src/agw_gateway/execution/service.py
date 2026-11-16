@@ -60,6 +60,7 @@ from agw_gateway.privacy.minimize import Minimizer
 from agw_gateway.risk_store import RiskPolicyStore
 from agw_gateway.tools.registry import AmbiguousToolVersion, ToolRegistry
 from agw_gateway.tools.spec import ToolSpec
+from agw_gateway.tracing import span
 
 logger = logging.getLogger("agw.execution.service")
 
@@ -241,6 +242,17 @@ class ActionService:
                 return self._replay(existing, fingerprint)
 
         RISK_DECISIONS.labels(decision.risk.level.name, decision.effect).inc()
+        with span(
+            "action.decision",
+            agw_tenant_id=agent.tenant_id,
+            agw_agent_id=str(agent.agent_id),
+            agw_tool_id=req.tool,
+            agw_action_id=str(result.body["action_id"]),
+            agw_decision=decision.effect,
+            agw_status=str(result.body["status"]),
+            agw_risk_level=decision.risk.level.name,
+        ):
+            pass
         self._crash.hit("after_tx1_commit")
         if decision.effect == "ALLOW" and self._on_authorized is not None:
             self._on_authorized()

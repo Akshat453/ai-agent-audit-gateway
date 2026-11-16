@@ -1,0 +1,4199 @@
+{
+ "components": {
+  "schemas": {
+   "Alert": {
+    "additionalProperties": false,
+    "properties": {
+     "alert_id": {
+      "title": "Alert Id",
+      "type": "string"
+     },
+     "created_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created At"
+     },
+     "delivered": {
+      "title": "Delivered",
+      "type": "boolean"
+     },
+     "detail": {
+      "additionalProperties": true,
+      "title": "Detail",
+      "type": "object"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "report_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Report Id"
+     },
+     "severity": {
+      "title": "Severity",
+      "type": "string"
+     }
+    },
+    "required": [
+     "alert_id",
+     "kind",
+     "severity",
+     "detail",
+     "created_at",
+     "delivered",
+     "report_id"
+    ],
+    "title": "Alert",
+    "type": "object"
+   },
+   "AuditorKeyRequest": {
+    "additionalProperties": false,
+    "properties": {
+     "public_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Public Key",
+      "type": "string"
+     }
+    },
+    "required": [
+     "public_key"
+    ],
+    "title": "AuditorKeyRequest",
+    "type": "object"
+   },
+   "DashboardConfig": {
+    "additionalProperties": false,
+    "properties": {
+     "chain_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Chain Id"
+     },
+     "contract": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Contract"
+     },
+     "explorer_tx_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Explorer Tx Url"
+     },
+     "roles": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Roles",
+      "type": "array"
+     },
+     "step_up_levels": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Step Up Levels",
+      "type": "array"
+     },
+     "step_up_window_seconds": {
+      "title": "Step Up Window Seconds",
+      "type": "integer"
+     },
+     "tenant": {
+      "title": "Tenant",
+      "type": "string"
+     },
+     "username": {
+      "title": "Username",
+      "type": "string"
+     }
+    },
+    "required": [
+     "tenant",
+     "username",
+     "roles",
+     "chain_id",
+     "contract",
+     "explorer_tx_url",
+     "step_up_window_seconds",
+     "step_up_levels"
+    ],
+    "title": "DashboardConfig",
+    "type": "object"
+   },
+   "DayCount": {
+    "additionalProperties": false,
+    "properties": {
+     "count": {
+      "title": "Count",
+      "type": "integer"
+     },
+     "day": {
+      "title": "Day",
+      "type": "string"
+     }
+    },
+    "required": [
+     "day",
+     "count"
+    ],
+    "title": "DayCount",
+    "type": "object"
+   },
+   "DecisionRequest": {
+    "additionalProperties": false,
+    "properties": {
+     "action_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Action Digest",
+      "type": "string"
+     },
+     "decision": {
+      "enum": [
+       "APPROVE",
+       "REJECT"
+      ],
+      "title": "Decision",
+      "type": "string"
+     },
+     "nonce": {
+      "pattern": "^[0-9a-f]{32}$",
+      "title": "Nonce",
+      "type": "string"
+     },
+     "reason": {
+      "default": "",
+      "maxLength": 1024,
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "decision",
+     "action_digest",
+     "nonce"
+    ],
+    "title": "DecisionRequest",
+    "type": "object"
+   },
+   "DelegationNode": {
+    "additionalProperties": false,
+    "properties": {
+     "child": {
+      "title": "Child",
+      "type": "string"
+     },
+     "child_runs": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Child Runs",
+      "type": "array"
+     },
+     "created_event_id": {
+      "title": "Created Event Id",
+      "type": "string"
+     },
+     "delegation_id": {
+      "title": "Delegation Id",
+      "type": "string"
+     },
+     "depth": {
+      "title": "Depth",
+      "type": "integer"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     },
+     "issuer": {
+      "title": "Issuer",
+      "type": "string"
+     },
+     "issuer_run": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Issuer Run"
+     },
+     "max_risk": {
+      "title": "Max Risk",
+      "type": "string"
+     },
+     "max_uses": {
+      "title": "Max Uses",
+      "type": "integer"
+     },
+     "parent_delegation_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Parent Delegation Id"
+     },
+     "revoked": {
+      "title": "Revoked",
+      "type": "boolean"
+     },
+     "tools": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Tools",
+      "type": "array"
+     },
+     "uses": {
+      "title": "Uses",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "delegation_id",
+     "depth",
+     "issuer",
+     "child",
+     "parent_delegation_id",
+     "tools",
+     "max_risk",
+     "uses",
+     "max_uses",
+     "expires_at",
+     "revoked",
+     "created_event_id",
+     "issuer_run",
+     "child_runs"
+    ],
+    "title": "DelegationNode",
+    "type": "object"
+   },
+   "EpochRow": {
+    "additionalProperties": false,
+    "properties": {
+     "anchor_priority": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Anchor Priority"
+     },
+     "anchor_status": {
+      "title": "Anchor Status",
+      "type": "string"
+     },
+     "block_number": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Block Number"
+     },
+     "chain_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Chain Id"
+     },
+     "epoch_no": {
+      "title": "Epoch No",
+      "type": "integer"
+     },
+     "epoch_root": {
+      "title": "Epoch Root",
+      "type": "string"
+     },
+     "explorer_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Explorer Url"
+     },
+     "finalized_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finalized At"
+     },
+     "first_seq": {
+      "title": "First Seq",
+      "type": "integer"
+     },
+     "included_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Included At"
+     },
+     "last_seq": {
+      "title": "Last Seq",
+      "type": "integer"
+     },
+     "seal_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Seal Reason"
+     },
+     "sealed_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sealed At"
+     },
+     "submitted_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Submitted At"
+     },
+     "tree_size": {
+      "title": "Tree Size",
+      "type": "integer"
+     },
+     "tx_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tx Hash"
+     }
+    },
+    "required": [
+     "epoch_no",
+     "first_seq",
+     "last_seq",
+     "tree_size",
+     "epoch_root",
+     "sealed_at",
+     "seal_reason",
+     "anchor_priority",
+     "anchor_status",
+     "tx_hash",
+     "block_number",
+     "chain_id",
+     "explorer_url",
+     "submitted_at",
+     "included_at",
+     "finalized_at"
+    ],
+    "title": "EpochRow",
+    "type": "object"
+   },
+   "EventHeader": {
+    "additionalProperties": false,
+    "properties": {
+     "event_hash": {
+      "title": "Event Hash",
+      "type": "string"
+     },
+     "event_id": {
+      "title": "Event Id",
+      "type": "string"
+     },
+     "header": {
+      "additionalProperties": true,
+      "title": "Header",
+      "type": "object"
+     },
+     "occurred_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Occurred At"
+     },
+     "seq": {
+      "title": "Seq",
+      "type": "integer"
+     },
+     "type": {
+      "title": "Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "seq",
+     "event_id",
+     "type",
+     "occurred_at",
+     "event_hash",
+     "header"
+    ],
+    "title": "EventHeader",
+    "type": "object"
+   },
+   "EventPage": {
+    "additionalProperties": false,
+    "properties": {
+     "events": {
+      "items": {
+       "$ref": "#/components/schemas/EventHeader"
+      },
+      "title": "Events",
+      "type": "array"
+     },
+     "next_from_seq": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next From Seq"
+     },
+     "payloads": {
+      "default": "never returned here: payloads require a disclosure grant (auditor)",
+      "title": "Payloads",
+      "type": "string"
+     }
+    },
+    "required": [
+     "events",
+     "next_from_seq"
+    ],
+    "title": "EventPage",
+    "type": "object"
+   },
+   "ExportRequest": {
+    "additionalProperties": false,
+    "properties": {
+     "event_ids": {
+      "anyOf": [
+       {
+        "items": {
+         "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+         "type": "string"
+        },
+        "maxItems": 1000,
+        "minItems": 1,
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Event Ids"
+     }
+    },
+    "title": "ExportRequest",
+    "type": "object"
+   },
+   "GrantRequest": {
+    "additionalProperties": false,
+    "properties": {
+     "action_id": {
+      "anyOf": [
+       {
+        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Action Id"
+     },
+     "auditor_id": {
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+      "title": "Auditor Id",
+      "type": "string"
+     },
+     "auditor_key_id": {
+      "pattern": "^[0-9a-f]{32}$",
+      "title": "Auditor Key Id",
+      "type": "string"
+     },
+     "delivery": {
+      "default": "hpke",
+      "enum": [
+       "hpke",
+       "plaintext"
+      ],
+      "title": "Delivery",
+      "type": "string"
+     },
+     "event_ids": {
+      "anyOf": [
+       {
+        "items": {
+         "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+         "type": "string"
+        },
+        "maxItems": 1000,
+        "minItems": 1,
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Event Ids"
+     },
+     "expires_in_seconds": {
+      "default": 604800,
+      "exclusiveMinimum": 0.0,
+      "title": "Expires In Seconds",
+      "type": "integer"
+     },
+     "purpose": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Purpose",
+      "type": "string"
+     }
+    },
+    "required": [
+     "auditor_id",
+     "auditor_key_id",
+     "purpose"
+    ],
+    "title": "GrantRequest",
+    "type": "object"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "title": "Detail",
+      "type": "array"
+     }
+    },
+    "title": "HTTPValidationError",
+    "type": "object"
+   },
+   "Incident": {
+    "additionalProperties": false,
+    "properties": {
+     "action_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Action Id"
+     },
+     "at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "At"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     },
+     "detail": {
+      "additionalProperties": true,
+      "title": "Detail",
+      "type": "object"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "reconcilable": {
+      "title": "Reconcilable",
+      "type": "boolean"
+     },
+     "run_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Run Id"
+     },
+     "status": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status"
+     },
+     "tool": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tool"
+     }
+    },
+    "required": [
+     "kind",
+     "at",
+     "action_id",
+     "run_id",
+     "tool",
+     "status",
+     "code",
+     "detail",
+     "reconcilable"
+    ],
+    "title": "Incident",
+    "type": "object"
+   },
+   "LoginRequest": {
+    "additionalProperties": false,
+    "properties": {
+     "password": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "title": "Password",
+      "type": "string"
+     },
+     "tenant": {
+      "pattern": "^[a-z0-9][a-z0-9-]{0,62}$",
+      "title": "Tenant",
+      "type": "string"
+     },
+     "username": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Username",
+      "type": "string"
+     }
+    },
+    "required": [
+     "tenant",
+     "username",
+     "password"
+    ],
+    "title": "LoginRequest",
+    "type": "object"
+   },
+   "Overview": {
+    "additionalProperties": false,
+    "properties": {
+     "actions_per_day": {
+      "items": {
+       "$ref": "#/components/schemas/DayCount"
+      },
+      "title": "Actions Per Day",
+      "type": "array"
+     },
+     "anchoring_configured": {
+      "title": "Anchoring Configured",
+      "type": "boolean"
+     },
+     "decisions": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Decisions",
+      "type": "object"
+     },
+     "last_verification": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Verification"
+     },
+     "oldest_pending_approval_seconds": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Oldest Pending Approval Seconds"
+     },
+     "oldest_unanchored_seconds": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Oldest Unanchored Seconds"
+     },
+     "oldest_unsealed_seconds": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Oldest Unsealed Seconds"
+     },
+     "open_alerts": {
+      "title": "Open Alerts",
+      "type": "integer"
+     },
+     "pending_approvals": {
+      "title": "Pending Approvals",
+      "type": "integer"
+     },
+     "risk": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Risk",
+      "type": "object"
+     },
+     "statuses": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Statuses",
+      "type": "object"
+     },
+     "unanchored_epochs": {
+      "title": "Unanchored Epochs",
+      "type": "integer"
+     },
+     "unsealed_events": {
+      "title": "Unsealed Events",
+      "type": "integer"
+     },
+     "verification_failures": {
+      "title": "Verification Failures",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "actions_per_day",
+     "decisions",
+     "statuses",
+     "risk",
+     "pending_approvals",
+     "oldest_pending_approval_seconds",
+     "unsealed_events",
+     "oldest_unsealed_seconds",
+     "unanchored_epochs",
+     "oldest_unanchored_seconds",
+     "anchoring_configured",
+     "verification_failures",
+     "last_verification",
+     "open_alerts"
+    ],
+    "title": "Overview",
+    "type": "object"
+   },
+   "Policies": {
+    "additionalProperties": false,
+    "properties": {
+     "note": {
+      "default": "read-only: policy changes go through a reviewed PR + CLI and an ADR",
+      "title": "Note",
+      "type": "string"
+     },
+     "policies": {
+      "items": {
+       "$ref": "#/components/schemas/PolicyVersion"
+      },
+      "title": "Policies",
+      "type": "array"
+     },
+     "risk_policies": {
+      "items": {
+       "$ref": "#/components/schemas/RiskPolicyVersion"
+      },
+      "title": "Risk Policies",
+      "type": "array"
+     }
+    },
+    "required": [
+     "policies",
+     "risk_policies"
+    ],
+    "title": "Policies",
+    "type": "object"
+   },
+   "PolicyVersion": {
+    "additionalProperties": false,
+    "properties": {
+     "created_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created At"
+     },
+     "created_by": {
+      "title": "Created By",
+      "type": "string"
+     },
+     "document": {
+      "additionalProperties": true,
+      "title": "Document",
+      "type": "object"
+     },
+     "policy_id": {
+      "title": "Policy Id",
+      "type": "string"
+     },
+     "version": {
+      "title": "Version",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "policy_id",
+     "version",
+     "created_at",
+     "created_by",
+     "document"
+    ],
+    "title": "PolicyVersion",
+    "type": "object"
+   },
+   "ReconcileRequest": {
+    "additionalProperties": false,
+    "properties": {
+     "justification": {
+      "maxLength": 2000,
+      "minLength": 10,
+      "title": "Justification",
+      "type": "string"
+     },
+     "observed": {
+      "enum": [
+       "COMPLETED",
+       "FAILED",
+       "NOT_EXECUTED"
+      ],
+      "title": "Observed",
+      "type": "string"
+     }
+    },
+    "required": [
+     "observed",
+     "justification"
+    ],
+    "title": "ReconcileRequest",
+    "type": "object"
+   },
+   "ReportSummary": {
+    "additionalProperties": false,
+    "properties": {
+     "alerts": {
+      "title": "Alerts",
+      "type": "integer"
+     },
+     "created_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created At"
+     },
+     "event_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Event Id"
+     },
+     "first_seq": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "First Seq"
+     },
+     "last_seq": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Seq"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "report_id": {
+      "title": "Report Id",
+      "type": "string"
+     },
+     "requested_by": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Requested By"
+     },
+     "result": {
+      "title": "Result",
+      "type": "string"
+     },
+     "trigger": {
+      "title": "Trigger",
+      "type": "string"
+     }
+    },
+    "required": [
+     "report_id",
+     "result",
+     "trigger",
+     "requested_by",
+     "first_seq",
+     "last_seq",
+     "created_at",
+     "event_id",
+     "reason",
+     "alerts"
+    ],
+    "title": "ReportSummary",
+    "type": "object"
+   },
+   "RiskPolicyVersion": {
+    "additionalProperties": false,
+    "properties": {
+     "created_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created At"
+     },
+     "created_by": {
+      "title": "Created By",
+      "type": "string"
+     },
+     "digest": {
+      "title": "Digest",
+      "type": "string"
+     },
+     "document": {
+      "additionalProperties": true,
+      "title": "Document",
+      "type": "object"
+     },
+     "policy_id": {
+      "title": "Policy Id",
+      "type": "string"
+     },
+     "version": {
+      "title": "Version",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "policy_id",
+     "version",
+     "digest",
+     "created_at",
+     "created_by",
+     "document"
+    ],
+    "title": "RiskPolicyVersion",
+    "type": "object"
+   },
+   "RunDetail": {
+    "additionalProperties": false,
+    "properties": {
+     "approvals": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Approvals",
+      "type": "array"
+     },
+     "delegations": {
+      "items": {
+       "$ref": "#/components/schemas/DelegationNode"
+      },
+      "title": "Delegations",
+      "type": "array"
+     },
+     "events": {
+      "items": {
+       "$ref": "#/components/schemas/TimelineEvent"
+      },
+      "title": "Events",
+      "type": "array"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "run_id",
+     "events",
+     "delegations",
+     "approvals"
+    ],
+    "title": "RunDetail",
+    "type": "object"
+   },
+   "RunSummary": {
+    "additionalProperties": false,
+    "properties": {
+     "actions": {
+      "title": "Actions",
+      "type": "integer"
+     },
+     "agents": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Agents",
+      "type": "array"
+     },
+     "delegated": {
+      "title": "Delegated",
+      "type": "boolean"
+     },
+     "first_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "First At"
+     },
+     "last_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last At"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "statuses": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Statuses",
+      "type": "object"
+     }
+    },
+    "required": [
+     "run_id",
+     "agents",
+     "actions",
+     "statuses",
+     "first_at",
+     "last_at",
+     "delegated"
+    ],
+    "title": "RunSummary",
+    "type": "object"
+   },
+   "StepUpRequest": {
+    "additionalProperties": false,
+    "properties": {
+     "password": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "title": "Password",
+      "type": "string"
+     }
+    },
+    "required": [
+     "password"
+    ],
+    "title": "StepUpRequest",
+    "type": "object"
+   },
+   "TimelineEvent": {
+    "additionalProperties": false,
+    "properties": {
+     "action_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Action Id"
+     },
+     "actor": {
+      "additionalProperties": true,
+      "title": "Actor",
+      "type": "object"
+     },
+     "agent": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Agent"
+     },
+     "anchor": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Anchor"
+     },
+     "approval": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Approval"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     },
+     "decision": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Decision"
+     },
+     "delegation": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Delegation"
+     },
+     "epoch_no": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Epoch No"
+     },
+     "event_hash": {
+      "title": "Event Hash",
+      "type": "string"
+     },
+     "event_id": {
+      "title": "Event Id",
+      "type": "string"
+     },
+     "evidence_class": {
+      "title": "Evidence Class",
+      "type": "string"
+     },
+     "occurred_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Occurred At"
+     },
+     "reasons": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Reasons",
+      "type": "array"
+     },
+     "refs": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Refs"
+     },
+     "risk": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Risk"
+     },
+     "seq": {
+      "title": "Seq",
+      "type": "integer"
+     },
+     "status": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status"
+     },
+     "tool": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tool"
+     },
+     "type": {
+      "title": "Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "seq",
+     "event_id",
+     "event_hash",
+     "type",
+     "evidence_class",
+     "occurred_at",
+     "actor",
+     "agent",
+     "action_id",
+     "tool",
+     "decision",
+     "status",
+     "code",
+     "reasons",
+     "risk",
+     "approval",
+     "delegation",
+     "refs",
+     "epoch_no",
+     "anchor"
+    ],
+    "title": "TimelineEvent",
+    "type": "object"
+   },
+   "ValidationError": {
+    "properties": {
+     "ctx": {
+      "title": "Context",
+      "type": "object"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "title": "Location",
+      "type": "array"
+     },
+     "msg": {
+      "title": "Message",
+      "type": "string"
+     },
+     "type": {
+      "title": "Error Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError",
+    "type": "object"
+   },
+   "Verifications": {
+    "additionalProperties": false,
+    "properties": {
+     "note": {
+      "default": "dashboard status is a convenience view; independent verification uses the CLI (agw-verify) on an exported bundle with trust roots obtained out of band",
+      "title": "Note",
+      "type": "string"
+     },
+     "pending_requests": {
+      "title": "Pending Requests",
+      "type": "integer"
+     },
+     "reports": {
+      "items": {
+       "$ref": "#/components/schemas/ReportSummary"
+      },
+      "title": "Reports",
+      "type": "array"
+     }
+    },
+    "required": [
+     "reports",
+     "pending_requests"
+    ],
+    "title": "Verifications",
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "title": "AI Agent Audit Gateway",
+  "version": "0.1.0"
+ },
+ "openapi": "3.1.0",
+ "paths": {
+  "/v1/actions": {
+   "post": {
+    "operationId": "post_action_v1_actions_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "idempotency-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Post Action"
+   }
+  },
+  "/v1/actions/{action_id}": {
+   "get": {
+    "description": "``?wait=N``: long-poll up to N seconds (capped by settings) until the status changes.",
+    "operationId": "get_action_v1_actions__action_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "action_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Action Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "wait",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "maximum": 120,
+       "minimum": 0,
+       "title": "Wait",
+       "type": "number"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Get Action V1 Actions  Action Id  Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Get Action"
+   }
+  },
+  "/v1/actions/{action_id}/reconcile": {
+   "post": {
+    "operationId": "reconcile_v1_actions__action_id__reconcile_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "action_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Action Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReconcileRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Reconcile V1 Actions  Action Id  Reconcile Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Reconcile"
+   }
+  },
+  "/v1/approvals": {
+   "get": {
+    "operationId": "list_approvals_v1_approvals_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "state",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "PENDING",
+          "APPROVED",
+          "REJECTED",
+          "EXPIRED",
+          "CONSUMED",
+          "INVALIDATED"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "State"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "maximum": 200,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response List Approvals V1 Approvals Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "List Approvals"
+   }
+  },
+  "/v1/approvals-signing-keys": {
+   "get": {
+    "description": "Public keys that verify decision signatures (for auditors / offline verification).",
+    "operationId": "signing_keys_v1_approvals_signing_keys_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Signing Keys V1 Approvals Signing Keys Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Signing Keys"
+   }
+  },
+  "/v1/approvals/{approval_id}": {
+   "get": {
+    "operationId": "get_approval_v1_approvals__approval_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "approval_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Approval Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Get Approval V1 Approvals  Approval Id  Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Get Approval"
+   }
+  },
+  "/v1/approvals/{approval_id}/decision": {
+   "post": {
+    "operationId": "decide_v1_approvals__approval_id__decision_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "approval_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Approval Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DecisionRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Decide V1 Approvals  Approval Id  Decision Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Decide"
+   }
+  },
+  "/v1/auditor-keys": {
+   "post": {
+    "operationId": "register_auditor_key_v1_auditor_keys_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AuditorKeyRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Register Auditor Key V1 Auditor Keys Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Register Auditor Key"
+   }
+  },
+  "/v1/auth/login": {
+   "post": {
+    "operationId": "login_v1_auth_login_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LoginRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Login V1 Auth Login Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Login"
+   }
+  },
+  "/v1/auth/logout": {
+   "post": {
+    "operationId": "logout_v1_auth_logout_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Logout"
+   }
+  },
+  "/v1/auth/me": {
+   "get": {
+    "description": "The authenticated human's own identity (no secrets).",
+    "operationId": "whoami_v1_auth_me_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Whoami V1 Auth Me Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Whoami"
+   }
+  },
+  "/v1/auth/step-up": {
+   "post": {
+    "description": "Re-authenticate this session (Phase 9): CRITICAL approvals need it within the window.",
+    "operationId": "step_up_v1_auth_step_up_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/StepUpRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Step Up V1 Auth Step Up Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Step Up"
+   }
+  },
+  "/v1/dashboard/alerts": {
+   "get": {
+    "operationId": "alerts_v1_dashboard_alerts_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Alert"
+         },
+         "title": "Response Alerts V1 Dashboard Alerts Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Alerts"
+   }
+  },
+  "/v1/dashboard/config": {
+   "get": {
+    "operationId": "config_v1_dashboard_config_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DashboardConfig"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Config"
+   }
+  },
+  "/v1/dashboard/epochs": {
+   "get": {
+    "operationId": "epochs_v1_dashboard_epochs_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/EpochRow"
+         },
+         "title": "Response Epochs V1 Dashboard Epochs Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Epochs"
+   }
+  },
+  "/v1/dashboard/events": {
+   "get": {
+    "operationId": "events_v1_dashboard_events_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 64,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Type"
+      }
+     },
+     {
+      "in": "query",
+      "name": "run_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Run Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "action_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Action Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "agent_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Agent Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "from_seq",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "minimum": 0,
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "From Seq"
+      }
+     },
+     {
+      "in": "query",
+      "name": "to_seq",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "minimum": 0,
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "To Seq"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EventPage"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Events"
+   }
+  },
+  "/v1/dashboard/events/{event_id}/bundle": {
+   "get": {
+    "description": "Evidence bundle (header + proof + epochs + anchor claim) WITHOUT the payload.",
+    "operationId": "event_bundle_v1_dashboard_events__event_id__bundle_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "event_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Event Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Event Bundle V1 Dashboard Events  Event Id  Bundle Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Event Bundle"
+   }
+  },
+  "/v1/dashboard/incidents": {
+   "get": {
+    "operationId": "incidents_v1_dashboard_incidents_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "kind",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "items": {
+          "enum": [
+           "denied",
+           "outcome_unknown",
+           "failed",
+           "security",
+           "alerts"
+          ],
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Kind"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Incident"
+         },
+         "title": "Response Incidents V1 Dashboard Incidents Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Incidents"
+   }
+  },
+  "/v1/dashboard/incidents/export": {
+   "get": {
+    "description": "Every SEALED event of the incident actions as a payload-free bundle (+ what is not\nsealed yet). Verify each bundle with ``agw-verify event --bundle``.",
+    "operationId": "incidents_export_v1_dashboard_incidents_export_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "kind",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "items": {
+          "enum": [
+           "denied",
+           "outcome_unknown",
+           "failed",
+           "security",
+           "alerts"
+          ],
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Kind"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "maximum": 200,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Incidents Export V1 Dashboard Incidents Export Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Incidents Export"
+   }
+  },
+  "/v1/dashboard/overview": {
+   "get": {
+    "operationId": "overview_v1_dashboard_overview_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "days",
+      "required": false,
+      "schema": {
+       "default": 14,
+       "maximum": 90,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Overview"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Overview"
+   }
+  },
+  "/v1/dashboard/policies": {
+   "get": {
+    "operationId": "policies_v1_dashboard_policies_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Policies"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Policies"
+   }
+  },
+  "/v1/dashboard/runs": {
+   "get": {
+    "operationId": "runs_v1_dashboard_runs_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "maximum": 200,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/RunSummary"
+         },
+         "title": "Response Runs V1 Dashboard Runs Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Runs"
+   }
+  },
+  "/v1/dashboard/runs/{run_id}": {
+   "get": {
+    "operationId": "run_detail_v1_dashboard_runs__run_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "run_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Run Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RunDetail"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Run Detail"
+   }
+  },
+  "/v1/dashboard/verifications": {
+   "get": {
+    "operationId": "verifications_v1_dashboard_verifications_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "maximum": 200,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Verifications"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Verifications"
+   },
+   "post": {
+    "description": "Queue a verifier run for the human's tenant. The WORKER runs it (the API process does\nnot contain the verifier, ADR-0016); poll GET /v1/dashboard/verifications.",
+    "operationId": "request_verification_v1_dashboard_verifications_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "202": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Request Verification V1 Dashboard Verifications Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Request Verification"
+   }
+  },
+  "/v1/dashboard/verifications/{report_id}": {
+   "get": {
+    "operationId": "verification_v1_dashboard_verifications__report_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "report_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Report Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Verification V1 Dashboard Verifications  Report Id  Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Verification"
+   }
+  },
+  "/v1/delegation-signing-keys": {
+   "get": {
+    "operationId": "delegation_keys_v1_delegation_signing_keys_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Delegation Keys V1 Delegation Signing Keys Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Delegation Keys"
+   }
+  },
+  "/v1/delegations": {
+   "post": {
+    "operationId": "create_delegation_v1_delegations_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Create Delegation V1 Delegations Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Create Delegation"
+   }
+  },
+  "/v1/delegations/{delegation_id}/revoke": {
+   "post": {
+    "operationId": "revoke_delegation_v1_delegations__delegation_id__revoke_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "delegation_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Delegation Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Revoke Delegation V1 Delegations  Delegation Id  Revoke Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Revoke Delegation"
+   }
+  },
+  "/v1/delegations/{delegation_id}/timeline": {
+   "get": {
+    "description": "For an issuer anywhere in the chain: the delegation (and its sub-delegations) and every\nevent of every child action requested under them, in seq order. Payloads are omitted.",
+    "operationId": "delegation_timeline_v1_delegations__delegation_id__timeline_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "delegation_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Delegation Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Delegation Timeline V1 Delegations  Delegation Id  Timeline Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Delegation Timeline"
+   }
+  },
+  "/v1/disclosures": {
+   "post": {
+    "operationId": "create_grant_v1_disclosures_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/GrantRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Create Grant V1 Disclosures Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Create Grant"
+   }
+  },
+  "/v1/disclosures/{grant_id}/export": {
+   "post": {
+    "operationId": "export_grant_v1_disclosures__grant_id__export_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "grant_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Grant Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/ExportRequest"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Body"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Export Grant V1 Disclosures  Grant Id  Export Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Export Grant"
+   }
+  },
+  "/v1/disclosures/{grant_id}/revoke": {
+   "post": {
+    "operationId": "revoke_grant_v1_disclosures__grant_id__revoke_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "grant_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Grant Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Revoke Grant"
+   }
+  },
+  "/v1/epochs/latest": {
+   "get": {
+    "operationId": "latest_epoch_v1_epochs_latest_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "tenant",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 63,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Tenant"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Latest Epoch V1 Epochs Latest Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Latest Epoch"
+   }
+  },
+  "/v1/epochs/{epoch_no}": {
+   "get": {
+    "operationId": "get_epoch_by_no_v1_epochs__epoch_no__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "epoch_no",
+      "required": true,
+      "schema": {
+       "minimum": 0,
+       "title": "Epoch No",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "tenant",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 63,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Tenant"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Get Epoch By No V1 Epochs  Epoch No  Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Get Epoch By No"
+   }
+  },
+  "/v1/events": {
+   "get": {
+    "description": "Event HEADERS only (structural, non-sensitive). Payloads are never returned here.\n\nWithout the ``audit:events:read`` scope an agent sees only its own events; with it, every\nevent of its tenant. Never another tenant's.",
+    "operationId": "list_events_v1_events_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "agent_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Agent Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "action_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Action Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "run_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Run Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "tool",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 128,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Tool"
+      }
+     },
+     {
+      "in": "query",
+      "name": "type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 64,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Type"
+      }
+     },
+     {
+      "in": "query",
+      "name": "from_seq",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "minimum": 0,
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "From Seq"
+      }
+     },
+     {
+      "in": "query",
+      "name": "to_seq",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "minimum": 0,
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "To Seq"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response List Events V1 Events Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "List Events"
+   }
+  },
+  "/v1/events/{event_id}/proof": {
+   "get": {
+    "description": "Evidence bundle for one event: header + inclusion proof + epoch chain. No payload.",
+    "operationId": "event_proof_v1_events__event_id__proof_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "event_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Event Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "tenant",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 63,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Tenant"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Event Proof V1 Events  Event Id  Proof Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Event Proof"
+   }
+  },
+  "/v1/health": {
+   "get": {
+    "operationId": "health_v1_health_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": {
+          "type": "string"
+         },
+         "title": "Response Health V1 Health Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Health"
+   }
+  },
+  "/v1/oauth/token": {
+   "post": {
+    "description": "RFC 8693 token exchange for registered integration clients (the MCP adapter).",
+    "operationId": "token_exchange_v1_oauth_token_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Token Exchange"
+   }
+  },
+  "/v1/ready": {
+   "get": {
+    "operationId": "ready_v1_ready_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": {
+          "type": "string"
+         },
+         "title": "Response Ready V1 Ready Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Ready"
+   }
+  },
+  "/v1/runs/{run_id}/timeline": {
+   "get": {
+    "operationId": "run_timeline_v1_runs__run_id__timeline_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "run_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Run Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Run Timeline V1 Runs  Run Id  Timeline Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Run Timeline"
+   }
+  },
+  "/v1/tools": {
+   "get": {
+    "operationId": "list_tools_v1_tools_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response List Tools V1 Tools Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "List Tools"
+   }
+  }
+ }
+}

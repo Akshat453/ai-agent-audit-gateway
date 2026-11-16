@@ -10,6 +10,10 @@ Status: Accepted (Phase 0). One phase per session. Each phase ends with a report
 > **Phase 8 note (ADR-0030).** The Phase 8 prompt delivered delegation tokens, A2A delegation
 > evidence and the MCP front-end (row 10 below) plus the SDK/LangGraph integrations. Row 8's
 > experiments + `_monitor` stream remain unscheduled.
+> **Phase 9 note (ADR-0031).** The Phase 9 prompt delivered the dashboard (row 9, plus
+> approve/reject, step-up, verification requests and reconciliation as thin forms over the API)
+> and row 8's monitoring stream (`_monitor`, VERIFICATION_REPORT). Row 8's experiment suite is
+> still open.
 Features specified for a later phase MUST NOT be implemented early. Earlier phases leave only
 interfaces.
 

@@ -9,7 +9,6 @@ OpenTelemetry API is installed, no SDK/exporter; the test asserts that.)
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import logging
 import uuid
@@ -121,10 +120,9 @@ def test_canary_never_leaks(gw: Gw, migrator_engine: Any) -> None:
         for name, text in surfaces.items()
     }
     assert leaks == {name: [] for name in surfaces}, leaks
-    # Traces: the OpenTelemetry API is present (a FastAPI/Starlette dependency) but no SDK or
-    # exporter is configured, so spans go to the no-op proxy provider: nothing to leak into.
-    if importlib.util.find_spec("opentelemetry.trace") is not None:
-        from opentelemetry import trace
+    # Traces: Phase 9 installs the SDK but tracing is OFF by default (no provider set), so
+    # spans go to the no-op proxy provider here. With tracing ON, the allowlist is asserted by
+    # test_tracing_allowlist.py (same canaries).
+    from opentelemetry import trace
 
-        assert type(trace.get_tracer_provider()).__name__ == "ProxyTracerProvider"
-        assert importlib.util.find_spec("opentelemetry.sdk") is None
+    assert type(trace.get_tracer_provider()).__name__ == "ProxyTracerProvider"

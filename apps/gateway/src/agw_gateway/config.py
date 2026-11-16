@@ -27,6 +27,7 @@ _SECRET_FIELDS = (
     "blob_access_key",
     "blob_secret_key",
     "smtp_password",
+    "monitor_webhook_secret",
 )
 
 
@@ -151,6 +152,22 @@ class Settings(BaseSettings):
     smtp_password: SecretStr | None = None
     smtp_from: str = Field(default="agw-gateway@localhost", max_length=254)
     smtp_allowed_domains: Annotated[tuple[str, ...], NoDecode] = ()  # empty = any domain
+    # Monitoring + dashboard (Phase 9, ADR-0031).
+    otel_enabled: bool = False
+    otel_endpoint: str | None = None  # OTLP/HTTP traces endpoint; unset + enabled -> console
+    monitor_interval_seconds: float = Field(default=60.0, gt=0)
+    monitor_max_events: int = Field(default=200_000, ge=100)
+    monitor_unanchored_alert_seconds: float = Field(default=900.0, gt=0)
+    monitor_unsealed_alert_seconds: float = Field(default=900.0, gt=0)
+    monitor_approval_queue_alert_seconds: float = Field(default=900.0, gt=0)
+    monitor_alert_cooldown_seconds: float = Field(default=900.0, ge=0)
+    monitor_webhook_url: str | None = None
+    monitor_webhook_secret: SecretStr | None = None  # HMAC-SHA256 of the body, X-AGW-Signature
+    # Step-up: CRITICAL decisions need a re-authentication within this window.
+    step_up_window_seconds: int = Field(default=300, ge=30, le=3600)
+    step_up_levels: Annotated[tuple[str, ...], NoDecode] = ("CRITICAL",)
+    # Explorer link template for anchors, e.g. https://sepolia.basescan.org/tx/{tx}
+    anchor_explorer_tx_url: str | None = Field(default=None, pattern=r"^https://[^ ]*\{tx\}[^ ]*$")
     # Code provenance: gateway build commit. If unset, resolved from git at startup.
     build_commit: str | None = Field(default=None, pattern=r"^[0-9a-zA-Z.+_-]{1,64}$")
 
@@ -159,6 +176,7 @@ class Settings(BaseSettings):
         "http_allowlist",
         "http_allow_plain",
         "smtp_allowed_domains",
+        "step_up_levels",
         mode="before",
     )
     @classmethod

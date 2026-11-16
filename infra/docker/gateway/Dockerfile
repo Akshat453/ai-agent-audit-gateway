@@ -25,3 +25,13 @@ RUN uv sync --frozen --no-dev --package agw-sdk && useradd --system --uid 10002 
 COPY examples/containment/probe.py /probe.py
 USER agent
 ENTRYPOINT ["python", "/probe.py"]
+
+# Phase 9 (compose profile "ui"): one Python runtime for init, gateway, worker, MCP adapter and
+# the demo agents (all workspace packages + the example code + the contract artifact).
+FROM base AS runtime
+RUN uv sync --frozen --no-dev --all-packages && useradd --system --uid 10003 agw \
+ && mkdir -p /var/lib/agw /var/lib/agw-sandbox && chown agw /var/lib/agw /var/lib/agw-sandbox
+COPY examples ./examples
+COPY contracts/artifacts ./contracts/artifacts
+COPY infra/docker/ui ./infra/docker/ui
+USER agw

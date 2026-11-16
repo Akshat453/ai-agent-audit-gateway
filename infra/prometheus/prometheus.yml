@@ -1,0 +1,10 @@
+# Phase 9 (ADR-0031): scrape the host-run gateway (/metrics, port 8080) and worker
+# (AGW_WORKER_METRICS_PORT=9464). Labels are bounded enums only (no ids, args or payloads).
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: agw-gateway
+    metrics_path: /metrics
+    static_configs: [{ targets: ["host.docker.internal:8080"] }]
+  - job_name: agw-worker
+    static_configs: [{ targets: ["host.docker.internal:9464"] }]
