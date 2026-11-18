@@ -1,0 +1,1 @@
+{"session_id":"g_1","transcript_path":"/home/u/.gemini/tmp/t.json","cwd":"/project","hook_event_name":"BeforeTool","timestamp":"2026-11-18T10:00:00Z","tool_name":"read_file","tool_input":{"file_path":"/project/.env"}}

@@ -1,11 +1,112 @@
 @import "tailwindcss";
 
-/* Phase 9 dashboard: plain, high-contrast, no web fonts (CSP: font-src 'self'). */
-:root { color-scheme: light; }
-body { @apply bg-slate-50 text-slate-900 antialiased; }
-a { @apply text-blue-800 underline underline-offset-2 hover:no-underline; }
-:focus-visible { @apply outline-2 outline-offset-2 outline-blue-700; }
-table { @apply w-full border-collapse text-sm; }
-th { @apply border-b border-slate-300 bg-slate-100 px-2 py-1 text-left font-semibold; }
-td { @apply border-b border-slate-200 px-2 py-1 align-top; }
-code, pre { @apply font-mono text-xs; }
+/* AgentGuard Console design tokens (Phase 9.5, docs/gateway/16-dashboard-design.md §3).
+   Radix Colors scales, bundled locally (CSP: style-src 'self' + nonce, no CDN). Light values
+   sit on :root/.light; dark values on .dark, which the server sets on <html> from the theme
+   cookie, so there is no flash and no inline script. */
+@import "@radix-ui/colors/slate.css";
+@import "@radix-ui/colors/slate-dark.css";
+@import "@radix-ui/colors/iris.css";
+@import "@radix-ui/colors/iris-dark.css";
+@import "@radix-ui/colors/jade.css";
+@import "@radix-ui/colors/jade-dark.css";
+@import "@radix-ui/colors/tomato.css";
+@import "@radix-ui/colors/tomato-dark.css";
+@import "@radix-ui/colors/amber.css";
+@import "@radix-ui/colors/amber-dark.css";
+@import "@radix-ui/colors/orange.css";
+@import "@radix-ui/colors/orange-dark.css";
+@import "@radix-ui/colors/blue.css";
+@import "@radix-ui/colors/blue-dark.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Scale roles: 1-2 app bg, 3-5 component bg/hover/active, 6-8 borders, 9-10 solid, 11 low-
+   contrast text, 12 high-contrast text. `gray` = slate (neutral), `brand` = iris (accent),
+   `ok` = jade, `bad` = tomato, `warn` = amber, `high` = orange, `info` = blue. */
+@theme inline {
+  --color-gray-1: var(--slate-1); --color-gray-2: var(--slate-2); --color-gray-3: var(--slate-3);
+  --color-gray-4: var(--slate-4); --color-gray-5: var(--slate-5); --color-gray-6: var(--slate-6);
+  --color-gray-7: var(--slate-7); --color-gray-8: var(--slate-8); --color-gray-9: var(--slate-9);
+  --color-gray-10: var(--slate-10); --color-gray-11: var(--slate-11); --color-gray-12: var(--slate-12);
+
+  --color-brand-1: var(--iris-1); --color-brand-2: var(--iris-2); --color-brand-3: var(--iris-3);
+  --color-brand-4: var(--iris-4); --color-brand-5: var(--iris-5); --color-brand-6: var(--iris-6);
+  --color-brand-7: var(--iris-7); --color-brand-8: var(--iris-8); --color-brand-9: var(--iris-9);
+  --color-brand-10: var(--iris-10); --color-brand-11: var(--iris-11); --color-brand-12: var(--iris-12);
+
+  --color-ok-3: var(--jade-3); --color-ok-4: var(--jade-4); --color-ok-6: var(--jade-6);
+  --color-ok-7: var(--jade-7); --color-ok-9: var(--jade-9); --color-ok-11: var(--jade-11);
+  --color-ok-12: var(--jade-12);
+  --color-bad-3: var(--tomato-3); --color-bad-4: var(--tomato-4); --color-bad-6: var(--tomato-6);
+  --color-bad-7: var(--tomato-7); --color-bad-8: var(--tomato-8); --color-bad-9: var(--tomato-9);
+  --color-bad-10: var(--tomato-10); --color-bad-11: var(--tomato-11); --color-bad-12: var(--tomato-12);
+  --color-warn-3: var(--amber-3); --color-warn-4: var(--amber-4); --color-warn-6: var(--amber-6);
+  --color-warn-7: var(--amber-7); --color-warn-9: var(--amber-9); --color-warn-11: var(--amber-11);
+  --color-warn-12: var(--amber-12);
+  --color-high-3: var(--orange-3); --color-high-4: var(--orange-4); --color-high-6: var(--orange-6);
+  --color-high-7: var(--orange-7); --color-high-9: var(--orange-9); --color-high-11: var(--orange-11);
+  --color-high-12: var(--orange-12);
+  --color-info-3: var(--blue-3); --color-info-4: var(--blue-4); --color-info-6: var(--blue-6);
+  --color-info-7: var(--blue-7); --color-info-9: var(--blue-9); --color-info-11: var(--blue-11);
+  --color-info-12: var(--blue-12);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+
+  /* Type scale (§3.2): text-title 20/28, text-section 15/22, text-body 14/20, text-dense
+     13/18, text-caption 12/16, text-kpi 28/32. */
+  --text-title: 20px; --text-title--line-height: 28px;
+  --text-section: 15px; --text-section--line-height: 22px;
+  --text-body: 14px; --text-body--line-height: 20px;
+  --text-dense: 13px; --text-dense--line-height: 18px;
+  --text-caption: 12px; --text-caption--line-height: 16px;
+  --text-kpi: 28px; --text-kpi--line-height: 32px;
+
+  --animate-in: agw-in 150ms ease-out;
+  --animate-slide: agw-slide 180ms ease-out;
+}
+
+@keyframes agw-in { from { opacity: 0; transform: translateY(2px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes agw-slide { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+
+@layer base {
+  :root { color-scheme: light; }
+  .dark { color-scheme: dark; }
+  html, body { height: 100%; }
+  body {
+    @apply bg-gray-1 font-sans text-body text-gray-12 antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  /* Iris focus ring everywhere (§8). */
+  :focus-visible { @apply outline-2 outline-offset-2 outline-brand-8; }
+  ::selection { @apply bg-brand-5 text-gray-12; }
+  code, pre, kbd, samp { @apply font-mono; }
+  a { @apply text-brand-11 underline-offset-2 hover:underline; }
+  /* Links inside running text are underlined (WCAG 1.4.1: not color alone). */
+  p a, li > a:not([class]), dd a:not([class]), .legacy a { @apply underline decoration-brand-7; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+  }
+}
+
+/* Density (§3.4): rows are 44 px (comfortable) or 36 px (compact); set on <html>. */
+:root { --row-h: 44px; }
+.density-compact { --row-h: 36px; }
+
+/* Legacy Phase 9 pages (rebuilt in Part B) keep plain tables; give them the new tokens. */
+.legacy table { @apply w-full border-collapse text-dense; }
+.legacy th { @apply border-b border-gray-6 bg-gray-2 px-3 py-2 text-left text-caption font-medium text-gray-11; }
+.legacy td { @apply border-b border-gray-4 px-3 py-2 align-top; }
+.legacy code, .legacy pre { @apply text-caption; }
+/* Phase 9 utility colors used inside legacy pages, re-pointed at the theme scales so they keep
+   AA contrast in dark mode too (Part B deletes them with the old pages). */
+.legacy .text-slate-500, .legacy .text-slate-600, .legacy .text-slate-700 { color: var(--slate-11); }
+.legacy .text-slate-900 { color: var(--slate-12); }
+.legacy .text-amber-900, .legacy .text-red-800, .legacy .text-green-900 { color: inherit; }
+.legacy .bg-white { background-color: var(--slate-1); }
+.legacy .border-slate-300, .legacy .border-slate-400, .legacy .border-slate-500 { border-color: var(--slate-7); }

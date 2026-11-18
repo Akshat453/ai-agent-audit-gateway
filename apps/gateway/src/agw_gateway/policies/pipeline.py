@@ -12,11 +12,13 @@ from datetime import datetime
 from typing import Any
 
 from agw_gateway.auth.models import AuthenticatedAgent
+from agw_gateway.connectors.constraint import ConnectorConstraint
 from agw_gateway.delegation.constraint import DelegationConstraint
 from agw_gateway.policies.engine import Decision, EvaluationInput, evaluate
 from agw_gateway.policies.models import PolicyDocument
 from agw_gateway.risk import RiskPolicy, build_context
 from agw_gateway.risk import evaluate as evaluate_risk
+from agw_gateway.timing import timed
 from agw_gateway.tools.metadata import ToolMetadata
 
 
@@ -32,6 +34,7 @@ def decide_action(
     now: datetime,
     delegation_depth: int | None = None,
     delegation: DelegationConstraint | None = None,
+    connector: ConnectorConstraint | None = None,
 ) -> Decision:
     """``args`` are the VALIDATED args (JSON mode), or None if validation failed.
 
@@ -43,29 +46,32 @@ def decide_action(
     scopes = agent.scopes
     if delegation is not None and delegation.failure is None:
         scopes = agent.scopes & delegation.scopes
-    risk = evaluate_risk(
-        build_context(
-            tool_id=tool_id,
-            tool=tool,
-            args=args,
-            environment=environment,
-            agent_scopes=scopes,
-            agent_trust_tier=agent.trust_tier,
-            delegation_depth=delegation.depth if delegation is not None else delegation_depth,
-            delegation_verified=delegation is not None,
-        ),
-        risk_policy,
-    )
-    return evaluate(
-        EvaluationInput(
-            agent=agent,
-            tool=tool,
-            args_valid=args is not None,
-            args=args,
-            environment=environment or "",
-            policy=policy,
-            risk=risk,
-            now=now,
-            delegation=delegation,
+    with timed("risk"):
+        risk = evaluate_risk(
+            build_context(
+                tool_id=tool_id,
+                tool=tool,
+                args=args,
+                environment=environment,
+                agent_scopes=scopes,
+                agent_trust_tier=agent.trust_tier,
+                delegation_depth=delegation.depth if delegation is not None else delegation_depth,
+                delegation_verified=delegation is not None,
+            ),
+            risk_policy,
         )
-    )
+    with timed("policy"):
+        return evaluate(
+            EvaluationInput(
+                agent=agent,
+                tool=tool,
+                args_valid=args is not None,
+                args=args,
+                environment=environment or "",
+                policy=policy,
+                risk=risk,
+                now=now,
+                delegation=delegation,
+                connector=connector,
+            )
+        )

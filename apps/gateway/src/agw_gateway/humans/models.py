@@ -7,7 +7,10 @@ from datetime import datetime
 from typing import Final
 from uuid import UUID
 
-ROLES: Final = frozenset({"approver", "admin", "auditor"})
+# C1 (ADR-0034): coding approvals are routed by path owner to these approving roles.
+APPROVING_ROLES: Final = frozenset({"approver", "security", "ledger_lead", "maintainer"})
+ROLES: Final = frozenset({"admin", "auditor"}) | APPROVING_ROLES
+VIEWER_ROLES: Final = frozenset({"auditor", "admin"}) | APPROVING_ROLES
 
 
 @dataclass(frozen=True)

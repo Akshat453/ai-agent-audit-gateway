@@ -1,0 +1,131 @@
+# Coding risk policy for the MintRail repository (C1, ADR-0034). Deterministic, no LLM.
+#
+# Versioned like the risk policy (ADR-0026): any change is a new `version`; its digest
+# SHA-256(TAG("AGW/coding-policy/v1") || file bytes) is recorded in every POLICY_EVALUATED and
+# bound into every coding approval. The decision logic lives in agw_gateway/coding/policy.py
+# (rule ids are stable); this file holds the lists that logic consults.
+#
+# Effects: allow | ask (a human approval through the gateway) | deny.
+# Combination: deny > ask > allow; the risk level is the maximum over all matched rules.
+# Mandatory rules (secrets, content rules, denied commands) override every score.
+# Paths use the glob rules in agw_gateway/coding/globs.py (case-insensitive, basename
+# patterns match at any depth).
+
+policy_id = "coding-mintrail"
+version = 1
+
+[roles]
+critical = "security"     # every CRITICAL ask
+default = "maintainer"    # HIGH asks with no owner below, command asks
+
+# HIGH paths: first matching owner glob decides the approving role.
+[[owners]]
+glob = "ledger/**"
+role = "ledger_lead"
+
+[paths]
+# Reading (or copying, grepping, staging) any of these is DENIED.
+secret = [
+  ".env", ".env.*", "*.pem", "*.key", "*.p12", "*.pfx", "*.keystore", "*.jks",
+  "id_rsa", "id_rsa.pub", "id_dsa", "id_ecdsa", "id_ed25519", "id_*.pub",
+  "~/.ssh/**", "~/.aws/**", "~/.config/gh/**", "~/.gnupg/**", "~/.docker/config.json",
+  "~/.kube/**", "~/.npmrc", "~/.pypirc", "~/.git-credentials", "~/.config/git/credentials",
+  ".netrc", ".git-credentials", ".pgpass", "credentials", "credentials.json",
+  "*.keychain", "*.keychain-db", "**/Library/Keychains/**",
+  "/proc/*/environ", "/proc/self/environ",
+  ".mintrail/*keys*",
+  # The C1 answer key: never readable by any agent.
+  "**/mintrail-private", "**/mintrail-private/**",
+]
+# Explicitly harmless templates (no secrets by convention; agents read them to learn config).
+secret_exceptions = [".env.example", ".env.sample", ".env.template"]
+# Basenames that look like SSH private keys without an extension (`id_*` in the prompt,
+# narrowed so source files such as `id_mapper.ts` are not flagged).
+secret_key_name_regex = '^id_[a-z0-9]+$'
+
+critical = [
+  ".github/**", "CODEOWNERS", "infra/**",
+  "pnpm-lock.yaml", "pnpm-workspace.yaml", ".npmrc", ".nvmrc",
+  "Dockerfile", "Dockerfile.*", "*.dockerfile", ".devcontainer/**",
+  ".claude/**", ".codex/**", ".cursor/**", ".gemini/**", ".agents/**", ".vscode/mcp.json",
+  "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".cursorrules", ".agentguard.yaml",
+  ".husky/**", ".git/**",
+]
+high = [
+  # As written in the C1 prompt.
+  "api/src/payments/**", "api/src/refunds/**", "api/src/auth/**",
+  "ledger/**", "depot/**", "packages/shared/src/money/**", "drizzle/**", "signal/**/sign*",
+  # MintRail's actual layout (the prompt's directories do not exist; ADR-0034 §7).
+  "api/src/**/payment*", "api/src/**/refund*", "api/src/**/*auth*",
+  "api/src/keys.ts", "api/src/scopes.ts", "api/src/signing.ts",
+  "packages/shared/src/money.ts", "packages/shared/src/signatures.ts",
+  "packages/shared/src/crypto.ts", "signal/src/verify.ts",
+  "drizzle.config.ts", "package.json",   # package.json: dependency sections are CRITICAL
+]
+tests = [
+  "*.test.*", "*.spec.*", "**/test/**", "**/tests/**", "**/__tests__/**", "**/e2e/**",
+]
+ci = [".github/workflows/**", ".gitlab-ci.yml", ".circleci/**"]
+# Hook and agent configuration: chmod/chown on these is DENIED.
+hook_config = [
+  ".claude/**", ".codex/**", ".cursor/**", ".gemini/**", ".agents/**", ".vscode/mcp.json",
+  ".git/hooks/**", ".husky/**", ".agentguard.yaml", "AGENTS.md", "CLAUDE.md",
+  "~/.claude/**", "~/.codex/**", "~/.cursor/**", "~/.gemini/**", "~/.agentguard/**",
+  "~/.config/agentguard/**",
+]
+authorized_keys = ["authorized_keys", "authorized_keys2"]
+# `rm -r` of these build outputs inside the workspace is allowed.
+build_artifacts = [
+  "node_modules", "node_modules/**", "**/node_modules", "**/node_modules/**",
+  "dist", "dist/**", "**/dist", "**/dist/**", ".next", "**/.next", "**/.next/**",
+  "coverage", "coverage/**", ".turbo", "**/.turbo", "**/test-results", "**/test-results/**",
+]
+signing = ["*sign*", "*verify*", "*signature*", "*hmac*", "*webhook*"]
+money = ["*money*", "ledger/**", "depot/**", "api/src/**/payment*", "api/src/**/refund*",
+         "*fees*", "*fx*", "*settlement*", "*payout*"]
+
+[commands]
+# Executables denied outright (network, remote shells, privilege).
+network = ["curl", "wget", "nc", "ncat", "netcat", "socat", "ssh", "scp", "sftp", "ftp",
+           "telnet", "rsync", "httpie", "http", "xh", "aria2c"]
+privilege = ["sudo", "doas", "su", "pkexec"]
+deploy = ["kubectl", "helm", "terraform", "tofu", "pulumi", "aws", "gcloud", "az", "flyctl",
+          "fly", "heroku", "vercel", "netlify", "railway", "doctl"]
+package_runners = ["npx", "pnpx", "bunx"]
+shells = ["sh", "bash", "zsh", "dash", "ksh", "fish", "csh", "tcsh"]
+interpreters = ["node", "python", "python3", "perl", "ruby", "php", "deno", "bun", "lua"]
+env_print = ["env", "printenv"]
+# Read-only commands whose path arguments are checked against the secret list.
+readers = ["cat", "head", "tail", "less", "more", "bat", "wc", "nl", "od", "xxd", "hexdump",
+           "strings", "stat", "file", "jq", "sort", "uniq", "cut", "diff", "cmp", "md5",
+           "md5sum", "shasum", "sha256sum"]
+searchers = ["grep", "egrep", "fgrep", "rg", "ag", "ack"]
+harmless = ["ls", "pwd", "echo", "printf", "true", "false", "test", "[", "which", "type",
+            "date", "basename", "dirname", "realpath", "tree", "whoami", "uname", "clear"]
+pnpm_allowed = ["test", "t", "lint", "typecheck", "build", "coverage", "vitest"]
+pnpm_allowed_scripts = ["test", "test:unit", "test:integration", "lint", "typecheck", "build",
+                        "coverage", "fmt"]
+pnpm_migration_scripts = ["db:migrate", "db:generate", "db:push", "migrate"]
+make_allowed = ["test", "lint", "typecheck", "coverage"]
+git_allowed = ["status", "diff", "log", "show", "add", "commit", "restore", "stash"]
+git_read_only = ["branch", "rev-parse", "ls-files", "blame", "shortlog", "describe",
+                 "remote", "config", "worktree", "tag"]
+
+[network_policy]
+# Anything naming one of these hosts is DENIED (production).
+production_hosts = ["*.mintrail.com", "*.mintrail.io", "mintrail.com", "mintrail.io",
+                    "prod.*", "*.prod.*", "*-prod.*", "prod-*"]
+local_hosts = ["localhost", "127.0.0.1", "0.0.0.0", "::1", "host.docker.internal"]
+
+[web]
+# WebFetch-style tools: these documentation hosts are allowed, anything else asks.
+allow_domains = ["docs.github.com", "nodejs.org", "developer.mozilla.org", "vitest.dev",
+                 "orm.drizzle.team", "nextjs.org", "expressjs.com", "www.typescriptlang.org",
+                 "pnpm.io", "playwright.dev", "react.dev", "www.postgresql.org"]
+
+[mcp]
+# MCP tools as "server/tool" globs. deny wins; allow = no approval; everything else asks.
+# Pushing through the GitHub MCP server would bypass the `git push` ban: denied.
+deny = ["github/push_files", "github/create_or_update_file", "github/delete_file",
+        "github/merge_pull_request", "github/create_repository", "github/fork_repository"]
+allow = ["github/get_*", "github/list_*", "github/search_*"]

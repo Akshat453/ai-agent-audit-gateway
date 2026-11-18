@@ -106,7 +106,7 @@ class Rpc:
             self._url, data=body.encode(), headers={"Content-Type": "application/json"}
         )
         try:
-            with urllib.request.urlopen(req, timeout=self._timeout) as resp:  # noqa: S310
+            with urllib.request.urlopen(req, timeout=self._timeout) as resp:  # noqa: S310  # nosec B310 - http(s) only, checked in __init__
                 doc = json.loads(resp.read())
         except (urllib.error.URLError, OSError, ValueError) as exc:
             raise ChainUnavailable(type(exc).__name__) from None

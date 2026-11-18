@@ -22,12 +22,17 @@ services:
       timeout: 3s
       retries: 30
 
-  # Phase 6 (ADR-0028): local chain for anchoring. Pinned Foundry image; Anvil's state lives
-  # only as long as the container (contracts/deploy-anvil.sh redeploys when needed).
+  # Phase 6 (ADR-0028): local chain for anchoring. Pinned Foundry image.
+  # Phase 10 (ADR-0032): the chain state persists in the agw-anvil volume (loaded on start,
+  # written every 2 s and on stop), so `make stop` / `make start` keeps the contract and the
+  # anchors a tenant is pinned to. `make down` (-v) still wipes it.
   anvil:
     image: ghcr.io/foundry-rs/foundry:v1.3.5
     entrypoint: ["anvil"]
-    command: ["--host", "0.0.0.0", "--chain-id", "31337", "--block-time", "1", "--silent"]
+    command: ["--host", "0.0.0.0", "--chain-id", "31337", "--block-time", "1", "--silent",
+              "--state", "/home/foundry/anvil-state.json", "--state-interval", "2"]
+    volumes:
+      - agw-anvil:/home/foundry   # mounted on the image's foundry-owned home, so it is writable
     ports:
       - "127.0.0.1:${AGW_ANVIL_HOST_PORT:-8545}:8545"
     healthcheck:
@@ -78,6 +83,23 @@ services:
       AGW_UI_DEMO_PASSWORD: ${AGW_UI_DEMO_PASSWORD:-}
       AGW_ENV: dev
       AGW_EXECUTOR_MODE: worker
+      # Self-service sign-up on /signup (dev only; the gateway refuses it outside dev/test).
+      AGW_SIGNUP_ENABLED: "true"
+      # CRITICAL actions need two DIFFERENT approvers ("four-eyes"). false = one approver.
+      AGW_APPROVAL_FOUR_EYES_CRITICAL: ${AGW_APPROVAL_FOUR_EYES_CRITICAL:-true}
+      # How long a password re-check ("step-up") stays valid for admin changes / CRITICAL
+      # approvals. 1800 s = 30 min (gateway default 300 s; max 3600).
+      AGW_STEP_UP_WINDOW_SECONDS: ${AGW_STEP_UP_WINDOW_SECONDS:-1800}
+      # Coding agents: "balanced" (default: everyday local work runs and is recorded; strict
+      # checks when a change is submitted) or "strict" (C1: ask at every sensitive step).
+      AGW_CODING_POLICY_PROFILE: ${AGW_CODING_POLICY_PROFILE:-balanced}
+      # C2/C3: the gateway's address as seen from this Mac (agw login, agents' MCP endpoint
+      # <url>/mcp, GitHub App redirects). Set it to your tunnel's https URL for GitHub webhooks.
+      AGW_PUBLIC_URL: ${AGW_PUBLIC_URL:-http://localhost:8088}
+      AGW_CODING_DASHBOARD_URL: ${AGW_DASHBOARD_PUBLIC_URL:-http://localhost:3000}
+      # 1 = seed the "demo" tenant (alice, bob, audrey, adam) and replay the Phase 8 demo;
+      # 0 = start empty and create your own tenant on /signup.
+      AGW_UI_SEED_DEMO: ${AGW_UI_SEED_DEMO:-1}
     volumes: ["ui-state:/var/lib/agw"]
     depends_on:
       postgres: { condition: service_healthy }
@@ -89,6 +111,8 @@ services:
     command: ["bash", "/app/infra/docker/ui/serve.sh", "gateway"]
     environment: *ui-env
     volumes: ["ui-state:/var/lib/agw", "ui-sandbox:/var/lib/agw-sandbox"]
+    ports:
+      - "127.0.0.1:${AGW_GATEWAY_HOST_PORT:-8088}:8080"
     depends_on: { ui-init: { condition: service_completed_successfully } }
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/v1/ready')"]
@@ -101,6 +125,14 @@ services:
     command: ["bash", "/app/infra/docker/ui/serve.sh", "worker"]
     environment: *ui-env
     volumes: ["ui-state:/var/lib/agw", "ui-sandbox:/var/lib/agw-sandbox"]
+    depends_on: { ui-gateway: { condition: service_healthy } }
+
+  ui-provision:
+    profiles: ["ui"]
+    build: { context: ., dockerfile: infra/docker/gateway/Dockerfile, target: runtime }
+    command: ["bash", "/app/infra/docker/ui/provision.sh"]
+    environment: *ui-env
+    volumes: ["ui-state:/var/lib/agw"]
     depends_on: { ui-gateway: { condition: service_healthy } }
 
   ui-mcp:
@@ -161,3 +193,4 @@ volumes:
   ui-sandbox:
   agw-pgdata:
   agw-blobs:
+  agw-anvil:

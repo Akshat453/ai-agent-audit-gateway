@@ -101,25 +101,32 @@ def main() -> None:
                 medium_max_age_seconds=settings.epoch_medium_max_age_seconds,
                 count_basis=settings.seal_count_basis,
             )
-            if settings.seal_adaptive
+            if settings.seal_adaptive and settings.ablation not in ("C3", "C4")
             else SealPolicy.fixed(settings.epoch_max_events, settings.epoch_max_age_seconds)
         ),
     )
     if settings.worker_metrics_port is not None:
         start_http_server(settings.worker_metrics_port, addr="127.0.0.1")
+    ab = settings.ablation  # Phase 10 ablation (ADR-0032): C1/C2 do not seal; C3 no anchoring
     periodic: list[tuple[float, Callable[[], object]]] = [
-        (settings.sealer_interval_seconds, sealer.tick),
+        *([] if ab in ("C1", "C2") else [(settings.sealer_interval_seconds, sealer.tick)]),
         (settings.approval_sweep_seconds, state.approvals.sweep),
     ]
     if state.retention is not None:
         periodic.append((settings.retention_sweep_seconds, state.retention.run_once))
     if state.anchor_gate is not None:
         periodic.append((settings.anchor_gate_sweep_seconds, state.anchor_gate.sweep_timeouts))
+    # C3 (ADR-0036): GitHub polling mode (open PRs -> the AgentGuard evidence check).
+    periodic.append((settings.github_poll_seconds, state.github_checks.poll_once))
     # Phase 9 (ADR-0031): monitoring evidence stream; dashboard requests are picked up fast.
     monitor = build_monitor(settings, state)
+    # C3: a TAMPERED / INCOMPLETE report flips the evidence check of open PRs.
+    monitor.on_report = lambda rep: state.github_checks.on_monitor_report(
+        rep.tenant, rep.result, rep.report_id
+    )
     periodic.append((1.0, monitor.process_requests))
     periodic.append((settings.monitor_interval_seconds, monitor.run_once))
-    anchorer = build_anchorer(settings, state)
+    anchorer = build_anchorer(settings, state) if ab not in ("C1", "C2", "C3") else None
     if anchorer is not None:
         periodic.append((settings.anchor_poll_seconds, anchorer.tick))
     runner = BackgroundRunner(

@@ -97,7 +97,7 @@ def start_anvil() -> tuple[Any, str]:
             req = urllib.request.Request(
                 url, data=body.encode(), headers={"Content-Type": "application/json"}
             )
-            with urllib.request.urlopen(req, timeout=2) as resp:  # noqa: S310
+            with urllib.request.urlopen(req, timeout=2) as resp:
                 if json.loads(resp.read()).get("result"):
                     return c, url
         except OSError:
@@ -145,10 +145,10 @@ class RpcProxy:
                     self._drop()
                     return
                 method = json.loads(body).get("method") if body else None
-                req = urllib.request.Request(  # noqa: S310 - local test node
+                req = urllib.request.Request(
                     proxy.upstream, data=body, headers={"Content-Type": "application/json"}
                 )
-                with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+                with urllib.request.urlopen(req, timeout=10) as resp:
                     out = resp.read()
                 if method == "eth_sendRawTransaction":
                     proxy.sent_raw += 1

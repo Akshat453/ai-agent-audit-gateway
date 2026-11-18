@@ -162,3 +162,21 @@ class ReconcileInvalid(GatewayError):
 
     code = "RECONCILE_INVALID"
     http_status = 409
+
+
+# --------------------------------------------------------------------------- C1 (ADR-0034)
+class CodingDeviceRequired(GatewayError):
+    code = "CODING_DEVICE_REQUIRED"
+    http_status = 403
+
+
+class CodingSessionClosed(GatewayError):
+    code = "CODING_SESSION_CLOSED"
+    http_status = 409
+
+
+class Conflict(GatewayError):
+    """C2: the resource already exists (e.g. a connector slug in use)."""
+
+    code = "CONFLICT"
+    http_status = 409

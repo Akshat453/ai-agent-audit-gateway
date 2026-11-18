@@ -1,4 +1,4 @@
-import { Badge, Page, short } from "@/components/ui";
+import { Badge, Page, short } from "@/components/legacy";
 import { gateway } from "@/lib/gateway";
 
 export default async function Runs() {

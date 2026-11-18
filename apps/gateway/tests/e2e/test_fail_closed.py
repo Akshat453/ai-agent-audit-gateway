@@ -74,7 +74,7 @@ def test_db_down_fails_closed(tmp_path: Path) -> None:
         )
         assert decision.status_code == 503
         assert decision.json()["error"]["code"] == "DEPENDENCY_UNAVAILABLE"
-        with pytest.raises(Exception):  # noqa: B017 - the sweeper cannot run without the DB
+        with pytest.raises(Exception):
             state.approvals.sweep()
 
         down = client.post("/v1/actions", json=body, headers={**headers, "Idempotency-Key": "b"})
@@ -82,7 +82,7 @@ def test_db_down_fails_closed(tmp_path: Path) -> None:
         assert down.json()["error"]["code"] == "DEPENDENCY_UNAVAILABLE"
         assert client.get("/v1/ready").status_code == 503
         assert client.get("/v1/health").status_code == 200  # liveness has no DB dependency
-        with pytest.raises(Exception):  # noqa: B017 - the executor cannot claim without the DB
+        with pytest.raises(Exception):
             state.executor.run_once()
         assert spies.total_calls() == 0
         state.executor.close()

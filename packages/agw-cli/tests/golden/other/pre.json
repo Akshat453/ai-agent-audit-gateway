@@ -1,0 +1,1 @@
+{"event":"pre","session_id":"s1","cwd":"/project","agent_version":"1.0","action":{"action_type":"command_exec","targets":{"command":"pnpm lint"}}}

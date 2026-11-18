@@ -1,0 +1,1 @@
+{"tool_name":"create_issue","tool_input":"{\"title\":\"x\"}","mcp_server_name":"github","command":"npx -y @modelcontextprotocol/server-github","conversation_id":"conv_1","hook_event_name":"beforeMCPExecution","cursor_version":"1.7.2","workspace_roots":["/project"]}

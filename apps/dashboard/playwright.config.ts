@@ -10,7 +10,7 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"]],
   use: {
-    baseURL: process.env.AGW_E2E_BASE_URL ?? "http://127.0.0.1:13000",
+    baseURL: process.env.AGW_E2E_BASE_URL ?? "http://127.0.0.1:23000",
     trace: "retain-on-failure",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

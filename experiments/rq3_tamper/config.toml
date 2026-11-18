@@ -1,0 +1,7 @@
+# RQ3 tamper detection at scale (Phase 10). `make rq3` -> experiments/rq3_tamper/results/
+seed = 7
+cases_per_class = 1000
+honest_prefix_cases = 1000      # false-positive check on honest, epoch-aligned prefixes
+material_actions = 200          # LOW actions (5 events each) sealed in fixed 100-event epochs
+material_tail_actions = 6       # left unsealed (the R2 window)
+regenerate_material = false     # true: build fresh material with the gateway (Testcontainers)

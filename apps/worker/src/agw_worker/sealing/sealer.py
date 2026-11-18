@@ -46,6 +46,7 @@ from agw_gateway.evidence import EvidenceWriter, NewEvent
 from agw_gateway.execution.crash import CrashPoints
 from agw_gateway.logs import log
 from agw_gateway.metrics import EPOCHS_SEALED, LEVELS, OLDEST_UNSEALED_AGE, PENDING_EVENTS
+from agw_gateway.timing import timed
 from agw_worker.sealing.policy import (
     PendingLevel,
     PendingWindow,
@@ -286,6 +287,10 @@ class Sealer:
         self.drain()
 
     def _seal(self, conn: Connection, job: Any) -> SealResult | None:
+        with timed("seal"):
+            return self._seal_inner(conn, job)
+
+    def _seal_inner(self, conn: Connection, job: Any) -> SealResult | None:
         tenant = job.tenant_id
         head = conn.execute(
             select(t.epoch_heads).where(t.epoch_heads.c.tenant_id == tenant).with_for_update()

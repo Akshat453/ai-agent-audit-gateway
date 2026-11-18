@@ -21,7 +21,7 @@ import os
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Final
+from typing import Any, Final, Literal
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -124,15 +124,25 @@ class StoredEvent:
     event_hash: bytes
 
 
+EvidenceMode = Literal["chain", "records", "none"]
+
+
 class EvidenceWriter:
-    def __init__(self, payload_store: PayloadStore | None = None) -> None:
+    """``mode`` exists ONLY for the Phase 10 ablation (ADR-0032; refused outside dev/test):
+    ``none`` writes no evidence (C1), ``records`` writes canonical CBOR records + payloads but
+    does not hash-link them (``prev`` = ZERO32; C2). ``chain`` is the production behaviour."""
+
+    def __init__(
+        self, payload_store: PayloadStore | None = None, mode: EvidenceMode = "chain"
+    ) -> None:
         # Phase 7: no default plaintext store. Without a KEK, events with payloads fail closed.
         self.payloads: PayloadStore = payload_store or NoPayloadStore()
+        self.mode: EvidenceMode = mode
 
     def append(
         self, conn: Connection, tenant_id: str, events: Sequence[NewEvent]
     ) -> list[StoredEvent]:
-        if not events:
+        if not events or self.mode == "none":
             return []
         head = conn.execute(
             text("SELECT last_seq, last_hash FROM chain_heads WHERE tenant_id = :t FOR UPDATE"),
@@ -152,7 +162,7 @@ class EvidenceWriter:
             header: dict[str, Any] = {
                 "tenant": tenant_id,
                 "seq": seq,
-                "prev": last_hash if seq > 0 else ZERO32,
+                "prev": last_hash if seq > 0 and self.mode == "chain" else ZERO32,
                 "id": event_id.bytes,
                 "type": ev.type,
                 "ts": now_us(),

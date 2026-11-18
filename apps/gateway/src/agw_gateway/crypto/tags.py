@@ -40,3 +40,7 @@ DELEGATION_SIG_TAG: Final = "AGW/delegation-sig/v1"
 DELEGATION_TOKEN_TAG: Final = "AGW/delegation-token/v1"  # noqa: S105
 INTEGRATION_KEY_TAG: Final = "AGW/integration-key/v1"
 MONITOR_REPORT_TAG: Final = "AGW/monitor-report/v1"
+# C1 (ADR-0034): coding-agent integration.
+CODING_ACTION_TAG: Final = "AGW/coding-action/v1"
+CODING_REPO_TAG: Final = "AGW/coding-repo/v1"
+# The coding policy digest tag is CODING_POLICY_TAG in agw_gateway.coding.policy.

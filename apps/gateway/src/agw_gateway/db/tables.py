@@ -578,3 +578,272 @@ monitor_requests = Table(
     Column("picked_at", DateTime(timezone=True)),
     Column("report_id", UUID(as_uuid=True)),
 )
+
+# C1 (ADR-0034): coding-agent integration.
+coding_devices = Table(
+    "coding_devices",
+    metadata,
+    Column("agent_id", UUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", Text, nullable=False),
+    Column("developer_id", UUID(as_uuid=True), nullable=False),
+    Column("label", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+)
+
+coding_sessions = Table(
+    "coding_sessions",
+    metadata,
+    Column("session_id", UUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", Text, nullable=False),
+    Column("device_id", UUID(as_uuid=True), nullable=False),
+    Column("developer_id", UUID(as_uuid=True), nullable=False),
+    Column("agent_kind", Text, nullable=False),
+    Column("agent_version", Text),
+    Column("native_session", Text),
+    Column("repo_digest", LargeBinary),
+    Column("head_sha", Text),
+    Column("workspace_root", Text),
+    Column("issue_number", Integer),
+    Column("issue_digest", LargeBinary),
+    Column("status", Text, nullable=False),
+    Column("started_at", DateTime(timezone=True)),
+    Column("ended_at", DateTime(timezone=True)),
+)
+
+coding_actions = Table(
+    "coding_actions",
+    metadata,
+    Column("action_id", UUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", Text, nullable=False),
+    Column("session_id", UUID(as_uuid=True), nullable=False),
+    Column("action_type", Text, nullable=False),
+    Column("action_digest", LargeBinary, nullable=False),
+    Column("correlation", Text),
+    Column("observed_at", DateTime(timezone=True)),
+    Column("created_at", DateTime(timezone=True)),
+)
+
+# C2 (ADR-0035): connectors, device enrollment, MCP OAuth, repos.
+connectors = Table(
+    "connectors",
+    metadata,
+    Column("connector_id", UUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", Text, nullable=False),
+    Column("type_id", Text, nullable=False),
+    Column("slug", Text, nullable=False),
+    Column("name", Text, nullable=False),
+    Column("config", JSONB, nullable=False),
+    Column("credentials_sealed", LargeBinary),
+    Column("credential_version", Integer, nullable=False),
+    Column("status", Text, nullable=False),
+    Column("policy_version", Integer, nullable=False),
+    Column("last_health", JSONB),
+    Column("created_by", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+    Column("updated_at", DateTime(timezone=True)),
+    Column("deleted_at", DateTime(timezone=True)),
+)
+
+connector_actions = Table(
+    "connector_actions",
+    metadata,
+    Column("connector_id", UUID(as_uuid=True), primary_key=True),
+    Column("name", Text, primary_key=True),
+    Column("description", Text, nullable=False),
+    Column("input_schema", JSONB, nullable=False),
+    Column("side_effect", Text, nullable=False),
+    Column("suggested_risk", Text, nullable=False),
+    Column("upstream_name", Text),
+    Column("created_at", DateTime(timezone=True)),
+)
+
+connector_policies = Table(
+    "connector_policies",
+    metadata,
+    Column("connector_id", UUID(as_uuid=True), primary_key=True),
+    Column("version", Integer, primary_key=True),
+    Column("document", JSONB, nullable=False),
+    Column("digest", LargeBinary, nullable=False),
+    Column("created_by", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+)
+
+connector_health = Table(
+    "connector_health",
+    metadata,
+    Column("check_id", UUID(as_uuid=True), primary_key=True),
+    Column("connector_id", UUID(as_uuid=True), nullable=False),
+    Column("ok", Boolean, nullable=False),
+    Column("detail", JSONB, nullable=False),
+    Column("checked_at", DateTime(timezone=True)),
+)
+
+device_enrollments = Table(
+    "device_enrollments",
+    metadata,
+    Column("device_code_hash", LargeBinary, primary_key=True),
+    Column("user_code", Text, nullable=False),
+    Column("tenant_id", Text, nullable=False),
+    Column("agent_kind", Text, nullable=False),
+    Column("label", Text, nullable=False),
+    Column("status", Text, nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("approved_by", UUID(as_uuid=True)),
+    Column("device_agent_id", UUID(as_uuid=True)),
+    Column("last_poll_at", DateTime(timezone=True)),
+    Column("created_at", DateTime(timezone=True)),
+)
+
+oauth_clients = Table(
+    "oauth_clients",
+    metadata,
+    Column("client_id", Text, primary_key=True),
+    Column("client_name", Text, nullable=False),
+    Column("redirect_uris", ARRAY(Text), nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+)
+
+oauth_codes = Table(
+    "oauth_codes",
+    metadata,
+    Column("code_hash", LargeBinary, primary_key=True),
+    Column("client_id", Text, nullable=False),
+    Column("tenant_id", Text, nullable=False),
+    Column("human_id", UUID(as_uuid=True), nullable=False),
+    Column("device_agent_id", UUID(as_uuid=True), nullable=False),
+    Column("redirect_uri", Text, nullable=False),
+    Column("code_challenge", Text, nullable=False),
+    Column("resource", Text, nullable=False),
+    Column("scope", Text, nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("used_at", DateTime(timezone=True)),
+)
+
+oauth_tokens = Table(
+    "oauth_tokens",
+    metadata,
+    Column("token_hash", LargeBinary, primary_key=True),
+    Column("kind", Text, nullable=False),
+    Column("client_id", Text, nullable=False),
+    Column("tenant_id", Text, nullable=False),
+    Column("human_id", UUID(as_uuid=True), nullable=False),
+    Column("device_agent_id", UUID(as_uuid=True), nullable=False),
+    Column("resource", Text, nullable=False),
+    Column("scope", Text, nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("revoked_at", DateTime(timezone=True)),
+    Column("created_at", DateTime(timezone=True)),
+)
+
+repos = Table(
+    "repos",
+    metadata,
+    Column("repo_id", UUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", Text, nullable=False),
+    Column("remote_digest", LargeBinary, nullable=False),
+    Column("remote_url", Text, nullable=False),
+    Column("name", Text, nullable=False),
+    Column("registered_by", UUID(as_uuid=True), nullable=False),
+    Column("policy_version", Integer, nullable=False),
+    Column("agents", JSONB, nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+    Column("updated_at", DateTime(timezone=True)),
+)
+
+repo_policies = Table(
+    "repo_policies",
+    metadata,
+    Column("repo_id", UUID(as_uuid=True), primary_key=True),
+    Column("version", Integer, primary_key=True),
+    Column("overlay", JSONB, nullable=False),
+    Column("digest", LargeBinary, nullable=False),
+    Column("source", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+)
+
+repo_proposals = Table(
+    "repo_proposals",
+    metadata,
+    Column("proposal_id", UUID(as_uuid=True), primary_key=True),
+    Column("repo_id", UUID(as_uuid=True), nullable=False),
+    Column("tenant_id", Text, nullable=False),
+    Column("items", JSONB, nullable=False),
+    Column("status", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+    Column("decided_by", UUID(as_uuid=True)),
+    Column("decided_at", DateTime(timezone=True)),
+    Column("reason", Text),
+)
+
+github_manifest_states = Table(
+    "github_manifest_states",
+    metadata,
+    Column("state_hash", LargeBinary, primary_key=True),
+    Column("tenant_id", Text, nullable=False),
+    Column("human_id", UUID(as_uuid=True), nullable=False),
+    Column("connector_id", UUID(as_uuid=True), nullable=False),
+    Column("purpose", Text, nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("used_at", DateTime(timezone=True)),
+)
+
+# C3 (ADR-0036): GitHub connector state.
+github_commits = Table(
+    "github_commits",
+    metadata,
+    Column("repo", Text, primary_key=True),
+    Column("sha", Text, primary_key=True),
+    Column("tenant_id", Text, nullable=False),
+    Column("connector_id", UUID(as_uuid=True), nullable=False),
+    Column("action_id", UUID(as_uuid=True), nullable=False),
+    Column("run_id", UUID(as_uuid=True), nullable=False),
+    Column("session_id", Text),
+    Column("issue_number", Integer),
+    Column("branch", Text, nullable=False),
+    Column("tree_sha", Text, nullable=False),
+    Column("diff_digest", LargeBinary, nullable=False),
+    Column("pushed_at", DateTime(timezone=True)),
+)
+
+github_prs = Table(
+    "github_prs",
+    metadata,
+    Column("connector_id", UUID(as_uuid=True), primary_key=True),
+    Column("repo", Text, primary_key=True),
+    Column("number", Integer, primary_key=True),
+    Column("tenant_id", Text, nullable=False),
+    Column("run_id", UUID(as_uuid=True)),
+    Column("created_by_action", UUID(as_uuid=True)),
+    Column("branch", Text),
+    Column("head_sha", Text),
+    Column("state", Text, nullable=False),
+    Column("html_url", Text),
+    Column("check_run_id", BigInteger),
+    Column("check_head_sha", Text),
+    Column("conclusion", Text),
+    Column("summary", Text),
+    Column("evaluated_at", DateTime(timezone=True)),
+    Column("created_at", DateTime(timezone=True)),
+)
+
+github_deliveries = Table(
+    "github_deliveries",
+    metadata,
+    Column("delivery_id", Text, primary_key=True),
+    Column("connector_id", UUID(as_uuid=True), nullable=False),
+    Column("event", Text, nullable=False),
+    Column("action", Text),
+    Column("verified", Boolean, nullable=False),
+    Column("outcome", Text, nullable=False),
+    Column("received_at", DateTime(timezone=True)),
+)
+
+github_tamper_notices = Table(
+    "github_tamper_notices",
+    metadata,
+    Column("connector_id", UUID(as_uuid=True), primary_key=True),
+    Column("repo", Text, primary_key=True),
+    Column("number", Integer, primary_key=True),
+    Column("report_id", UUID(as_uuid=True), primary_key=True),
+    Column("created_at", DateTime(timezone=True)),
+)

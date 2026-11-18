@@ -47,8 +47,8 @@ ETH_USD = 3000.0
 def start_anvil() -> tuple[str, str]:
     argv = ["docker", "run", "-d", "--rm", "-p", "127.0.0.1::8545", "--entrypoint", "anvil"]
     argv += [IMAGE, "--host", "0.0.0.0", "--chain-id", "31337", "--silent"]  # noqa: S104 - in container
-    cid = subprocess.check_output(argv, text=True).strip()  # noqa: S603 - fixed argv
-    port = subprocess.check_output(["docker", "port", cid, "8545"], text=True).split(":")[-1]  # noqa: S603, S607
+    cid = subprocess.check_output(argv, text=True).strip()
+    port = subprocess.check_output(["docker", "port", cid, "8545"], text=True).split(":")[-1]  # noqa: S607
     url = f"http://127.0.0.1:{port.strip()}"
     w3 = Web3(HTTPProvider(url))
     for _ in range(100):
@@ -142,7 +142,7 @@ def main() -> int:
             nonce += 1
     finally:
         if container:
-            subprocess.run(["docker", "rm", "-f", container], capture_output=True, check=False)  # noqa: S603, S607
+            subprocess.run(["docker", "rm", "-f", container], capture_output=True, check=False)  # noqa: S607
 
     finality: dict[str, float | None] = {}
     if args.finality_timeout > 0 and rows:

@@ -1,0 +1,36 @@
+# Phase 10: the research experiments, on manual trigger only (they take minutes to hours and
+# their latency numbers depend on the runner). Results are uploaded as an artifact; compare
+# them with docs/gateway/research/results.md as a DIFFERENT setup (other hardware).
+name: experiments
+on:
+  workflow_dispatch:
+    inputs:
+      experiment:
+        description: which experiment
+        type: choice
+        options: [rq1, rq2, rq3, rq4, rq5, rq6, rq7, all]
+        default: rq3
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - name: run
+        env:
+          EXPERIMENT: ${{ inputs.experiment }}
+        run: |
+          if [ "$EXPERIMENT" = all ]; then make experiments; else make "$EXPERIMENT"; fi
+          make plots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: experiment-results-${{ inputs.experiment }}
+          path: |
+            experiments/rq*/results/
+            docs/gateway/research/figures/

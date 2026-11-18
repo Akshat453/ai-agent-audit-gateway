@@ -1,0 +1,5 @@
+seed = 11
+actions = 120          # x4 tool mix -> about 600 events, several epochs
+tail_actions = 4       # unsealed tail at export time
+bundles = 60           # per-event bundles sampled into the kit
+missing_cases_per_class = 10

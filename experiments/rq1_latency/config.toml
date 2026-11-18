@@ -1,0 +1,9 @@
+# RQ1 latency (Phase 10, ADR-0032). `make rq1` -> experiments/rq1_latency/results/
+seed = 1
+configs = ["C0", "C1", "C2", "C3", "C4", "C5", "C6"]
+concurrency = [1, 10, 50]
+runs = 5                 # independent runs per (config, concurrency); CI over runs
+requests_per_agent = 12  # measured requests per agent per run
+min_requests = 120       # at concurrency 1, measure at least this many
+warmup_requests = 30     # per run, excluded
+tool = "test_echo"       # LOW, no approval: isolates the evidence/control pipeline cost

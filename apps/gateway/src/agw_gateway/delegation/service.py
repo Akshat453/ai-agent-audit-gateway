@@ -310,6 +310,8 @@ class DelegationService:
 
     # ---------------------------------------------------------------- issue
     def create(self, issuer: AuthenticatedAgent, req: DelegationRequest) -> dict[str, Any]:
+        if self._signer is None or self._writer.mode == "none":
+            raise DelegationUnavailable
         try:
             return self._create(issuer, req)
         except DelegationRefused as exc:
@@ -347,7 +349,8 @@ class DelegationService:
         )
 
     def _create(self, issuer: AuthenticatedAgent, req: DelegationRequest) -> dict[str, Any]:
-        if self._signer is None:
+        if self._signer is None or self._writer.mode == "none":
+            # no key, or (ablation C1) no evidence: delegation provenance cannot be recorded
             raise DelegationUnavailable
         scopes = tuple(sorted(set(req.scopes)))
         tools = tuple(sorted(set(req.tools)))
@@ -393,7 +396,7 @@ class DelegationService:
             if child is None or child.status != "active" or req.child_agent_id == issuer.agent_id:
                 raise DelegationRefused("DELEGATION_CHILD_INVALID", 422)
             for tool_id in tools:
-                spec = self._registry.resolve(tool_id, None)
+                spec = self._registry.resolve(tool_id, None, issuer.tenant_id)
                 if spec is None or spec.meta.required_scope not in scopes:
                     raise DelegationRefused("DELEGATION_TOOL_INVALID", 422)
 

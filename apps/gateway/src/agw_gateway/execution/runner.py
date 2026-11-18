@@ -35,6 +35,10 @@ class BackgroundRunner:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
+    def add_periodic(self, interval: float, task: Callable[[], object]) -> None:
+        """C3: register another periodic task (e.g. GitHub polling) before ``start``."""
+        self._periodic.append((interval, task, [0.0]))
+
     def nudge(self) -> None:
         self._wake.set()
 

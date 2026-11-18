@@ -25,6 +25,7 @@ from agw_gateway.evidence.bundle import (
 )
 from agw_gateway.execution.errors import EventNotSealedYet, NotFound, PayloadTooLarge
 from agw_gateway.keys import KeyUnavailable
+from agw_gateway.timing import timed
 
 router = APIRouter(prefix="/v1")
 
@@ -37,7 +38,8 @@ def _state(request: Request) -> GatewayState:
 def authenticated_agent(
     request: Request, authorization: Annotated[str | None, Header()] = None
 ) -> AuthenticatedAgent:
-    agent = _state(request).authenticator.authenticate(authorization)
+    with timed("auth"):
+        agent = _state(request).authenticator.authenticate(authorization)
     request.state.agent_id = str(agent.agent_id)
     return agent
 

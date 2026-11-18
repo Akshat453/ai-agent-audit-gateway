@@ -6,9 +6,21 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(cd ../.. && pwd)"
 set -a; . "$ROOT/.env"; set +a
-GW_PORT="${AGW_E2E_GATEWAY_PORT:-18080}"
-UI_PORT="${AGW_E2E_DASHBOARD_PORT:-13000}"
+GW_PORT="${AGW_E2E_GATEWAY_PORT:-28080}"
+UI_PORT="${AGW_E2E_DASHBOARD_PORT:-23000}"
+# The cleanup below kills whatever listens on these two ports, so they must be FREE before we
+# start: never test (or kill) another project's server that happens to use them.
+for port in "$GW_PORT" "$UI_PORT"; do
+  if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "port $port is already in use by another process; set AGW_E2E_GATEWAY_PORT / AGW_E2E_DASHBOARD_PORT" >&2
+    exit 1
+  fi
+done
 LOGS="$(mktemp -d -t agw-dashboard-e2e.XXXXXX)"
+export AGW_SIGNUP_ENABLED=true
+# The suite tests the product defaults, not the owner's local choices in .env.
+export AGW_APPROVAL_FOUR_EYES_CRITICAL=true AGW_CODING_POLICY_PROFILE=balanced
+unset AGW_STEP_UP_WINDOW_SECONDS
 export AGW_EXECUTOR_MODE=inprocess AGW_PRE_ANCHOR_RULES= AGW_APPROVAL_SWEEP_SECONDS=1
 export AGW_APPROVAL_SIGNING_KEY_FILE="$ROOT/secrets/approval-signing.key"
 export AGW_DELEGATION_SIGNING_KEY_FILE="$ROOT/secrets/delegation-signing.key"

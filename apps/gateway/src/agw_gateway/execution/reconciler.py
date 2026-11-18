@@ -86,12 +86,13 @@ class Reconciler:
                         t.actions.c.agent_id,
                         t.actions.c.tool_id,
                         t.actions.c.tool_version,
+                        t.actions.c.tenant_id,
                     )
                     .where(t.actions.c.action_id == job.action_id)
                     .with_for_update()
                 ).one()
                 spec = (
-                    self._registry.get_any(action.tool_id, action.tool_version)
+                    self._registry.get_any(action.tool_id, action.tool_version, action.tenant_id)
                     if action.tool_version
                     else None
                 )

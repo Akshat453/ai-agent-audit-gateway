@@ -296,7 +296,7 @@ class Anchorer:
                        AND r.chain_id = :c AND r.contract = :addr AND r.submitter = :sub
                      GROUP BY r.tenant_id, r.recorder_id
                      ORDER BY prio DESC, first_pending ASC, r.tenant_id
-                    """  # noqa: S608 - constant SQL fragment, no user input
+                    """  # noqa: S608  # nosec B608 - PRIORITY_RANK is a constant SQL fragment, no user input
                 ),
                 self._mine,
             ).all()

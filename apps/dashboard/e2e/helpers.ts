@@ -6,7 +6,8 @@ import { expect, type Page } from "@playwright/test";
 export type Fixture = {
   tenant: string; password: string; approve: string; reject: string; expired: string;
   xss: string; auditor_view: string; csrf_target: string; critical: string; run: string;
-  child_run: string; planner_run: string; xss_subject: string;
+  child_run: string; planner_run: string; xss_subject: string; keyboard: string; keyboard_action: string;
+  connector: string; proposal: string; user_code: string; // C2
 };
 
 export const fx: Fixture = JSON.parse(readFileSync(join(__dirname, ".fixture.json"), "utf8"));
@@ -33,4 +34,31 @@ export async function login(page: Page, user: string) {
 /** The CSRF token the server rendered into this page's forms (as a real form would send). */
 export async function csrfOf(page: Page): Promise<string> {
   return (await page.locator('input[name="csrf"]').first().getAttribute("value")) ?? "";
+}
+
+/** Open the user menu (top bar) and choose an item: logout, density, timezone. */
+export async function userMenu(page: Page, item: string | RegExp) {
+  await page.getByRole("button", { name: /User menu for/ }).click();
+  await page.getByRole("menuitem", { name: item }).or(page.getByRole("menuitemradio", { name: item })).first().click();
+}
+
+/** Approve through the confirmation dialog (Phase 9.5): open it, satisfy the CRITICAL
+ *  type-to-confirm gate when present, then confirm. */
+export async function confirmApprove(page: Page) {
+  await page.getByRole("button", { name: "Approve exactly this action" }).click();
+  const dialog = page.getByTestId("approve-dialog");
+  await expect(dialog).toBeVisible();
+  const code = dialog.getByTestId("confirm-code");
+  if (await code.count()) await dialog.getByLabel(/to confirm/).fill(((await code.textContent()) ?? "").trim());
+  await dialog.getByRole("button", { name: "Confirm approval" }).click();
+}
+
+/** C2: re-authenticate (step-up) on an admin page that shows the inline step-up card. */
+export async function stepUp(page: Page) {
+  const form = page.getByTestId("step-up-form");
+  if (await form.count()) {
+    await form.getByLabel(/Re-enter your password/).fill(fx.password);
+    await form.getByRole("button", { name: "Re-authenticate" }).click();
+  }
+  await expect(page.getByTestId("step-up-ok")).toBeVisible();
 }

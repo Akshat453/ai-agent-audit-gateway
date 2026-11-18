@@ -188,7 +188,7 @@ for name, path, old, new, test in M:
         argv = FORGE if test == "forge" else [
             "uv", "run", "pytest", "-q", "-x", "-p", "no:cacheprovider", test,
         ]  # fmt: skip
-        r = subprocess.run(argv, capture_output=True, text=True, check=False)  # noqa: S603
+        r = subprocess.run(argv, capture_output=True, text=True, check=False)
     finally:
         path.write_text(src)
     ok = r.returncode != 0

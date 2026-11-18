@@ -40,6 +40,7 @@ from agw_gateway.logs import log
 from agw_gateway.privacy.cipher import EnvelopeCipher, SealedDataError, ops_context
 from agw_gateway.privacy.classification import FieldClasses
 from agw_gateway.privacy.minimize import Minimizer
+from agw_gateway.timing import timed
 from agw_gateway.tools.registry import ToolRegistry
 from agw_gateway.tools.spec import ExecutionContext, ToolResult, ToolSpec
 from agw_gateway.tracing import span
@@ -152,7 +153,8 @@ class Executor:
     # ---------------------------------------------------------------- per job
     def _process(self, job: ClaimedJob) -> None:
         try:
-            prepared = self._dispatch_tx(job)
+            with timed("dispatch_tx"):
+                prepared = self._dispatch_tx(job)
         except KeyUnavailable:
             # KEK down: nothing was dispatched (tx rolled back); the lease expires and the
             # reconciler returns the AUTHORIZED job to PENDING. Fail closed, retry later.
@@ -180,7 +182,8 @@ class Executor:
         future: Future[ToolResult] = self._pool.submit(spec.adapter.execute, args, ctx)
         outcome: tuple[str, Any]
         try:
-            outcome = ("COMPLETED", future.result(timeout=self._timeout))
+            with timed("adapter"):
+                outcome = ("COMPLETED", future.result(timeout=self._timeout))
         except FutureTimeout:
             outcome = ("OUTCOME_UNKNOWN", "ADAPTER_TIMEOUT")
         except Exception as exc:  # adapter errors are recorded, never re-raised to the agent
@@ -205,7 +208,8 @@ class Executor:
         ):
             pass
         self._crash.hit("after_adapter_return")
-        self._result_tx(job, spec, outcome, observed)
+        with timed("result_tx"):
+            self._result_tx(job, spec, outcome, observed)
 
     def _lock_job(self, conn: Connection, job: ClaimedJob) -> Any:
         return conn.execute(
@@ -265,7 +269,7 @@ class Executor:
                 .with_for_update()
             ).one()
             spec = (
-                self._registry.get_any(action.tool_id, action.tool_version)
+                self._registry.get_any(action.tool_id, action.tool_version, action.tenant_id)
                 if action.tool_version
                 else None
             )

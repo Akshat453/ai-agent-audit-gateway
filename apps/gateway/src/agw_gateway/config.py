@@ -130,6 +130,7 @@ class Settings(BaseSettings):
     blob_access_key: SecretStr | None = None
     blob_secret_key: SecretStr | None = None
     blob_secure: bool = True
+    blob_timeout_seconds: float = Field(default=5.0, gt=0, le=120)  # Phase 10: bounded
     retention_sweep_seconds: float = Field(default=3600.0, gt=0)
     disclosure_max_events: int = Field(default=200, ge=1, le=1000)
     # Delegation (Phase 8, ADR-0030). No key -> issuing returns 503 and every presented token
@@ -166,8 +167,38 @@ class Settings(BaseSettings):
     # Step-up: CRITICAL decisions need a re-authentication within this window.
     step_up_window_seconds: int = Field(default=300, ge=30, le=3600)
     step_up_levels: Annotated[tuple[str, ...], NoDecode] = ("CRITICAL",)
+    # C1 (ADR-0034): coding-agent integration. None = the bundled MintRail coding policy.
+    coding_policy_file: Path | None = None
+    # The bundled coding profile when no file is given: "balanced" (default; everyday local
+    # work runs and is recorded, strict checks at submit) or "strict" (C1: ask at each step).
+    coding_policy_profile: Literal["balanced", "strict"] = "balanced"
+    # Base URL for approval links handed to developers ("<base>/approvals/<id>").
+    coding_dashboard_url: str = Field(default="http://localhost:3000", pattern=r"^https?://\S+$")
+    coding_max_diff_bytes: int = Field(default=512 * 1024, ge=1024, le=4 * 1024 * 1024)
+    # C2 (ADR-0035): this gateway's public base URL (OAuth issuer, MCP resource, GitHub
+    # callbacks). The MCP resource is "<public_url>/mcp".
+    public_url: str = Field(
+        default="http://localhost:8000", pattern=r"^https?://[^\s/]+(/[^\s]*)?$"
+    )
+    device_code_ttl_seconds: int = Field(default=600, ge=60, le=1800)
+    mcp_access_token_ttl_seconds: int = Field(default=600, ge=60, le=3600)
+    mcp_refresh_token_ttl_seconds: int = Field(default=86_400, ge=600, le=30 * 86_400)
+    # C3 (ADR-0036): GitHub. A local directory of bare repos "<root>/<owner>/<name>.git"
+    # replacing github.com for git operations: dev/test ONLY (refused elsewhere).
+    github_clone_root: Path | None = None
+    github_poll_seconds: float = Field(default=60.0, ge=10)
+    # Self-service sign-up (POST /v1/auth/signup): anyone who can reach the gateway may create
+    # a NEW tenant and become its admin. For local testing only: refused outside dev/test.
+    signup_enabled: bool = False
     # Explorer link template for anchors, e.g. https://sepolia.basescan.org/tx/{tx}
     anchor_explorer_tx_url: str | None = Field(default=None, pattern=r"^https://[^ ]*\{tx\}[^ ]*$")
+    # Phase 10 ablation (ADR-0032): C1..C6 switch evidence / approvals / pre-anchor gate (and,
+    # in the worker, sealing and anchoring) for the evaluation harness. Refused outside
+    # dev/test: production always runs the full system (C6 semantics).
+    ablation: Literal["C1", "C2", "C3", "C4", "C5", "C6"] | None = None
+    # Hardening (Phase 10): per-credential request rate limit (token bucket), 0 = off.
+    rate_limit_per_minute: int = Field(default=600, ge=0, le=1_000_000)
+    rate_limit_burst: int = Field(default=60, ge=1, le=100_000)
     # Code provenance: gateway build commit. If unset, resolved from git at startup.
     build_commit: str | None = Field(default=None, pattern=r"^[0-9a-zA-Z.+_-]{1,64}$")
 
@@ -213,6 +244,18 @@ class Settings(BaseSettings):
                 ok = False
             if not ok:
                 raise ValueError("anchor_deployment_salt must be 64 hex characters")
+        return self
+
+    @model_validator(mode="after")
+    def _signup_only_in_dev(self) -> Settings:
+        if self.signup_enabled and self.env not in ("dev", "test"):
+            raise ValueError("self-service sign-up is refused outside dev/test")
+        return self
+
+    @model_validator(mode="after")
+    def _ablation_only_in_dev(self) -> Settings:
+        if self.ablation is not None and self.env not in ("dev", "test"):
+            raise ValueError("ablation configurations are refused outside dev/test")
         return self
 
     @model_validator(mode="after")

@@ -11,8 +11,12 @@ from agw_gateway.anchoring import AnchorGate
 from agw_gateway.approvals.service import ApprovalService
 from agw_gateway.auth import Authenticator
 from agw_gateway.auth.exchange import TokenExchange
+from agw_gateway.coding.repos import RepoService
+from agw_gateway.coding.service import CodingService
 from agw_gateway.config import Settings
+from agw_gateway.connectors.service import ConnectorService
 from agw_gateway.delegation.service import DelegationService
+from agw_gateway.enrollment import EnrollmentService
 from agw_gateway.evidence import EvidenceWriter
 from agw_gateway.evidence.blobs import BlobStore, BlobUnavailable, BucketNotPrivate, S3BlobStore
 from agw_gateway.evidence.payloads import PayloadStore
@@ -22,9 +26,11 @@ from agw_gateway.execution.manual_reconcile import ManualReconciliation
 from agw_gateway.execution.reconciler import Reconciler
 from agw_gateway.execution.runner import BackgroundRunner
 from agw_gateway.execution.service import ActionService
+from agw_gateway.github.checks import GithubChecks
 from agw_gateway.humans import HumanAuthenticator
 from agw_gateway.keys import KeyProvider
 from agw_gateway.logs import log
+from agw_gateway.mcp_remote.oauth import OAuthServer
 from agw_gateway.privacy.cipher import EnvelopeCipher
 from agw_gateway.privacy.disclosure import DisclosureService
 from agw_gateway.privacy.minimize import Minimizer
@@ -60,6 +66,12 @@ class GatewayState:
     exchange: TokenExchange = None  # type: ignore[assignment]
     reconciliation: ManualReconciliation = None  # type: ignore[assignment]  # Phase 9
     writer: EvidenceWriter = None  # type: ignore[assignment]  # the shared evidence writer
+    coding: CodingService = None  # type: ignore[assignment]  # C1 (ADR-0034)
+    connectors: ConnectorService = None  # type: ignore[assignment]  # C2 (ADR-0035)
+    repos: RepoService = None  # type: ignore[assignment]  # C2
+    enrollment: EnrollmentService = None  # type: ignore[assignment]  # C2
+    oauth: OAuthServer = None  # type: ignore[assignment]  # C2
+    github_checks: GithubChecks = None  # type: ignore[assignment]  # C3 (ADR-0036)
 
     def sync(self) -> None:
         """Startup sync: tool registry + configured risk policy (both fail closed on drift)

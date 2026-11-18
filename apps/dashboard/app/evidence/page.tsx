@@ -1,4 +1,4 @@
-import { Badge, Notice, Page, SafeText, short } from "@/components/ui";
+import { Badge, Notice, Page, SafeText, short } from "@/components/legacy";
 import { gateway, me } from "@/lib/gateway";
 
 const UUID = /^[0-9a-fA-F-]{36}$/;
@@ -34,7 +34,7 @@ export default async function Evidence({ searchParams }: { searchParams: Promise
         <tbody>
           {(data?.events ?? []).map((e) => (
             <tr key={e.event_id}>
-              <td>{e.seq}</td>
+              <td><a href={`/events/${e.event_id}`}>{e.seq}</a></td>
               <td><Badge value={e.type} /><div className="text-xs">{e.occurred_at}</div></td>
               <td><code>{short(e.event_hash, 16)}…</code></td>
               <td className="w-1/2"><SafeText text={JSON.stringify(e.header, null, 1)} max={1500} label={`header ${e.seq}`} /></td>

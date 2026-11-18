@@ -125,6 +125,13 @@ Optional fields are **omitted** when absent and are never encoded as `null`.
 > payload `approval` section is `{"record": <signed decision record>, "comment": tstr}`.
 > The prompt's "APPROVAL_REQUESTED" is the existing APPROVAL_REQUIRED type.
 
+> C1 note (ADR-0034): coding-agent actions are ordinary lifecycle events with tool
+> `coding.<action_type>`. They follow the AUTHORIZED → COMPLETED | FAILED path with no
+> ACTION_DISPATCHED: the agent executes them and reports back. The `code` map gains optional
+> keys `kind` (agent kind), `repo` (SHA-256 of the remote URL), `head` (git sha) and `diff`
+> (SHA-256 of the diff). These are optional keys inside an existing map, as Phase 4 did inside
+> `risk`; top-level keys are unchanged. `violation.kind` gains `CODING_UNDECIDED_ACTION`.
+
 > Phase 4 note (ADR-0026): optional keys were added *inside* the existing `risk` map,
 > discriminated by `cv = "risk-v2"`, as ADR-0023 did for Phase 2 additions. "New fields" above
 > means new top-level keys; Phase 1–3 records remain valid unchanged.

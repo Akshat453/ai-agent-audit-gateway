@@ -1,68 +1,78 @@
 import "./globals.css";
 
+import { GeistMono } from "geist/font/mono";
+import { GeistSans } from "geist/font/sans";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import { CsrfField } from "@/components/ui";
+import { AppShell, type ShellHealth } from "@/components/shell/app-shell";
+import { NonceSetter } from "@/components/shell/nonce";
+import { PRODUCT_NAME } from "@/lib/brand";
+import { cn } from "@/lib/cn";
 import { gatewayFor } from "@/lib/gateway";
-import { csrfFor, sessionToken } from "@/lib/session";
+import { visibleNav } from "@/lib/nav";
+import { prefs as readPrefs } from "@/lib/prefs";
+import { csrfFor, nonce as readNonce, sessionToken } from "@/lib/session";
 
 export const metadata: Metadata = {
-  title: "AGW audit dashboard",
-  description: "Read-only investigation and approvals over the AI agent audit gateway",
+  title: { default: PRODUCT_NAME, template: `%s · ${PRODUCT_NAME}` },
+  description: "Investigation, approvals and tamper-evident evidence for AI agent actions",
 };
-export const dynamic = "force-dynamic"; // per-request CSP nonce (proxy.ts)
+export const dynamic = "force-dynamic"; // per-request CSP nonce (proxy.ts) + per-user prefs
 
-const NAV: { href: string; label: string; roles?: string[] }[] = [
-  { href: "/", label: "Overview" },
-  { href: "/runs", label: "Runs" },
-  { href: "/approvals", label: "Approvals" },
-  { href: "/evidence", label: "Evidence" },
-  { href: "/epochs", label: "Epochs & anchors" },
-  { href: "/verification", label: "Verification" },
-  { href: "/policies", label: "Policies" },
-  { href: "/incidents", label: "Incidents" },
-];
+function worst(chips: { name: string; status: string }[]): ShellHealth {
+  const bad = chips.filter((c) => c.status === "down");
+  const degraded = chips.filter((c) => c.status === "degraded");
+  if (bad.length) return { worst: "down", summary: `Down: ${bad.map((c) => c.name).join(", ")}` };
+  if (degraded.length) return { worst: "degraded", summary: `Degraded: ${degraded.map((c) => c.name).join(", ")}` };
+  if (!chips.length) return { worst: "off", summary: "Health unknown" };
+  return { worst: "ok", summary: "All systems normal" };
+}
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const token = await sessionToken();
-  let who: { username: string; roles: string[]; tenant: string } | null = null;
+  const [token, p, nonce] = await Promise.all([sessionToken(), readPrefs(), readNonce()]);
+  const fonts = cn(GeistSans.variable, GeistMono.variable);
+  const htmlClass = cn(fonts, p.theme === "dark" ? "dark" : "light", p.density === "compact" && "density-compact");
+
+  let shell: ReactNode = null;
   if (token) {
-    const { data } = await gatewayFor(token).GET("/v1/dashboard/config");
-    who = data ? { username: data.username, roles: data.roles, tenant: data.tenant } : null;
+    const gw = gatewayFor(token);
+    const [session, pending, alerts, health] = await Promise.all([
+      gw.GET("/v1/dashboard/session"),
+      gw.GET("/v1/dashboard/approvals", { params: { query: { state: "PENDING", limit: 1 } } }),
+      gw.GET("/v1/dashboard/alerts", { params: { query: { limit: 100 } } }),
+      gw.GET("/v1/dashboard/health"),
+    ]);
+    const s = session.data;
+    if (s) {
+      const dayAgo = Date.now() - 86_400_000;
+      shell = (
+        <AppShell
+          user={{ username: s.username, roles: s.roles, tenant: s.tenant, env: s.env, stepUpRemaining: s.step_up_remaining_seconds ?? null, stepUpWindow: s.step_up_window_seconds }}
+          nav={visibleNav(s.roles)}
+          pendingApprovals={pending.data?.total ?? 0}
+          alerts24h={(alerts.data ?? []).filter((a) => a.created_at && Date.parse(a.created_at) > dayAgo).length}
+          health={worst(health.data ?? [])}
+          csrf={csrfFor(token)}
+          prefs={p}
+        >
+          {children}
+        </AppShell>
+      );
+    }
   }
   return (
-    <html lang="en">
+    <html lang="en" className={htmlClass} suppressHydrationWarning>
       <body>
-        <a href="#main" className="sr-only focus:not-sr-only">Skip to content</a>
-        <header className="border-b border-slate-300 bg-white">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-2">
-            <span className="font-bold">AGW audit</span>
-            {who ? (
-              <>
-                <nav aria-label="Main" className="flex flex-wrap gap-3 text-sm">
-                  {NAV.map((n) => (
-                    <a key={n.href} href={n.href}>{n.label}</a>
-                  ))}
-                </nav>
-                <span className="ml-auto text-sm" data-testid="whoami">
-                  {who.username} ({who.roles.join(", ")}) · tenant {who.tenant}
-                </span>
-                <form method="post" action="/api/auth/logout">
-                  <CsrfField csrf={token ? csrfFor(token) : ""} />
-                  <button className="rounded border border-slate-400 px-2 py-0.5 text-sm" type="submit">
-                    Log out
-                  </button>
-                </form>
-              </>
-            ) : null}
-          </div>
-        </header>
-        {children}
-        <footer className="mx-auto max-w-7xl px-4 pb-6 text-xs text-slate-600">
-          Dashboard status is a convenience view; independent verification uses the CLI
-          (agw-verify) on exported bundles with trust roots obtained out of band.
-        </footer>
+        <NonceSetter nonce={nonce} />
+        {shell ?? children}
+        {/* Logout is a plain CSRF-protected form POST; the user menu submits it. */}
+        {token ? (
+          <form id="logout-form" method="post" action="/api/auth/logout" hidden>
+            <input type="hidden" name="csrf" value={csrfFor(token)} />
+            <button type="submit">Log out</button>
+          </form>
+        ) : null}
       </body>
     </html>
   );

@@ -1,4 +1,4 @@
-import { Card, Notice, Page, SafeText } from "@/components/ui";
+import { Card, Notice, Page, SafeText } from "@/components/legacy";
 import { lineDiff } from "@/lib/diff";
 import { gateway } from "@/lib/gateway";
 

@@ -70,6 +70,9 @@ HEADER_KEYS = frozenset(
         "erasure",  # Phase 7
         "delegation",  # Phase 8 (ADR-0030); "refs" (05 §4) is written from Phase 8 on
         "report",  # Phase 9 (ADR-0031): VERIFICATION_REPORT
+        "connector",  # C2 (ADR-0035): CONNECTOR_*
+        "device",  # C2: DEVICE_ENROLLED
+        "repo",  # C2: REPO_POLICY_CHANGED
     }
 )
 # Phase 7: an export reports a payload it could not produce. Ciphertext that fails its AEAD

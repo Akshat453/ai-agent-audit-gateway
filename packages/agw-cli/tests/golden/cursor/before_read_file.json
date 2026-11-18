@@ -1,0 +1,1 @@
+{"file_path":"/project/.env","content":"DATABASE_URL=postgres://u:p@db/x","attachments":[],"conversation_id":"conv_1","hook_event_name":"beforeReadFile","cursor_version":"1.7.2","workspace_roots":["/project"]}

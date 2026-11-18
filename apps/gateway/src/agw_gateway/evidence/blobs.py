@@ -49,8 +49,19 @@ class S3BlobStore:
         secret_key: str,
         bucket: str,
         secure: bool = True,
+        timeout_seconds: float = 5.0,
     ) -> None:
-        self._c = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
+        # Phase 10 hardening: minio-py's default is 300 s connect + 300 s read with 5 retries,
+        # so a hung object store would hold a request (and its DB transaction) for many
+        # minutes before failing closed. Bounded here: one timeout, at most 2 retries.
+        http = urllib3.PoolManager(
+            timeout=urllib3.Timeout(connect=timeout_seconds, read=timeout_seconds),
+            retries=urllib3.Retry(total=2, backoff_factor=0.1,
+                                  status_forcelist=[500, 502, 503, 504]),
+            maxsize=10,
+        )  # fmt: skip
+        self._c = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure,
+                        http_client=http)  # fmt: skip
         self.bucket = bucket
 
     def __repr__(self) -> str:  # never show credentials

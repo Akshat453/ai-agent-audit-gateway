@@ -10,6 +10,9 @@ export function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDev = process.env.NODE_ENV === "development";
   const https = request.nextUrl.protocol === "https:";
+  // C2 (ADR-0035): the GitHub App manifest flow is a plain form POST from an integration's
+  // page to github.com. Only those pages may submit a form to GitHub; nothing else changes.
+  const githubForm = request.nextUrl.pathname.startsWith("/integrations/");
   const csp = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
@@ -19,7 +22,7 @@ export function proxy(request: NextRequest) {
     "connect-src 'self'",
     "object-src 'none'",
     "base-uri 'none'",
-    "form-action 'self'",
+    `form-action 'self'${githubForm ? " https://github.com" : ""}`,
     "frame-ancestors 'none'",
     ...(https ? ["upgrade-insecure-requests"] : []),
   ].join("; ");

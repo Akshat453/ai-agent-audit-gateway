@@ -1,0 +1,367 @@
+{
+  "$defs": {
+    "ContentDigests": {
+      "additionalProperties": false,
+      "description": "SHA-256 hex of what the CLI saw: the diff it sent, the new content, MCP arguments.",
+      "properties": {
+        "args": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Args"
+        },
+        "content": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content"
+        },
+        "diff": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Diff"
+        }
+      },
+      "title": "ContentDigests",
+      "type": "object"
+    },
+    "Developer": {
+      "additionalProperties": false,
+      "description": "Informational only: the developer is ALWAYS taken from the device key, never here.",
+      "properties": {
+        "email": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Email"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        }
+      },
+      "title": "Developer",
+      "type": "object"
+    },
+    "McpTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "server": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Server"
+        },
+        "tool": {
+          "maxLength": 256,
+          "title": "Tool",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool"
+      ],
+      "title": "McpTarget",
+      "type": "object"
+    },
+    "Repo": {
+      "additionalProperties": false,
+      "properties": {
+        "head_sha": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Head Sha"
+        },
+        "remote_url": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remote Url"
+        }
+      },
+      "title": "Repo",
+      "type": "object"
+    },
+    "Targets": {
+      "additionalProperties": false,
+      "properties": {
+        "argv": {
+          "default": [],
+          "items": {
+            "maxLength": 8192,
+            "type": "string"
+          },
+          "maxItems": 1024,
+          "title": "Argv",
+          "type": "array"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "maxLength": 65536,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Command"
+        },
+        "mcp": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/McpTarget"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "paths": {
+          "default": [],
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 256,
+          "title": "Paths",
+          "type": "array"
+        },
+        "query": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Query"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        }
+      },
+      "title": "Targets",
+      "type": "object"
+    }
+  },
+  "$id": "https://agentguard.local/schemas/agw.coding-action/1",
+  "additionalProperties": false,
+  "description": "One pre-action question from a coding agent, normalized.",
+  "properties": {
+    "action_type": {
+      "enum": [
+        "file_read",
+        "file_write",
+        "file_delete",
+        "command_exec",
+        "search",
+        "web_fetch",
+        "mcp_call",
+        "git_op",
+        "unknown"
+      ],
+      "title": "Action Type",
+      "type": "string"
+    },
+    "agent_kind": {
+      "enum": [
+        "claude_code",
+        "codex",
+        "cursor",
+        "gemini_cli",
+        "mcp_generic",
+        "other"
+      ],
+      "title": "Agent Kind",
+      "type": "string"
+    },
+    "agent_version": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Za-z0-9._/+\\-]{1,64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Agent Version"
+    },
+    "content_digests": {
+      "$ref": "#/$defs/ContentDigests",
+      "default": {
+        "args": null,
+        "content": null,
+        "diff": null
+      }
+    },
+    "developer": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Developer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "incomplete": {
+      "default": false,
+      "title": "Incomplete",
+      "type": "boolean"
+    },
+    "native_tool": {
+      "anyOf": [
+        {
+          "maxLength": 256,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Native Tool"
+    },
+    "repo": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Repo"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "schema": {
+      "const": "agw.coding-action/1",
+      "default": "agw.coding-action/1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    },
+    "targets": {
+      "$ref": "#/$defs/Targets",
+      "default": {
+        "argv": [],
+        "command": null,
+        "mcp": null,
+        "paths": [],
+        "query": null,
+        "url": null
+      }
+    },
+    "workspace_root": {
+      "anyOf": [
+        {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Workspace Root"
+    }
+  },
+  "required": [
+    "agent_kind",
+    "action_type"
+  ],
+  "title": "agw.coding-action/1",
+  "type": "object"
+}

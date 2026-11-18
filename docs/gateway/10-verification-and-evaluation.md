@@ -80,6 +80,8 @@ we state that the tamper runs are deterministic and synthetic.
 
 ## 5. Benchmarks, risk and ablation experiments (Phase 8)
 
+> **Phase 10 (ADR-0032):** implemented as `experiments/rq1_latency … rq7_audit` with the prompt's C0–C6 ladder (one codebase, `AGW_ABLATION`), not the directory names and the Paper-B ladder planned below. Results: [research/results.md](research/results.md).
+
 | Experiment | Measures | Notes |
 |---|---|---|
 | `benchmarks/action-latency` | p50/p95/p99 POST→COMPLETED for no-op adapter, per configuration | Our per-event cost includes a Postgres tx. Paper B's ~48 µs (§VI-C) is in-process and not comparable. We say so in the report. |

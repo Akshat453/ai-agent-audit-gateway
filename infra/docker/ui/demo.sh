@@ -5,6 +5,7 @@
 # HIGH email approval, one pending CRITICAL IAM change (step-up), one DENIED delete.
 set -euo pipefail
 . /app/infra/docker/ui/env.sh
+if [ "${AGW_UI_SEED_DEMO:-1}" != "1" ]; then echo "demo skipped (AGW_UI_SEED_DEMO=0)"; exit 0; fi
 cd /app
 key() { python -m agw_gateway.admin create-agent-key --tenant demo --agent "$1" --expires-days 1 "${@:2}"; }
 export AGW_GATEWAY_URL=http://ui-gateway:8080

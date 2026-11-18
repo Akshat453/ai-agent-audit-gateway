@@ -97,7 +97,7 @@ for name, path, old, new, test in M:
     assert src.count(old) == 1, (name, src.count(old))
     path.write_text(src.replace(old, new))
     try:
-        r = subprocess.run(  # noqa: S603 - fixed argv
+        r = subprocess.run(
             ["uv", "run", "pytest", "-q", "-x", "-p", "no:cacheprovider", test],  # noqa: S607
             capture_output=True,
             text=True,

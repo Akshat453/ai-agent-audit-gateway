@@ -1,0 +1,3 @@
+seed = 1  # the agent model is deterministic; seed kept for the harness convention
+repetitions = 5
+warmup = 1

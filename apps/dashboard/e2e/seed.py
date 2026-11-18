@@ -2,7 +2,7 @@
 HTTP as real agents, and uses the operator (migrator) only to create identities and to move
 one approval's clock into the past. Writes e2e/.fixture.json (test-only random password).
 
-    uv run python apps/dashboard/e2e/seed.py --gateway http://127.0.0.1:18080
+    uv run python apps/dashboard/e2e/seed.py --gateway http://127.0.0.1:28080
 """
 
 from __future__ import annotations
@@ -19,7 +19,13 @@ from pathlib import Path
 import httpx
 from sqlalchemy import text
 
-from agw_gateway.admin import create_key, ensure_agent, ensure_human, ensure_tenant
+from agw_gateway.admin import (
+    create_device_key,
+    create_key,
+    ensure_agent,
+    ensure_human,
+    ensure_tenant,
+)
 from agw_gateway.db import create_db_engine
 
 HERE = Path(__file__).resolve().parent
@@ -85,6 +91,7 @@ def main() -> int:
     xss = act(agent, "send_email", {"to": ext, "subject": XSS_SUBJECT, "body": XSS_BODY}, run)
     auditor_view = act(agent, "send_email", {"to": ext, "subject": "auditor looks"}, run)
     csrf_target = act(agent, "send_email", {"to": ext, "subject": "csrf target"}, run)
+    keyboard = act(agent, "send_email", {"to": ext, "subject": "keyboard only"}, run)  # 9.5
     critical = act(
         iam, "update_iam_role", {"principal": "svc-e2e", "role": "editor", "grant": True}, run
     )
@@ -111,6 +118,35 @@ def main() -> int:
             ),
             {"a": expired["approval"]["approval_id"]},  # type: ignore[index]
         )
+    # C2: a connector (admin + step-up over HTTP, like the console), a registered repository with
+    # a pending loosening proposal (from an enrolled device), and a pending device-enrollment code.
+    login = httpx.post(f"{gw}/v1/auth/login", json={"tenant": tenant, "username": "adam",
+                                                     "password": password}, timeout=15)  # fmt: skip
+    login.raise_for_status()
+    admin = {"Authorization": f"Session {login.json()['session_token']}"}
+    httpx.post(f"{gw}/v1/auth/step-up", json={"password": password}, headers=admin,
+               timeout=15).raise_for_status()  # fmt: skip
+    conn = httpx.post(
+        f"{gw}/v1/connectors",
+        json={"type_id": "slack", "slug": "seedslack", "name": "Seed Slack", "config": {},
+              "credentials": {"webhook_url": "https://hooks.slack.com/services/T111/B111/SEEDSEEDSEED"}},
+        headers=admin, timeout=15,
+    )  # fmt: skip
+    conn.raise_for_status()
+    device = create_device_key(mig, tenant, "adam", "seedlaptop")
+    repo = httpx.post(
+        f"{gw}/v1/coding/repos",
+        json={"remote_url": "https://github.com/acme/seed-repo.git",
+              "agents": {"claude_code": {"tier": "enforced"}},
+              "agentguard_yaml": "version: 1\ndeny_paths: [\"secrets/**\"]\n"
+                                 "allow_commands: [\"make demo\"]\n"},
+        headers={"Authorization": f"Bearer {device}"}, timeout=15,
+    )  # fmt: skip
+    repo.raise_for_status()
+    dev = httpx.post(f"{gw}/v1/device/authorize",
+                     json={"tenant": tenant, "agent_kind": "claude_code", "label": "e2e-laptop"},
+                     timeout=15)  # fmt: skip
+    dev.raise_for_status()
     fixture = {
         "tenant": tenant,
         "password": password,
@@ -121,10 +157,15 @@ def main() -> int:
         "auditor_view": auditor_view["approval"]["approval_id"],  # type: ignore[index]
         "csrf_target": csrf_target["approval"]["approval_id"],  # type: ignore[index]
         "critical": critical["approval"]["approval_id"],  # type: ignore[index]
+        "keyboard": keyboard["approval"]["approval_id"],  # type: ignore[index]
+        "keyboard_action": keyboard["action_id"],
         "run": run,
         "child_run": child_run,
         "planner_run": planner_run,
         "xss_subject": XSS_SUBJECT,
+        "connector": conn.json()["connector_id"],
+        "proposal": repo.json()["proposal_id"],
+        "user_code": dev.json()["user_code"],
     }
     (HERE / ".fixture.json").write_text(json.dumps(fixture, indent=1))
     print(f"seeded tenant {tenant}")

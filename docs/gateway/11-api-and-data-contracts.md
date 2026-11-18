@@ -150,6 +150,97 @@ action_digest, nonce}` (the echo must match), `GET /v1/approvals-signing-keys`;
 *(Phase 7)* `POST /v1/exports` (bundle). *(Phase 10)* MCP adapter front-end.
 *(Phase 6)* The `GET /v1/epochs/{n|latest}` and `GET /v1/events/{id}/proof` responses gain an optional, **untrusted** `anchor` claim: `{chain_id, contract, recorder_id, epoch_no, status, tx_hash, block_number}` (bundle schema updated). Verifiers compare it with their pins and never take trust roots from it. Operator CLI `python -m agw_worker.anchoring.admin` (`recorder-id`, `deploy`, `record-deployment`, `register`, `trust-config`). `agw-verify event|epochs --chain-rpc URL --trust-config pinned.json` (exit 5 = UNTRUSTED_ANCHOR).
 
+### 5.8 Coding-agent API (C1, implemented, ADR-0034)
+
+Callers use a **device key**: an agent credential with only the `coding:device` scope, bound to a developer in `coding_devices`, sent as `Authorization: Bearer agw_…`.
+- Any other credential gets 403 `CODING_DEVICE_REQUIRED`.
+- Body and rate limits are the global ones.
+- The `agw` CLI (`packages/agw-cli`) is the reference client; the agent capability table is in [coding-agents.md](coding-agents.md).
+
+| Endpoint | Body → response |
+|---|---|
+| `POST /v1/coding/sessions` | `{agent_kind, agent_version?, native_session_id?, repo?{remote_url, head_sha}, workspace_root?, issue?{number, text_sha256}}` → 201 `{session_id, run_id}` (the same id; it is the evidence run) |
+| `POST /v1/coding/decide` | `{session_id, action: agw.coding-action/1, diff?, correlation_id?}` → `{decision: allow\|deny\|ask, reason, rule_ids, risk_level, action_id, status, action_digest, policy{id,version}, approval?{approval_id, state, required_role, required_approvals, expires_at, link}}`. An identical `ask` while pending returns the same approval; after approval the identical retry consumes it and returns `allow`; after rejection, `deny`. 409 `CODING_SESSION_CLOSED`; 413 if the diff exceeds `AGW_CODING_MAX_DIFF_BYTES` |
+| `GET /v1/coding/actions/{id}?wait=N` | `{action_id, status, risk_level, approval_state}`. Long-polls until the status or approval state changes (owner device only, else 404) |
+| `POST /v1/coding/observe` | `{session_id, action_id? \| correlation_id?, action_type?, success, exit_code?, result_sha256?, files_touched[], duration_ms?}` → 202 `{recorded: COMPLETED\|FAILED\|duplicate\|violation}`. Anything not AUTHORIZED gives `violation`: a SECURITY_VIOLATION `CODING_UNDECIDED_ACTION` |
+| `POST /v1/coding/sessions/{id}/end` | → `{session_id, status: ENDED, actions{status: n}}` |
+| `GET /v1/coding/status` | `{tenant, device{id,label}, developer, open_sessions, policy{id, version, digest}}` |
+
+**Settings:** `AGW_CODING_POLICY_FILE` (default: the bundled `coding-mintrail` v1), `AGW_CODING_DASHBOARD_URL` (approval links) and `AGW_CODING_MAX_DIFF_BYTES`.
+
+**Tables** (migration 0011): `coding_devices`, `coding_sessions`, `coding_actions`; `agw_app` gets SELECT/INSERT plus column-level UPDATE only. The approving roles `security`, `ledger_lead` and `maintainer` are added.
+
+### 5.9 C2: connectors, enrollment, repos, MCP (implemented, ADR-0035)
+
+**Human session endpoints** (admin with a recent step-up for every change):
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /v1/connectors/catalog` | the types: manifests, config schema, credential field names, setup/tier |
+| `GET /v1/connectors` · `POST /v1/connectors` | list (admin/auditor/security) · add `{type_id, slug, name, config, credentials}` (credentials are write-only) |
+| `GET /v1/connectors/{id}` · `PATCH` · `DELETE` | detail (credentials only as `{fields, set, version}`), update name/config, delete (sealed credentials destroyed) |
+| `POST …/{id}/test` · `/classify` · `/rotate` · `/disable` · `/enable` | health check (and discovery for MCP upstreams); `{actions:{name: classification\|null}}` creates a new policy version; rotate credentials |
+| `POST …/{id}/github/manifest` · `/github/install`; `GET /v1/connectors/github/manifest-callback` · `/setup-callback` | GitHub App manifest + install flow (single-use state) |
+| `GET /v1/repos` · `POST /v1/repos/proposals/{id}/decision` | repositories, overlays, pending `.agentguard.yaml` proposals with diff; approve/reject |
+| `GET /v1/people` · `POST /v1/people` | list · invite (temporary password shown once) |
+| `GET /v1/onboarding` | the new-tenant checklist |
+| `GET /v1/device/requests/{user_code}` · `POST …/decision` | approve or deny a device enrollment |
+| `GET` / `POST /v1/oauth/consent` | MCP OAuth consent (the dashboard page) |
+
+**Device-key endpoints:** `POST /v1/coding/repos` (register + `.agentguard.yaml` text) and `GET /v1/coding/repos/status?remote_url=`.
+
+**Public endpoints:**
+- `POST /v1/device/authorize` and `POST /v1/device/token` (RFC 8628 errors as `{"error": …}`/400);
+- `/.well-known/oauth-protected-resource[/mcp]` and `/.well-known/oauth-authorization-server`;
+- `POST /oauth/register` (DCR), `GET /oauth/authorize`, `POST /oauth/token` and `POST /oauth/revoke`;
+- `POST /mcp` (Bearer `agwm_…`; MCP 2026-07-28 + legacy). GET and DELETE on `/mcp` return 405.
+
+**Connector actions** are called like any tool: `POST /v1/actions {tool: "cx_<slug>_<action>", …}`.
+
+**Settings:** `AGW_PUBLIC_URL`, `AGW_DEVICE_CODE_TTL_SECONDS`, `AGW_MCP_ACCESS_TOKEN_TTL_SECONDS` and `AGW_MCP_REFRESH_TOKEN_TTL_SECONDS`.
+
+### 5.10 C3: GitHub dev-tools and the evidence check (implemented, ADR-0036)
+
+**Connector actions** (`cx_<slug>_<action>`, device key or MCP; `environment: "dev"`):
+
+| Action | Arguments (all take optional `repo` = one of the connector's repos) | Proposed |
+|---|---|---|
+| `github_issue_get` · `github_issue_list` | `number` · `state`, `labels`, `per_page` | LOW |
+| `github_issue_comment` | `number`, `body` | MEDIUM |
+| `git_submit_change` | `session_id`, `issue_number`, `branch` (`fix\|feat/MR-<issue>-<slug>`), `base_sha`, `commit_message`, `change_format` (`diff`\|`bundle`), `change` (base64) | MEDIUM; raised by content (C1 rules) |
+| `github_pr_create` | `branch`, `title`, `issue_number`, optional `base`, `draft`; the body is the gateway's evidence template | MEDIUM |
+| `github_pr_comment` · `github_pr_status` | `number`, `body` · `number` | MEDIUM · LOW |
+
+`git_submit_change` returns `{branch, head_sha, tree_sha, commits, diff_digest, files}`; `github_pr_create` returns `{number, html_url, check}`; `github_pr_status` returns `{number, state, merged, head_sha, check, summary}`.
+
+**Human session endpoints:**
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /v1/connectors/{id}/classify-proposed` | admin + step-up: accept the manifest proposals as a new classification version |
+| `GET /v1/connectors/{id}/github` | installation ids, repos, mode, recent deliveries (event, action, verified, outcome, time) and tracked PRs |
+| `GET /v1/dashboard/runs/{run_id}/prs` | PRs opened in a run, with check conclusion and link |
+
+**Public endpoint:** `POST /v1/webhooks/github/{connector_id}`. It is authenticated only by `X-Hub-Signature-256`: 401 on a bad or missing signature, 200 "duplicate delivery" on a repeated `X-GitHub-Delivery`, 202 with the evaluation result otherwise.
+
+**Tables** (migration 0013): `github_commits` (append-only), `github_prs`, `github_deliveries`, `github_tamper_notices`.
+
+**Settings:** `AGW_GITHUB_POLL_SECONDS` (default 60). `AGW_GITHUB_CLONE_ROOT` (local bare repos instead of github.com) is honoured only when `AGW_ENV` is dev or test, and ignored otherwise.
+
+### 5.11 Self-service sign-up (dev/test only)
+
+Public:
+- `GET /v1/auth/signup` → `{"enabled": bool}`.
+- `POST /v1/auth/signup {organization, tenant, username, password}` → 201 with the same session fields as login, plus `tenant` and `username`.
+
+Behaviour:
+- It creates a **new** tenant (genesis chain and epoch heads) and its first human, with roles admin, approver, auditor, maintainer and security, through the SECURITY DEFINER `agw_signup_tenant` (migration 0014). The runtime role still has no INSERT on `tenants` or `humans`.
+- An existing tenant id gets 409, and nothing changes.
+- Rules: tenant id `^[a-z0-9][a-z0-9-]{2,62}$`, username `^[a-z0-9][a-z0-9._-]{0,63}$`, password 12–1024 characters. Violations get 422 with field names only.
+- Off by default (404). `AGW_SIGNUP_ENABLED=true` is refused outside dev/test.
+
+The compose `ui` profile enables it. Its `ui-provision` service registers each new tenant's anchoring recorder on the local Anvil contract. `AGW_UI_SEED_DEMO=0` starts the stack without the demo tenant. Dashboard: `/signup`, linked from `/login` when enabled.
+
 ## 6. Database contracts
 
 Exact Phase 1 tables: [14-phase-1-handoff.md §3](14-phase-1-handoff.md). Later additions:

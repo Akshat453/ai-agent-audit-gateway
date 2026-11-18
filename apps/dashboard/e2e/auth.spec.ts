@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { fx, login, watch } from "./helpers";
+import { fx, login, userMenu, watch } from "./helpers";
 
 test("login: wrong password refused; session only in an httpOnly Secure SameSite=Strict cookie", async ({ page, context }) => {
   const problems = watch(page);
@@ -28,7 +28,7 @@ test("login: wrong password refused; session only in an httpOnly Secure SameSite
   expect(csp).not.toContain("unsafe-inline");
   expect(problems).toEqual([]);
 
-  await page.getByRole("button", { name: "Log out" }).click();
+  await userMenu(page, "Log out"); // Phase 9.5: logout is in the user menu
   await expect(page).toHaveURL(/\/login$/);
   await page.goto("/runs");
   await expect(page).toHaveURL(/\/login$/);

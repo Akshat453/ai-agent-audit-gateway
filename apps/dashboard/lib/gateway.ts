@@ -59,3 +59,30 @@ export async function postJson(path: string, token: string, body: unknown) {
   }
   return { status: r.status, data };
 }
+
+/** Any-method JSON call for the C2 admin endpoints (their request bodies are free-form, so the
+ *  typed client cannot send them). The body is never logged: it may carry credentials. */
+export async function sendJson(method: "POST" | "PATCH" | "DELETE", path: string, token: string, body?: unknown) {
+  const r = await fetch(GATEWAY_URL + path, {
+    method,
+    headers: { Authorization: `Session ${token}`, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    cache: "no-store",
+  });
+  let data: unknown = null;
+  try {
+    data = await r.json();
+  } catch {
+    data = null;
+  }
+  return { status: r.status, data };
+}
+
+/** The gateway's uniform error ({error:{code, fields?}}) or an OAuth-style {error: "code"}. */
+export function errorOf(status: number, data: unknown): { code: string; fields: string[] } {
+  const e = (data as { error?: unknown } | null)?.error;
+  if (typeof e === "string") return { code: e, fields: [] };
+  const obj = (e ?? {}) as { code?: unknown; fields?: unknown };
+  const fields = Array.isArray(obj.fields) ? obj.fields.filter((f): f is string => typeof f === "string").slice(0, 20) : [];
+  return { code: typeof obj.code === "string" ? obj.code : `HTTP_${status}`, fields };
+}

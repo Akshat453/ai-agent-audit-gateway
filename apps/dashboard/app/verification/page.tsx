@@ -1,4 +1,4 @@
-import { Badge, Card, CsrfField, Notice, Page, RESULT_EXPLANATION, SafeText, short } from "@/components/ui";
+import { Badge, Card, CsrfField, Notice, Page, RESULT_EXPLANATION, SafeText, short } from "@/components/legacy";
 import { gateway, getJson, me } from "@/lib/gateway";
 import { csrfToken } from "@/lib/session";
 

@@ -155,6 +155,12 @@ class Code(_M):
     gw: Text  # gateway build: git commit (+dirty) or "unknown"
     adapter: Text | None = None  # "<adapter class>@<tool version>"
     agent: Text | None = None  # agent-declared version (unauthenticated claim)
+    # C1 (ADR-0034): coding-agent code provenance. Optional keys inside the existing map
+    # (as ADR-0026 did inside ``risk``); absent on every non-coding record.
+    kind: Annotated[str, Field(max_length=32)] | None = None  # declared agent kind
+    repo: Bytes32 | None = None  # SHA-256 of the repository remote URL (URL in the payload)
+    head: Annotated[str, Field(pattern=r"^[0-9a-f]{40}([0-9a-f]{24})?$")] | None = None
+    diff: Bytes32 | None = None  # SHA-256 of the diff (the diff itself: encrypted payload)
 
 
 class EpochRef(_M):
@@ -231,6 +237,35 @@ class VerificationReportRef(_M):
     trigger: Literal["schedule", "manual"]
 
 
+class ConnectorRef(_M):
+    """C2 (ADR-0035): CONNECTOR_* events. Never secrets: credentials are referenced only by
+    their version number; ``digest`` commits to the non-secret config / classification."""
+
+    id: Bytes16  # connector instance id
+    type: Annotated[str, Field(max_length=64)]  # connector type id (github, slack, ...)
+    ver: UInt  # connector policy version after this change (0 = nothing classified yet)
+    act: Annotated[str, Field(max_length=128)] | None = None  # action name (classification)
+    cred: UInt | None = None  # credential version (rotation)
+    digest: Bytes32 | None = None  # SHA-256 of the canonical non-secret config/classification
+
+
+class DeviceRef(_M):
+    """C2: DEVICE_ENROLLED: the device (agent) issued to a developer by an approved flow."""
+
+    id: Bytes16  # the device's agent id
+    kind: Annotated[str, Field(max_length=32)]  # declared agent kind
+    via: Literal["device_code", "mcp_oauth", "admin"]
+
+
+class RepoRef(_M):
+    """C2: REPO_POLICY_CHANGED: a repository's tighten-only overlay or an admin decision."""
+
+    id: Bytes16  # repo id
+    ver: UInt  # repo policy version after the change
+    digest: Bytes32  # SHA-256 of the canonical overlay
+    decision: Literal["TIGHTENED", "PROPOSAL_APPROVED", "PROPOSAL_REJECTED", "REGISTERED"]
+
+
 class Refs(_M):
     """Hash references to earlier events (05 §4; Paper A §4 declared dependency)."""
 
@@ -242,7 +277,14 @@ class Violation(_M):
     # (approvals); ``claimed`` then names the endpoint, never request content.
     # DELEGATION_REFUSED (Phase 8): a delegation request that would exceed the issuer's
     # authority (``claimed`` = the refusal code, never request content).
-    kind: Literal["AGENT_ID_MISMATCH", "AGENT_ON_HUMAN_ENDPOINT", "DELEGATION_REFUSED"]
+    # CODING_UNDECIDED_ACTION (C1): a coding agent reported an action the gateway never
+    # authorized (``claimed`` = the action type).
+    kind: Literal[
+        "AGENT_ID_MISMATCH",
+        "AGENT_ON_HUMAN_ENDPOINT",
+        "DELEGATION_REFUSED",
+        "CODING_UNDECIDED_ACTION",
+    ]
     claimed: Annotated[str, Field(max_length=128)]
 
 
@@ -282,6 +324,9 @@ class EventHeader(_M):
     delegation: DelegationRef | None = None  # Phase 8: DELEGATION_* and delegated requests
     refs: Refs | None = None  # Phase 8: hash link to the event this one depends on
     report: VerificationReportRef | None = None  # Phase 9: VERIFICATION_REPORT only
+    connector: ConnectorRef | None = None  # C2: CONNECTOR_* only (ADR-0035)
+    device: DeviceRef | None = None  # C2: DEVICE_ENROLLED only
+    repo: RepoRef | None = None  # C2: REPO_POLICY_CHANGED only
     obs: UInt | None = None  # observed_at, µs: when the executor/reconciler observed it
 
     def model_post_init(self, _context: Any) -> None:
@@ -332,6 +377,15 @@ DelegationRevoked = _header("DELEGATION_REVOKED", "A2A", ("delegation",))
 VerificationReport = _header("VERIFICATION_REPORT", "SYS", ("report", "payload"))
 # Operator-recorded outcome of an OUTCOME_UNKNOWN action (never a retry).
 ActionReconciled = _header("ACTION_RECONCILED", "A2H", ("action", "outcome", "payload"))
+# C2 (ADR-0035): connector administration, device enrollment, repo policy.
+ConnectorAdded = _header("CONNECTOR_ADDED", "A2H", ("connector",))
+ConnectorUpdated = _header("CONNECTOR_UPDATED", "A2H", ("connector",))
+ConnectorActionClassified = _header("CONNECTOR_ACTION_CLASSIFIED", "A2H", ("connector",))
+ConnectorCredentialRotated = _header("CONNECTOR_CREDENTIAL_ROTATED", "A2H", ("connector",))
+ConnectorDisabled = _header("CONNECTOR_DISABLED", "A2H", ("connector",))
+ConnectorDeleted = _header("CONNECTOR_DELETED", "A2H", ("connector",))
+DeviceEnrolled = _header("DEVICE_ENROLLED", "A2H", ("device",))
+RepoPolicyChanged = _header("REPO_POLICY_CHANGED", "A2H", ("repo",))
 
 HEADER_MODELS: Final[dict[str, type[EventHeader]]] = {
     m.TYPE: m
@@ -357,6 +411,14 @@ HEADER_MODELS: Final[dict[str, type[EventHeader]]] = {
         DelegationRevoked,
         VerificationReport,
         ActionReconciled,
+        ConnectorAdded,
+        ConnectorUpdated,
+        ConnectorActionClassified,
+        ConnectorCredentialRotated,
+        ConnectorDisabled,
+        ConnectorDeleted,
+        DeviceEnrolled,
+        RepoPolicyChanged,
     )
 }
 # Types that have a model but may not be written yet. Empty since Phase 5 (ADR-0027).

@@ -53,6 +53,8 @@ from agw_gateway.approvals.binding import (
 )
 from agw_gateway.approvals.signing import DecisionSigner, verify_decision
 from agw_gateway.auth.models import AuthenticatedAgent
+from agw_gateway.coding import is_coding_tool
+from agw_gateway.connectors.tools import constraint_for
 from agw_gateway.crypto.canonical import args_digest
 from agw_gateway.db import tables as t
 from agw_gateway.evidence import EvidenceWriter, NewEvent
@@ -68,7 +70,7 @@ from agw_gateway.execution.errors import (
     NotFound,
     StepUpRequired,
 )
-from agw_gateway.humans.models import AuthenticatedHuman
+from agw_gateway.humans.models import APPROVING_ROLES, VIEWER_ROLES, AuthenticatedHuman
 from agw_gateway.ids import uuid7
 from agw_gateway.keys import KeyUnavailable
 from agw_gateway.logs import log
@@ -125,11 +127,22 @@ class NewApproval:
     action_digest: bytes
     required: int
     ttl: timedelta
+    # C1 (ADR-0034): coding approvals are routed to a role by path owner; default "approver".
+    role: str = "approver"
 
     @classmethod
-    def create(cls, action_digest: bytes, level: str, config: ApprovalConfig) -> NewApproval:
+    def create(
+        cls, action_digest: bytes, level: str, config: ApprovalConfig, role: str = "approver"
+    ) -> NewApproval:
+        if role not in APPROVING_ROLES:
+            raise ValueError("unknown approving role")
         return cls(
-            uuid7(), os.urandom(16), action_digest, config.required(level), config.ttl(level)
+            uuid7(),
+            os.urandom(16),
+            action_digest,
+            config.required(level),
+            config.ttl(level),
+            role,
         )
 
     def insert(self, conn: Connection, tenant_id: str, action_id: UUID) -> dict[str, Any]:
@@ -143,7 +156,7 @@ class NewApproval:
                 action_id=action_id,
                 action_digest=self.action_digest,
                 nonce=self.nonce,
-                required_role="approver",
+                required_role=self.role,
                 required_approvals=self.required,
                 state="PENDING",
                 requested_at=now,
@@ -239,7 +252,7 @@ class ApprovalService:
     # ---------------------------------------------------------------- reads (approver UI)
     @staticmethod
     def _require_viewer(human: AuthenticatedHuman) -> None:
-        if not (human.roles & {"approver", "auditor", "admin"}):
+        if not (human.roles & VIEWER_ROLES):
             raise Forbidden
 
     def list_approvals(
@@ -322,7 +335,7 @@ class ApprovalService:
                 .where(t.approval_decisions.c.approval_id == approval_id)
                 .order_by(t.approval_decisions.c.decided_at_us)
             ).all()
-        spec = self._registry.get_any(action.tool_id, action.tool_version or "")
+        spec = self._registry.get_any(action.tool_id, action.tool_version or "", action.tenant_id)
         args = self._open_request(action) or {}
         validated = spec.validate_args(args) if spec is not None else None
         target = (
@@ -397,7 +410,7 @@ class ApprovalService:
         echoed_digest: str,
         echoed_nonce: str,
     ) -> dict[str, Any]:
-        if not human.has("approver"):
+        if not (human.roles & APPROVING_ROLES):
             raise Forbidden
         if self._signer is None:
             # Fail closed: an unsigned decision is never recorded; the action stays pending.
@@ -409,6 +422,8 @@ class ApprovalService:
             ap = self._lock_approval(conn, approval_id, tenant_id=human.tenant_id)
             if ap is None:
                 raise NotFound
+            if not human.has(ap.required_role):  # C1: routed approvals (ADR-0034)
+                raise Forbidden
             if ap.state != "PENDING":
                 raise ApprovalNotPending
             action = self._lock_action(conn, ap.action_id)
@@ -577,6 +592,10 @@ class ApprovalService:
             if not ap.live:
                 self._expire(conn, ap, action)
                 result = AuthorizeResult("EXPIRED", "APPROVAL_EXPIRED")
+            elif action is not None and is_coding_tool(action.tool_id):
+                # C1 (ADR-0034): the agent executes a coding action itself. The approval stays
+                # APPROVED until the agent's IDENTICAL retry consumes it (consume_for_retry).
+                result = AuthorizeResult("NOOP", "AWAITING_AGENT_RETRY")
             else:
                 result = self._revalidate_and_commit(conn, ap, action)
         APPROVAL_AUTHORIZATIONS.labels(result.code or result.result).inc()
@@ -600,7 +619,7 @@ class ApprovalService:
         if len(decs) < ap.required_approvals:
             return self._deny(conn, ap, action, "DECISION_SIGNATURE_INVALID", None)
         # (4) recompute the action digest from the stored request.
-        spec = self._registry.get_any(action.tool_id, action.tool_version or "")
+        spec = self._registry.get_any(action.tool_id, action.tool_version or "", action.tenant_id)
         try:
             request = self._open_request(action)
         except SealedDataError:
@@ -657,7 +676,7 @@ class ApprovalService:
         )
         current = load_active_policy(conn)
         # The CURRENT registry: a tool disabled since the approval is unknown -> DENY.
-        resolved = self._registry.resolve(action.tool_id, action.tool_version)
+        resolved = self._registry.resolve(action.tool_id, action.tool_version, action.tenant_id)
         # Phase 8: the delegation chain must STILL be live and covering (a parent's
         # revocation or scope reduction since the request takes effect here).
         constraint = None
@@ -676,6 +695,7 @@ class ApprovalService:
             now=datetime.now(UTC),
             delegation_depth=action.delegation_depth if constraint is None else None,
             delegation=constraint,
+            connector=constraint_for(resolved, agent, args_json),  # C2: current classification
         )
         if decision.effect == "DENY":
             return self._deny(conn, ap, action, "POLICY_REEVALUATION_DENIED", decision)
@@ -755,6 +775,105 @@ class ApprovalService:
         )
         return AuthorizeResult("AUTHORIZED", None)
 
+    # ---------------------------------------------------------------- C1: agent-executed
+    def lock_for_retry(self, conn: Connection, approval_id: UUID) -> tuple[Any, Any]:
+        """Lock order approval -> action (as everywhere); for ``consume_for_retry``."""
+        ap = self._lock_approval(conn, approval_id)
+        action = self._lock_action(conn, ap.action_id) if ap is not None else None
+        return ap, action
+
+    def consume_for_retry(
+        self,
+        conn: Connection,
+        ap: Any,
+        action: Any,
+        *,
+        digest: bytes,
+        policy_fields: dict[str, Any],
+        authorized_fields: dict[str, Any],
+    ) -> AuthorizeResult:
+        """Consume an APPROVED coding approval for the agent's identical retry (ADR-0034 §5).
+
+        The caller holds the row locks (``lock_for_retry``) and has re-evaluated the retry
+        under the CURRENT coding policy; ``digest`` is the coding action digest recomputed from
+        the retry. Every ADR-0027 §7 guard applies, except that nothing reaches the outbox:
+        the agent executes the action. Single use is the ``approval_uses`` primary key.
+        """
+        if ap.state != "APPROVED":
+            return AuthorizeResult("NOOP", ap.state)
+        if not ap.live:
+            self._expire(conn, ap, action)
+            return AuthorizeResult("EXPIRED", "APPROVAL_EXPIRED")
+        if action is None or action.tenant_id != ap.tenant_id:
+            self._set_approval(conn, ap.approval_id, "INVALIDATED", "TENANT_MISMATCH")
+            return AuthorizeResult("DENIED", "TENANT_MISMATCH")
+        if action.status != "PENDING_APPROVAL":
+            self._set_approval(conn, ap.approval_id, "INVALIDATED", "ACTION_NOT_PENDING")
+            return AuthorizeResult("DENIED", "ACTION_NOT_PENDING")
+        decs = self._valid_decisions(conn, ap)
+        if len(decs) < ap.required_approvals:
+            return self._deny(conn, ap, action, "DECISION_SIGNATURE_INVALID", None)
+        if not (
+            hmac.compare_digest(digest, bytes(ap.action_digest))
+            and hmac.compare_digest(digest, bytes(action.action_digest or b""))
+        ):
+            return self._deny(conn, ap, action, "APPROVAL_BINDING_MISMATCH", None)
+        agent_status = conn.execute(
+            select(t.agents.c.status).where(t.agents.c.agent_id == action.agent_id)
+        ).scalar_one()
+        if agent_status != "active":
+            return self._deny(conn, ap, action, "AGENT_INACTIVE", None)
+        conn.execute(
+            insert(t.approval_uses).values(
+                nonce=bytes(ap.nonce), approval_id=ap.approval_id, action_id=ap.action_id
+            )
+        )
+        self._set_approval(conn, ap.approval_id, "CONSUMED", None)
+        common = {"action_id": ap.action_id, "run_id": action.run_id, "agent_id": action.agent_id}
+        level = approval_event_level(action.risk_level)
+        self._writer.append(
+            conn,
+            ap.tenant_id,
+            [
+                NewEvent(
+                    type="POLICY_EVALUATED",
+                    actor_kind="gateway",
+                    actor_id=GATEWAY_ACTOR_ID,
+                    fields=policy_fields,
+                    risk_level=level,
+                    **common,
+                ),
+                NewEvent(
+                    type="ACTION_AUTHORIZED",
+                    actor_kind="gateway",
+                    actor_id=GATEWAY_ACTOR_ID,
+                    fields={
+                        **authorized_fields,
+                        "approval": {
+                            "id": ap.approval_id.bytes,
+                            "binding": bytes(ap.action_digest),
+                            "exp": us(ap.expires_at),
+                            "req": ap.required_approvals,
+                            "decs": decs,
+                        },
+                    },
+                    risk_level=level,
+                    **common,
+                ),
+            ],
+        )
+        self._set_action(conn, ap.action_id, status="AUTHORIZED", request_args_sealed=None)
+        APPROVAL_AUTHORIZATIONS.labels("AUTHORIZED").inc()
+        log(
+            logger,
+            logging.INFO,
+            "coding approval consumed",
+            tenant_id=ap.tenant_id,
+            action_id=ap.action_id,
+            status="AUTHORIZED",
+        )
+        return AuthorizeResult("AUTHORIZED", None)
+
     def _valid_decisions(self, conn: Connection, ap: Any) -> list[dict[str, Any]]:
         """APPROVED decisions that (a) verify under the gateway's CONFIGURED key, (b) over the
         decision record recomputed from the approval row, (c) by a still-active approver of
@@ -771,7 +890,7 @@ class ApprovalService:
                 t.approval_decisions.c.decision == "APPROVED",
                 t.humans.c.tenant_id == ap.tenant_id,
                 t.humans.c.status == "active",
-                literal("approver") == any_(t.humans.c.roles),
+                literal(ap.required_role) == any_(t.humans.c.roles),
             )
             .order_by(t.approval_decisions.c.decided_at_us)
         ).all()
@@ -875,7 +994,12 @@ class ApprovalService:
             approved = (
                 conn.execute(
                     select(t.approvals.c.approval_id)
-                    .where(t.approvals.c.state == "APPROVED", t.approvals.c.expires_at > func.now())
+                    .join(t.actions, t.actions.c.action_id == t.approvals.c.action_id)
+                    .where(
+                        t.approvals.c.state == "APPROVED",
+                        t.approvals.c.expires_at > func.now(),
+                        ~t.actions.c.tool_id.startswith("coding."),  # consumed by a retry
+                    )
                     .order_by(t.approvals.c.requested_at)
                     .limit(self._batch)
                 )

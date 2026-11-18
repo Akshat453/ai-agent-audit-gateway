@@ -114,7 +114,7 @@ for name, path, old, new, test in M:
         mutated = mutated.replace(o, new)
     path.write_text(mutated)
     try:
-        r = subprocess.run(  # noqa: S603 - fixed argv
+        r = subprocess.run(
             ["uv", "run", "pytest", "-q", "-x", "-p", "no:cacheprovider", test],  # noqa: S607
             capture_output=True,
             text=True,

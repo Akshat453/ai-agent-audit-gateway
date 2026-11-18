@@ -131,14 +131,14 @@ def _seal_column(
     with engine.begin() as conn:
         rows = conn.execute(
             text(
-                f"SELECT {key} AS k, tenant_id, action_id, {plain} AS v FROM {table} "  # noqa: S608
+                f"SELECT {key} AS k, tenant_id, action_id, {plain} AS v FROM {table} "  # noqa: S608  # nosec B608 - identifiers are constants from the two call sites
                 f"WHERE {plain} IS NOT NULL AND {sealed} IS NULL FOR UPDATE"
             )
         ).all()
         for r in rows:
             blob = cipher.seal_json(ops_context(r.tenant_id, purpose, r.action_id.bytes), r.v)
             conn.execute(
-                text(f"UPDATE {table} SET {sealed} = :b WHERE {key} = :k"),  # noqa: S608
+                text(f"UPDATE {table} SET {sealed} = :b WHERE {key} = :k"),  # noqa: S608  # nosec B608 - constant identifiers
                 {"b": blob, "k": r.k},
             )
             done += 1

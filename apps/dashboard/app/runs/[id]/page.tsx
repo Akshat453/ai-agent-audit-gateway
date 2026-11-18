@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
-import { Badge, Card, Page, short } from "@/components/ui";
+import { Badge, Card, Page, short } from "@/components/legacy";
+import { PullRequestsCard } from "@/components/github/pull-requests";
 import { gateway } from "@/lib/gateway";
 
 const INDENT = ["ml-0", "ml-6", "ml-12", "ml-18"];
@@ -12,6 +13,7 @@ export default async function Run({ params }: { params: Promise<{ id: string }> 
   if (!data) notFound();
   return (
     <Page title={`Run ${short(id, 13)}`} lead="Lifecycle events in recording order (seq). Payloads (args, results) are never shown here.">
+      <PullRequestsCard runId={id} />
       {data.delegations.length ? (
         <Card title="Delegation tree">
           <ul className="space-y-1 text-sm" aria-label="Delegations">
@@ -47,8 +49,8 @@ export default async function Run({ params }: { params: Promise<{ id: string }> 
         <tbody>
           {data.events.map((e) => (
             <tr key={e.event_id}>
-              <td>{e.seq}</td>
-              <td><code>{e.type}</code><div className="text-xs text-slate-600">{e.evidence_class} · {e.occurred_at}</div></td>
+              <td><a href={`/events/${e.event_id}`}>{e.seq}</a></td>
+              <td><code>{e.type}</code>{e.action_id ? <> · <a href={`/actions/${e.action_id}`} className="text-xs">action</a></> : null}<div className="text-xs text-slate-600">{e.evidence_class} · {e.occurred_at}</div></td>
               <td>{e.agent ?? `${String(e.actor.kind)}:${short(String(e.actor.id))}`}</td>
               <td>{e.tool ? `${String(e.tool.id)}${e.tool.ver ? "@" + String(e.tool.ver) : ""}` : ""}</td>
               <td>

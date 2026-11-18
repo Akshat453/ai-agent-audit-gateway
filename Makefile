@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV ?= uv
 COV_PKGS := */agw_gateway/policies/*,*/agw_gateway/auth/*,*/agw_gateway/tools/*,*/agw_gateway/execution/*,*/agw_gateway/approvals/*,*/agw_gateway/humans/*,*/agw_gateway/anchoring/*,*/agw_worker/anchoring/*,*/agw_gateway/privacy/*,*/agw_gateway/keys/*,*/agw_gateway/delegation/*,*/agw_gateway/auth/*,*/agw_sdk/*,*/agw_langgraph/*,*/agw_mcp/*
 
-.PHONY: up down migrate test lint demo sync vectors verify-isolated bench tamper risk-eval seal-compare dev-keys approval-attacks approval-mutations contracts-test contracts-check contracts-gas contracts-slither anchor-deploy-anvil anchor-gas anchor-mutations dev-kek privacy-mutations containment injection-corpus delegation-mutations dev-delegation-key integration-latency dashboard-api dashboard-check dashboard-e2e ui-up ui-screenshots monitoring-mutations
+.PHONY: start stop rebuild c2-mutations c3-mutations coding-policy coding-cli coding-mutations device-key up down migrate test lint demo sync vectors verify-isolated bench tamper risk-eval seal-compare dev-keys approval-attacks approval-mutations contracts-test contracts-check contracts-gas contracts-slither anchor-deploy-anvil anchor-gas anchor-mutations dev-kek privacy-mutations containment injection-corpus delegation-mutations dev-delegation-key integration-latency dashboard-api dashboard-check dashboard-e2e ui-up ui-screenshots monitoring-mutations rq1 rq2 rq3 rq4 rq5 rq6 rq7 experiments plots hardening hardening-ci
 
 .env:
 	cp .env.example .env
@@ -23,7 +23,7 @@ migrate: .env sync
 lint: sync
 	$(UV) run ruff check .
 	$(UV) run ruff format --check .
-	$(UV) run mypy apps/gateway/src apps/worker/src packages/gateway-sdk/src packages/schemas/src packages/verifier/src integrations/langgraph/src integrations/mcp/src
+	$(UV) run mypy apps/gateway/src apps/worker/src packages/gateway-sdk/src packages/schemas/src packages/verifier/src integrations/langgraph/src integrations/mcp/src packages/agw-cli/src
 	$(UV) run lint-imports
 
 test: lint
@@ -164,9 +164,79 @@ dashboard-e2e: .env sync
 ui-up: .env
 	docker compose --profile ui up -d --build
 
+# One command each: start the whole stack (infra + gateway + worker + MCP + demo data +
+# dashboard) and stop it. `stop` KEEPS the data volumes; `make down` deletes them.
+# `start` reuses the built images (compose builds them only if they do not exist yet);
+# after changing code, run `make rebuild` once.
+start: .env
+	docker compose --profile ui up -d
+	@echo "Dashboard: http://localhost:3000  (new account: /signup; demo users when AGW_UI_SEED_DEMO=1)"
+	@echo "Gateway:   http://localhost:8088  (agw login --url http://localhost:8088; MCP: /mcp)"
+
+rebuild: .env
+	docker compose --profile ui up -d --build
+	@echo "Dashboard: http://localhost:3000  (new account: /signup; demo users when AGW_UI_SEED_DEMO=1)"
+	@echo "Gateway:   http://localhost:8088  (agw login --url http://localhost:8088; MCP: /mcp)"
+
+stop:
+	docker compose --profile ui --profile monitoring stop
+
 ui-screenshots:
 	cd apps/dashboard && AGW_SHOT_PASSWORD="$$(grep '^AGW_UI_DEMO_PASSWORD=' ../../.env | cut -d= -f2-)" node scripts/screenshots.mjs
 
 # Phase 9: remove each dashboard-API / step-up / reconcile / monitor / tracing guard in turn.
 monitoring-mutations: sync
 	$(UV) run python experiments/monitoring/mutation_check.py
+
+# Phase 10 (ADR-0032): one command per experiment. Config: experiments/<rq>/config.toml
+# (fixed seeds); raw CSV + env.json -> experiments/<rq>/results/. Needs Docker.
+rq1: sync
+	$(UV) run python -m experiments.rq1_latency.run
+rq2: sync
+	$(UV) run python -m experiments.rq2_batching.run
+rq3: sync
+	$(UV) run python -m experiments.rq3_tamper.run
+rq4: sync
+	$(UV) run python -m experiments.rq4_authz.run
+rq5: sync
+	$(UV) run python -m experiments.rq5_faults.run
+rq6: sync
+	$(UV) run python -m experiments.rq6_agents.run
+rq7: sync
+	$(UV) run python -m experiments.rq7_audit.run
+# rq6 before rq2: rq2 replays the agent trace that rq6 records.
+experiments: rq1 rq3 rq4 rq5 rq6 rq2 rq7
+
+# Figures for results.md, generated ONLY from the raw CSVs.
+plots: sync
+	$(UV) run python -m experiments.plots
+
+# Phase 10 hardening: scanners (network + Docker), DB least-privilege review, backup drill.
+hardening: sync
+	$(UV) run python -m experiments.hardening.run scans
+	$(UV) run python -m experiments.hardening.run grants
+	$(UV) run python -m experiments.hardening.run backup
+hardening-ci: sync
+	$(UV) run python -m experiments.hardening.run ci
+
+# C1 (ADR-0034): coding-agent integration.
+# The labeled coding-policy table (>= 100 actions incl. every MintRail trap) must pass 100 %.
+coding-policy: sync
+	$(UV) run pytest -q apps/gateway/tests/unit/test_coding_policy.py
+# Every `agw hook` adapter + fail-closed behaviour (no gateway needed).
+coding-cli: sync
+	$(UV) run pytest -q packages/agw-cli/tests
+# Remove each coding-security guard in turn; its named test must fail.
+coding-mutations: sync
+	$(UV) run python apps/gateway/tests/coding_mutation_check.py
+# Issue a coding device key (printed once): make device-key TENANT=demo DEVELOPER=alice LABEL=laptop
+device-key: .env sync
+	set -a; . ./.env; set +a; $(UV) run python -m agw_gateway.admin create-device-key --tenant $(TENANT) --developer $(DEVELOPER) --label $(LABEL)
+
+# C2 (ADR-0035): remove each connector / identity / repo-policy / CLI guard; its test must fail.
+c2-mutations: sync
+	$(UV) run python apps/gateway/tests/c2_mutation_check.py
+
+# C3 (ADR-0036): remove each GitHub connector / evidence-check guard; its test must fail.
+c3-mutations: sync
+	$(UV) run python apps/gateway/tests/c3_mutation_check.py

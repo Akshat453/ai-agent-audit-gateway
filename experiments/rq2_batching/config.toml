@@ -1,0 +1,18 @@
+# RQ2 adaptive vs fixed batching (Phase 10, ADR-0032). SIMULATION with the production seal
+# decision (agw_worker.sealing.policy.decide). `make rq2` -> experiments/rq2_batching/results/
+seeds = [1, 2, 3, 4, 5]
+hours = 6.0                    # simulated time per run
+rate_actions_per_s = 0.5       # Poisson arrivals (~43k actions/day)
+fixed_anchor_interval_s = 600  # C4: anchor every sealed epoch at this interval
+routine_anchor_interval_s = 600  # C5: routine epochs on the same interval; HIGH/CRIT at once
+finality_delay_s = 12          # stated: inclusion + 2 confirmations (Base ~2 s blocks, rounded up)
+gas_per_anchor = 81566         # measured mean, experiments/anchoring/results/gas-anvil-31337.json
+gas_price_gwei = [0.001, 0.01, 0.1]  # stated L2 execution prices, NOT market data
+eth_usd = 3000.0               # stated, NOT market data
+# events per action by level (requested..completed / ..approval required / ..denied)
+events = { LOW = 5, MEDIUM = 5, HIGH = 3, CRITICAL = 3 }
+
+[mixes]   # LOW / MEDIUM / HIGH / CRITICAL shares (prompt's example normalised to 100 %)
+example = [0.895, 0.08, 0.02, 0.005]
+quiet = [0.99, 0.009, 0.0009, 0.0001]
+hot = [0.70, 0.20, 0.08, 0.02]

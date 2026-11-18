@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any, Final, Literal
 from uuid import UUID
@@ -32,6 +32,8 @@ from agw_gateway.anchoring.gate import GatePolicy
 from agw_gateway.approvals.binding import ActionBinding, policy_digest, target_resource
 from agw_gateway.approvals.service import ApprovalConfig, NewApproval
 from agw_gateway.auth.models import AuthenticatedAgent
+from agw_gateway.connectors.constraint import Assessment
+from agw_gateway.connectors.tools import ConnectorToolSpec, constraint_for
 from agw_gateway.crypto.canonical import ZERO32, args_digest, profile_value
 from agw_gateway.db import tables as t
 from agw_gateway.delegation.constraint import DelegationConstraint
@@ -58,6 +60,7 @@ from agw_gateway.policy_store import ACTIVE_POLICY_ID, StoredPolicy, load_active
 from agw_gateway.privacy.cipher import EnvelopeCipher, ops_context
 from agw_gateway.privacy.minimize import Minimizer
 from agw_gateway.risk_store import RiskPolicyStore
+from agw_gateway.timing import timed
 from agw_gateway.tools.registry import AmbiguousToolVersion, ToolRegistry
 from agw_gateway.tools.spec import ToolSpec
 from agw_gateway.tracing import span
@@ -66,6 +69,7 @@ logger = logging.getLogger("agw.execution.service")
 
 IDEMPOTENCY_KEY_RE: Final = re.compile(r"^[A-Za-z0-9_\-:.]{1,128}$")
 __all__ = ["ACTIVE_POLICY_ID", "ActionService", "SubmitResult"]
+_LEVELS: Final = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 _STATUS_FOR_EFFECT: Final = {
     "ALLOW": "AUTHORIZED",
     "DENY": "DENIED",
@@ -148,7 +152,9 @@ class ActionService:
         cipher: EnvelopeCipher | None = None,
         minimizer: Minimizer | None = None,
         delegations: DelegationService | None = None,
+        no_approvals: bool = False,
     ) -> None:
+        self._no_approvals = no_approvals
         self._delegations = delegations
         self._gate = gate or GatePolicy(frozenset(), 0.0)
         self._cipher_obj = cipher
@@ -204,13 +210,28 @@ class ActionService:
 
         for attempt in (1, 2):
             resolved = self._resolve_delegation(agent, req)
-            spec, decision, validated, policy = self._evaluate(agent, req, resolved)
+            spec, decision, validated, policy, assessment = self._evaluate(agent, req, resolved)
             binding = _binding(agent, req, spec, decision, validated, policy, resolved)
             approval = (
-                NewApproval.create(binding, decision.risk.level.name, self._approval_config)
+                NewApproval.create(
+                    binding,
+                    decision.risk.level.name,
+                    self._approval_config,
+                    _approver_role(spec, assessment),
+                )
                 if decision.effect == "REQUIRE_APPROVAL" and binding is not None
                 else None
             )
+            if self._no_approvals and decision.effect == "REQUIRE_APPROVAL":
+                # Phase 10 ablation C1-C5 ONLY (ADR-0032; refused outside dev/test): approval
+                # enforcement switched off. Recorded honestly as an ALLOW by the ablation rule.
+                decision = replace(
+                    decision,
+                    effect="ALLOW",
+                    reasons=(),
+                    matched_rule_ids=(*decision.matched_rule_ids, "ABLATION-NO-APPROVAL"),
+                )
+                approval = None
             try:
                 result = self._tx1(
                     agent,
@@ -223,6 +244,7 @@ class ActionService:
                     binding,
                     approval,
                     resolved,
+                    assessment,
                 )
                 break
             except _DelegationRace:
@@ -311,13 +333,23 @@ class ActionService:
 
     def _evaluate(
         self, agent: AuthenticatedAgent, req: ActionRequest, resolved: Resolved | None = None
-    ) -> tuple[ToolSpec | None, Decision, BaseModel | None, StoredPolicy]:
+    ) -> tuple[ToolSpec | None, Decision, BaseModel | None, StoredPolicy, Assessment | None]:
         try:
-            spec = self._registry.resolve(req.tool, req.tool_version)
+            spec = self._registry.resolve(req.tool, req.tool_version, agent.tenant_id)
         except AmbiguousToolVersion:
             raise RequestInvalid(["tool_version"]) from None
         validated = spec.validate_args(req.args) if spec is not None else None
         policy = self._load_policy()
+        args_json = validated.model_dump(mode="json") if validated is not None else None
+        # C3 (ADR-0036): a connector action may inspect its content first (e.g. the full diff
+        # of git_submit_change). Its level is a FLOOR on the tool's base risk; it never lowers.
+        assessment: Assessment | None = None
+        if isinstance(spec, ConnectorToolSpec) and spec.assessor and args_json is not None:
+            assessment = spec.assessor(args_json)
+            if assessment is not None and assessment.level is not None:
+                base = spec.meta.base_risk or "CRITICAL"
+                floor = max(base, assessment.level, key=_LEVELS.index)
+                spec = replace(spec, meta=replace(spec.meta, base_risk=floor))
         decision = decide_action(
             agent=agent,
             tool_id=req.tool,
@@ -329,8 +361,9 @@ class ActionService:
             now=datetime.now(UTC),
             delegation_depth=req.delegation.depth if req.delegation else None,
             delegation=resolved.constraint if resolved is not None else None,
+            connector=constraint_for(spec, agent, args_json, assessment),  # C2/C3
         )
-        return spec, decision, validated, policy
+        return spec, decision, validated, policy, assessment
 
     def _tx1(
         self,
@@ -344,6 +377,7 @@ class ActionService:
         binding: bytes | None,
         approval: NewApproval | None,
         resolved: Resolved | None = None,
+        assessment: Assessment | None = None,
     ) -> SubmitResult:
         action_id = uuid7()
         verified = _verified(resolved)
@@ -352,7 +386,7 @@ class ActionService:
         body = _response_body(action_id, req.run_id, status, decision, approval)
         pending = decision.effect == "REQUIRE_APPROVAL"
 
-        with self._engine.begin() as conn:
+        with timed("durable_write"), self._engine.begin() as conn:
             conn.execute(text(f"SET LOCAL statement_timeout = {self._timeout_ms}"))
             if (
                 verified is not None
@@ -425,6 +459,9 @@ class ActionService:
                 if validated is not None and spec is not None
                 else self._minimizer().unvalidated(conn, agent.tenant_id, req.args)
             )
+            if assessment is not None and assessment.facts:
+                # C3: what the content assessment established (digests / shas, never content)
+                intent_args = {**intent_args, "assessment": profile_value(dict(assessment.facts))}
             events = _tx1_events(
                 agent,
                 req,
@@ -525,6 +562,16 @@ def _binding(
         delegation_id=ok.delegation_id if (ok := _verified(resolved)) else None,
         delegation_hash=ok.token_hash if ok else None,
     ).digest()
+
+
+def _approver_role(spec: ToolSpec | None, assessment: Assessment | None = None) -> str:
+    """C2: a connector action's approvals go to the role its classification names; C3: a
+    content finding (e.g. a CRITICAL path in a diff) names its own role (security)."""
+    if assessment is not None and assessment.approver_role:
+        return assessment.approver_role
+    if isinstance(spec, ConnectorToolSpec) and spec.binding and spec.binding.entry:
+        return spec.binding.entry.approver_role
+    return "approver"
 
 
 def _verified(resolved: Resolved | None) -> Resolved | None:

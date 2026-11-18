@@ -1,0 +1,6 @@
+seed = 1  # no randomness; kept for the harness convention
+kill_reps = 10
+partition_requests = 10
+partition_seconds = 8
+client_timeout_seconds = 3
+test_reps = 3

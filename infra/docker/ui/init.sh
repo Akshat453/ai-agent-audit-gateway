@@ -59,6 +59,11 @@ then
   python -m agw_worker.anchoring.admin deploy --rpc http://anvil:8545 --owner-key-file "$S/anchor-owner.key" --out "$S/deployment.json" >/dev/null
 fi
 . /app/infra/docker/ui/env.sh   # picks up AGW_ANCHOR_CONTRACT
+if [ "${AGW_UI_SEED_DEMO:-1}" != "1" ]; then
+  rm -f "$S/mcp-client.token"
+  echo "ui-init done: database agw_ui, no demo tenant (AGW_UI_SEED_DEMO=0): create one on /signup"
+  exit 0
+fi
 AGW_DEMO_APPROVER_PASSWORD="$AGW_UI_DEMO_PASSWORD" python -m agw_gateway.admin seed-demo >/dev/null
 python -m agw_worker.anchoring.admin register --tenant demo --owner-key-file "$S/anchor-owner.key" >/dev/null
 python -m agw_worker.anchoring.admin trust-config --tenant demo --deployment "$S/deployment.json" \

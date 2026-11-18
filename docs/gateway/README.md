@@ -3,7 +3,7 @@
 Status: **Phase 0 (design), Phase 1 (core gateway), Phase 2 (flight recorder), Phase 3
 (Merkle epochs + offline verifier), Phase 4 (risk engine + risk-adaptive sealing), Phase 5
 (action-bound human approval) and Phase 6 (blockchain anchoring, on Anvil; Base Sepolia pending a
-funded key) Phase 7 (encryption, key management, selective disclosure) Phase 8 (agent integrations: SDK, LangGraph, MCP; delegation tokens; containment) and Phase 9 (audit dashboard, monitoring evidence stream, reconciliation) implemented,
+funded key) Phase 7 (encryption, key management, selective disclosure) Phase 8 (agent integrations: SDK, LangGraph, MCP; delegation tokens; containment) Phase 9 (audit dashboard, monitoring evidence stream, reconciliation) and Phase 10 (evaluation RQ1–RQ7, ablations, hardening, CI) implemented, plus C1 (coding-agent integration API, `agw` CLI) and C2 (connectors, Integrations page, device enrollment, MCP sign-in, `agw login/init/doctor`; 2026-11-18) and C3 (GitHub dev-tools through the gateway, server-side `git_submit_change`, the "AgentGuard evidence" check; 2026-11-18; owner steps in [github-app-setup.md](github-app-setup.md)),
 2026-11-16.** Per-phase records: [phases/](phases/).
 Phase numbers follow the phase prompts, which differ from [13-roadmap.md](13-roadmap.md) (see
 the note there).
@@ -41,8 +41,11 @@ separate responsibilities. The documents keep them apart deliberately:
 | 13 | [13-roadmap.md](13-roadmap.md) | Phases 1–10, scope and exit criteria |
 | 14 | [14-phase-1-handoff.md](14-phase-1-handoff.md) | **The Phase 1 backlog**: tables, endpoints, demo tools, auth, ordered tasks |
 | 15 | [15-glossary.md](15-glossary.md) | One definition per term |
+| — | [coding-agents.md](coding-agents.md) | C1: coding-agent hook capabilities (Claude Code, Codex, Cursor, Gemini CLI, MCP), the `agw` CLI, the coding policy summary, per-agent limitations |
+| 16 | [16-dashboard-design.md](16-dashboard-design.md) | Phase 9.5 AgentGuard Console: visual system, layout, pages, signature evidence views, UX + accessibility rules |
 | — | [adr/](adr/README.md) | Architecture Decision Records (locked decisions; change only via a new ADR) |
 | — | [phases/](phases/) | One document per implemented phase: what changed, decisions, work done, gaps |
+| — | [research/results.md](research/results.md) | Phase 10 evaluation (RQ1–RQ7): setup, results with backing artifacts, threats to validity, non-claims; [research/hardening.md](research/hardening.md) |
 
 ## Sources
 

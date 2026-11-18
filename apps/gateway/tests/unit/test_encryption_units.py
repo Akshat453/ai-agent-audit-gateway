@@ -90,10 +90,10 @@ def test_hpke_sealed_dek_only_opens_for_its_event_grant_and_recipient() -> None:
         env.disclosure_info("acme", b"h" * 16, E1, kid),  # another grant
         env.disclosure_info("acmf", b"g" * 16, E1, kid),  # another tenant
     ):
-        with pytest.raises(Exception):  # noqa: B017 - InvalidTag from HPKE
+        with pytest.raises(Exception):
             env.open_from_sender(sealed, priv, wrong)
     other = X25519PrivateKey.generate().private_bytes_raw()
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(Exception):
         env.open_from_sender(sealed, other, info)
     assert len(kid) == 32 and kid == vdisc.key_id(pub)
 
@@ -196,4 +196,4 @@ def test_verifier_core_has_no_crypto_import() -> None:
         "import sys, agw_verifier.cli, agw_verifier.epochs, agw_verifier.anchor; "
         "assert 'cryptography' not in sys.modules, 'eager import'"
     )
-    subprocess.run(["python", "-c", code], check=True)  # noqa: S607
+    subprocess.run(["python", "-c", code], check=True)

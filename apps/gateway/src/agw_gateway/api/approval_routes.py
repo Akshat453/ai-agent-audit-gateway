@@ -13,13 +13,16 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 
 from agw_gateway.api.state import GatewayState
 from agw_gateway.auth import AuthenticationFailed
 from agw_gateway.db import tables as t
-from agw_gateway.execution.errors import AgentNotPermitted
+from agw_gateway.execution.errors import AgentNotPermitted, Conflict, NotFound
 from agw_gateway.humans import AuthenticatedHuman, HumanAuthFailed
+from agw_gateway.humans.service import hash_password
+from agw_gateway.ids import uuid7
 
 router = APIRouter(prefix="/v1")
 
@@ -83,6 +86,64 @@ async def login(request: Request, body: LoginRequest) -> dict[str, Any]:
         "session_token": issued.token,
         "expires_at": issued.expires_at.isoformat().replace("+00:00", "Z"),
     }
+
+
+class SignupRequest(_Body):
+    organization: str = Field(min_length=1, max_length=200)
+    tenant: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{2,62}$")
+    username: str = Field(pattern=r"^[a-z0-9][a-z0-9._-]{0,63}$")
+    password: str = Field(min_length=12, max_length=1024)
+
+
+# The first person of a new tenant can do everything; they invite others from People.
+SIGNUP_ROLES = ("admin", "approver", "auditor", "maintainer", "security")
+
+
+@router.get("/auth/signup")
+def signup_status(request: Request) -> dict[str, bool]:
+    """Whether self-service sign-up is enabled (dev/test only). Public, no secrets."""
+    return {"enabled": _state(request).settings.signup_enabled}
+
+
+@router.post("/auth/signup", status_code=201)
+async def signup(request: Request, body: SignupRequest) -> dict[str, Any]:
+    """Create a NEW tenant and its first admin, then sign in. Never touches an existing
+    tenant (409). Disabled unless ``AGW_SIGNUP_ENABLED`` (dev/test only): 404."""
+    state = _state(request)
+    if not state.settings.signup_enabled:
+        raise NotFound
+    await run_in_threadpool(_create_tenant, state, body)
+    issued = await run_in_threadpool(state.humans.login, body.tenant, body.username, body.password)
+    return {
+        "tenant": body.tenant,
+        "username": body.username,
+        "token_type": "Session",
+        "session_token": issued.token,
+        "expires_at": issued.expires_at.isoformat().replace("+00:00", "Z"),
+    }
+
+
+def _create_tenant(state: GatewayState, body: SignupRequest) -> None:
+    with state.engine.begin() as conn:
+        taken = conn.execute(
+            select(t.tenants.c.tenant_id).where(t.tenants.c.tenant_id == body.tenant)
+        ).first()
+        if taken is not None:
+            raise Conflict
+        try:
+            conn.execute(
+                text("SELECT agw_signup_tenant(:t, :d, :h, :u, :r, :p)"),
+                {
+                    "t": body.tenant,
+                    "d": body.organization,
+                    "h": uuid7(),
+                    "u": body.username,
+                    "r": list(SIGNUP_ROLES),
+                    "p": hash_password(body.password),
+                },
+            )
+        except IntegrityError:  # a concurrent sign-up for the same tenant id
+            raise Conflict from None
 
 
 @router.get("/auth/me")

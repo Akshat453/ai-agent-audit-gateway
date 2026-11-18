@@ -7,6 +7,7 @@ import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import timedelta
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -15,19 +16,30 @@ from sqlalchemy import Engine
 from agw_gateway import __version__
 from agw_gateway.anchoring import AnchorGate, Finality, GatePolicy
 from agw_gateway.api.approval_routes import router as approval_router
+from agw_gateway.api.c2_routes import router as c2_router
+from agw_gateway.api.coding_routes import coding_router
+from agw_gateway.api.console_routes import router as console_router
 from agw_gateway.api.dashboard_routes import router as dashboard_router
 from agw_gateway.api.delegation_routes import router as delegation_router
 from agw_gateway.api.disclosure_routes import router as disclosure_router
 from agw_gateway.api.errors import install_error_handlers, unexpected_error_response
+from agw_gateway.api.limits import BodySizeLimit, RateLimit
+from agw_gateway.api.mcp_routes import router as mcp_router
 from agw_gateway.api.routes import router
 from agw_gateway.api.state import GatewayState
 from agw_gateway.approvals.service import ApprovalConfig, ApprovalService
 from agw_gateway.approvals.signing import DecisionSigner, SigningKeyUnavailable
 from agw_gateway.auth import Authenticator
 from agw_gateway.auth.exchange import TokenExchange
+from agw_gateway.coding.policy import CodingPolicy
+from agw_gateway.coding.repos import RepoService
+from agw_gateway.coding.service import CodingService
 from agw_gateway.config import Settings, get_settings
+from agw_gateway.connectors.service import ConnectorService
+from agw_gateway.connectors.tools import ConnectorTools
 from agw_gateway.db import create_db_engine
 from agw_gateway.delegation.service import DelegationService, load_delegation_signer
+from agw_gateway.enrollment import EnrollmentService
 from agw_gateway.evidence import EvidenceWriter
 from agw_gateway.evidence.blobs import BlobStore, S3BlobStore
 from agw_gateway.evidence.payloads import EncryptedPayloadStore, NoPayloadStore, PayloadStore
@@ -37,10 +49,13 @@ from agw_gateway.execution.manual_reconcile import ManualReconciliation
 from agw_gateway.execution.reconciler import Reconciler
 from agw_gateway.execution.runner import BackgroundRunner
 from agw_gateway.execution.service import ActionService
+from agw_gateway.github import actions as github_actions
+from agw_gateway.github.checks import CHECKS, GithubChecks
 from agw_gateway.humans import HumanAuthenticator
 from agw_gateway.ids import uuid7
 from agw_gateway.keys import KeyProvider, KeyUnavailable, LocalKeyProvider, VaultTransitKeyProvider
 from agw_gateway.logs import configure_logging, log
+from agw_gateway.mcp_remote.oauth import OAuthServer
 from agw_gateway.privacy.cipher import EnvelopeCipher
 from agw_gateway.privacy.disclosure import DisclosureService
 from agw_gateway.privacy.minimize import Minimizer
@@ -104,6 +119,7 @@ def load_blob_store(settings: Settings) -> S3BlobStore | None:
         secret_key=settings.blob_secret_key.get_secret_value(),
         bucket=settings.blob_bucket,
         secure=settings.blob_secure,
+        timeout_seconds=settings.blob_timeout_seconds,
     )
 
 
@@ -122,6 +138,11 @@ def build_state(
     )
     registry = registry or ToolRegistry([*demo_tool_specs(), *external_tool_specs(settings)])
     crash = crash or CrashPoints(settings.env)
+    coding_policy = (
+        CodingPolicy(settings.coding_policy_file.read_bytes())
+        if settings.coding_policy_file is not None
+        else CodingPolicy.bundled(settings.coding_policy_profile)
+    )
     provider = load_key_provider(settings) if key_provider is None else key_provider
     blobs = load_blob_store(settings) if blob_store is None else blob_store
     payloads: PayloadStore = (
@@ -131,7 +152,12 @@ def build_state(
     )
     cipher = EnvelopeCipher(provider) if provider is not None else None
     minimizer = Minimizer(provider) if provider is not None else None
-    writer = EvidenceWriter(payloads)
+    # Phase 10 ablation (ADR-0032), dev/test only: C1 no evidence, C2 unlinked records,
+    # C3+ the hash chain; approvals enforced and CRITICAL pre-anchored only in C6.
+    ab = settings.ablation
+    writer = EvidenceWriter(
+        payloads, mode="none" if ab == "C1" else "records" if ab == "C2" else "chain"
+    )
     encrypted = payloads if isinstance(payloads, EncryptedPayloadStore) else None
     disclosure = (
         DisclosureService(
@@ -180,7 +206,7 @@ def build_state(
             r.nudge()
 
     gate_policy = GatePolicy(
-        rules=frozenset(settings.pre_anchor_rules),
+        rules=frozenset(settings.pre_anchor_rules if ab in (None, "C6") else ()),
         timeout_seconds=settings.critical_anchor_timeout_seconds,
     )
     anchor_gate = AnchorGate(
@@ -243,8 +269,41 @@ def build_state(
         cipher=cipher,
         minimizer=minimizer,
         delegations=delegations,
+        no_approvals=ab is not None and ab != "C6",
         approval_config=approval_config,
     )
+    connectors = ConnectorService(
+        engine=engine,
+        writer=writer,
+        cipher=cipher,
+        step_up_window_seconds=settings.step_up_window_seconds,
+        gateway_url=settings.public_url,
+        dashboard_url=settings.coding_dashboard_url,
+        settings_view={
+            "chain_id": settings.anchor_chain_id,
+            "contract": settings.anchor_contract,
+            "rpc_host": _rpc_host(settings),
+            "finality": settings.anchor_finality,
+            "explorer": settings.anchor_explorer_tx_url,
+        },
+    )
+    repos = RepoService(
+        engine=engine, writer=writer, step_up_window_seconds=settings.step_up_window_seconds
+    )
+    # C3 (ADR-0036): the GitHub connector's process-wide hooks.
+    github_actions.OVERLAY_LOOKUP[0] = repos.overlay_for
+    github_actions.POLICY[:] = [coding_policy]  # the hook and the submit use ONE policy
+    github_actions.CLONE_ROOT[0] = (
+        settings.github_clone_root if settings.env in ("dev", "test") else None
+    )
+    github_checks = GithubChecks(
+        engine=engine, connectors=connectors, dashboard=settings.coding_dashboard_url
+    )
+    CHECKS[:] = [github_checks]
+    if runner is not None:
+        runner.add_periodic(settings.github_poll_seconds, github_checks.poll_once)
+    if registry.dynamic is None:  # C2: connector actions resolve per tenant at runtime
+        registry.dynamic = ConnectorTools(engine, connectors)
     return GatewayState(
         settings=settings,
         engine=engine,
@@ -271,7 +330,44 @@ def build_state(
         reconciliation=ManualReconciliation(engine, writer),
         writer=writer,
         exchange=TokenExchange(engine, timedelta(seconds=settings.exchange_token_ttl_seconds)),
+        coding=CodingService(
+            engine=engine,
+            writer=writer,
+            approvals=approvals,
+            approval_config=approval_config,
+            policy=coding_policy,
+            dashboard_url=settings.coding_dashboard_url,
+            build_commit=build_commit,
+            max_diff_bytes=settings.coding_max_diff_bytes,
+            cipher=cipher,
+            overlay_lookup=repos.overlay_for,
+        ),
+        connectors=connectors,
+        repos=repos,
+        github_checks=github_checks,
+        enrollment=EnrollmentService(
+            engine=engine,
+            writer=writer,
+            verification_uri=f"{settings.coding_dashboard_url.rstrip('/')}/enroll",
+            ttl_seconds=settings.device_code_ttl_seconds,
+        ),
+        oauth=OAuthServer(
+            engine=engine,
+            writer=writer,
+            issuer=settings.public_url,
+            dashboard_url=settings.coding_dashboard_url,
+            http=connectors.http,
+            access_ttl=settings.mcp_access_token_ttl_seconds,
+            refresh_ttl=settings.mcp_refresh_token_ttl_seconds,
+        ),
     )
+
+
+def _rpc_host(settings: Settings) -> str | None:
+    """Host only: an RPC URL may embed a provider API key."""
+    if settings.anchor_rpc_url is None:
+        return None
+    return urlsplit(settings.anchor_rpc_url.get_secret_value()).hostname
 
 
 def create_app(state: GatewayState | None = None, *, sync_registry: bool = True) -> FastAPI:
@@ -308,6 +404,10 @@ def create_app(state: GatewayState | None = None, *, sync_registry: bool = True)
     app.include_router(approval_router)
     app.include_router(disclosure_router)
     app.include_router(delegation_router)
+    app.include_router(coding_router)  # C1 coding-agent integration (ADR-0034)
+    app.include_router(c2_router)  # C2 connectors, enrollment, repos (ADR-0035)
+    app.include_router(mcp_router)  # C2 remote MCP + OAuth
+    app.include_router(console_router)  # Phase 9.5 read-only views (ADR-0033)
     app.include_router(dashboard_router)
 
     @app.get("/metrics", include_in_schema=False)
@@ -349,4 +449,11 @@ def create_app(state: GatewayState | None = None, *, sync_registry: bool = True)
         )
         return response
 
+    # Phase 10 hardening: outermost layers, before routing/auth/body parsing (api/limits.py).
+    app.add_middleware(BodySizeLimit, max_bytes=state.settings.max_body_bytes)
+    app.add_middleware(
+        RateLimit,
+        per_minute=state.settings.rate_limit_per_minute,
+        burst=state.settings.rate_limit_burst,
+    )
     return app

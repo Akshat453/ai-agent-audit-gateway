@@ -1,24 +1,35 @@
-# docs/gateway/00 §9. CI never holds testnet keys.
+# docs/gateway/00 §9, Phase 10 (ADR-0032). CI never holds testnet keys or real secrets.
 name: ci
 on:
   pull_request:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      - run: uv run mypy apps/gateway/src apps/worker/src packages/gateway-sdk/src packages/schemas/src packages/verifier/src
+      - run: >
+          uv run mypy apps/gateway/src apps/worker/src packages/gateway-sdk/src
+          packages/schemas/src packages/verifier/src integrations/langgraph/src integrations/mcp/src packages/agw-cli/src
       - run: uv run lint-imports
 
   unit:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       matrix:
         python: ["3.12", "3.13"]
@@ -30,26 +41,103 @@ jobs:
       - run: uv sync --frozen
       - run: uv run pytest -m "(unit or property) and not e2e"
 
+  # Testcontainers (Postgres 16, MinIO, Vault, Anvil) need Docker: ubuntu runners have it.
   integration-and-coverage:
-    runs-on: ubuntu-latest  # Docker available for Testcontainers
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen
       - run: uv run pytest --cov --cov-report=term
-      - name: coverage gate (policies, auth, tools, execution >= 85%)
-        run: >
-          uv run coverage report --fail-under=85
-          --include='*/agw_gateway/policies/*,*/agw_gateway/auth/*,*/agw_gateway/tools/*,*/agw_gateway/execution/*'
+      - name: coverage gates (same as `make test`)
+        run: |
+          uv run coverage report --fail-under=85 --include='*/agw_gateway/policies/*,*/agw_gateway/auth/*,*/agw_gateway/tools/*,*/agw_gateway/execution/*,*/agw_gateway/approvals/*,*/agw_gateway/humans/*,*/agw_gateway/anchoring/*,*/agw_worker/anchoring/*,*/agw_gateway/privacy/*,*/agw_gateway/keys/*,*/agw_gateway/delegation/*,*/agw_sdk/*,*/agw_langgraph/*,*/agw_mcp/*'
+          uv run coverage report --fail-under=100 --include='*/agw_gateway/risk/*'
 
-  vectors-and-verifier-isolation:
+  # Smart contract: Foundry tests in the pinned image + the committed artifact equals a build.
+  contracts:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: make contracts-test
+      - run: make contracts-check
+
+  # The frozen vectors, checked by BOTH implementations: the producer (agw_schemas /
+  # agw_gateway) and the independent verifier (agw_verifier), plus the verifier's isolation.
+  vectors-both-implementations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen
       - run: make vectors
+      - name: producer side
+        run: uv run pytest -q packages/schemas/tests apps/gateway/tests/unit/test_merkle.py
+      - name: independent verifier side
+        run: uv run pytest -q packages/verifier/tests
       - run: make verify-isolated
+
+  # End-to-end smoke: the compose stack, migrations, the single-agent demo (seal, anchor on
+  # Anvil, offline verification) and the dashboard's OpenAPI/type drift check.
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: make up
+      - run: make migrate
+      - run: make demo
+      - run: make dashboard-check
+      - if: always()
+        run: docker compose logs --no-color --tail=200
+      - if: always()
+        run: make down
+
+  # Phase 9.5 (ADR-0033): the dashboard against a real gateway + seeded tenant, production
+  # build: auth, approvals (dialogs, CRITICAL step-up), CSRF/XSS, console behaviour, CSP
+  # contract, and axe in light AND dark.
+  dashboard-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: make up
+      - run: make migrate
+      - run: cd apps/dashboard && npm ci --no-audit --no-fund && npx playwright install --with-deps chromium
+      - run: make dashboard-e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-e2e-results
+          path: apps/dashboard/e2e/.results
+          retention-days: 7
+      - if: always()
+        run: make down
+
+  dependency-and-code-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: uv sync --frozen
+      - run: make hardening-ci
 
   secrets-scan:
     runs-on: ubuntu-latest

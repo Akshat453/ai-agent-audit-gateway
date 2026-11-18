@@ -20,6 +20,7 @@ import argparse
 import getpass
 import json
 import os
+import re
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
@@ -222,6 +223,39 @@ def create_integration_client(engine: Engine, tenant_id: str, name: str, audienc
     return token
 
 
+def create_device_key(
+    engine: Engine,
+    tenant_id: str,
+    developer: str,
+    label: str,
+    expires_in: timedelta | None = None,
+) -> str:
+    """C1 (ADR-0034): issue a per-developer coding device key (printed once).
+
+    A device key is an agent credential with only the ``coding:device`` scope (it cannot call
+    any gateway tool), bound in ``coding_devices`` to the developer (a human) it acts for.
+    """
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", label):
+        raise SystemExit("label must match [A-Za-z0-9._-]{1,64}")
+    with engine.connect() as conn:
+        developer_id = conn.execute(
+            select(t.humans.c.human_id).where(
+                t.humans.c.tenant_id == tenant_id, t.humans.c.username == developer
+            )
+        ).scalar_one_or_none()
+    if developer_id is None:
+        raise SystemExit(f"unknown developer {tenant_id}/{developer} (create-human first)")
+    name = f"device:{developer}:{label}"
+    agent_id = ensure_agent(engine, tenant_id, name, ("coding:device",))
+    with engine.begin() as conn:
+        conn.execute(
+            insert(t.coding_devices)
+            .values(agent_id=agent_id, tenant_id=tenant_id, developer_id=developer_id, label=label)
+            .on_conflict_do_nothing()
+        )
+    return create_key(engine, tenant_id, name, expires_in)
+
+
 def revoke_key(engine: Engine, key_id: str) -> bool:
     with engine.begin() as conn:
         n = conn.execute(
@@ -369,6 +403,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     gd = sub.add_parser("gen-delegation-key", help="write a dev Ed25519 delegation-signing key")
     gd.add_argument("--out", required=True)
     gd.add_argument("--if-missing", action="store_true")
+    dk = sub.add_parser("create-device-key", help="C1 coding device key for a developer (once)")
+    dk.add_argument("--tenant", required=True)
+    dk.add_argument("--developer", required=True, help="the developer's human username")
+    dk.add_argument("--label", required=True, help="device label, e.g. laptop")
+    dk.add_argument("--expires-days", type=int, default=None)
     ch = sub.add_parser("create-human", help="create/reset an approver/auditor/admin (no agent)")
     ch.add_argument("--tenant", required=True)
     ch.add_argument("--username", required=True)
@@ -481,6 +520,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.cmd == "create-agent-key":
             expires = timedelta(days=args.expires_days) if args.expires_days else None
             print(create_key(engine, args.tenant, args.agent, expires, args.audience))
+        elif args.cmd == "create-device-key":
+            expires = timedelta(days=args.expires_days) if args.expires_days else None
+            print(create_device_key(engine, args.tenant, args.developer, args.label, expires))
         elif args.cmd == "agent-id":
             with engine.connect() as conn:
                 print(

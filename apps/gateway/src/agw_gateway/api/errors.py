@@ -31,6 +31,7 @@ MESSAGES: Final[dict[str, str]] = {
     "METHOD_NOT_ALLOWED": "Method not allowed.",
     "IDEMPOTENCY_KEY_REUSED": "Idempotency-Key was used with a different request body.",
     "PAYLOAD_TOO_LARGE": "Request body too large.",
+    "RATE_LIMITED": "Too many requests; retry after the Retry-After interval.",
     "EVENT_NOT_SEALED": "The event is not sealed into an epoch yet; retry later.",
     "REQUEST_INVALID": "Request envelope is invalid.",
     "DEPENDENCY_UNAVAILABLE": "A required dependency is unavailable. Nothing was executed.",
@@ -70,6 +71,13 @@ MESSAGES: Final[dict[str, str]] = {
     # Phase 9 (ADR-0031)
     "STEP_UP_REQUIRED": "Re-authenticate (step-up) before approving an action of this risk.",
     "RECONCILE_INVALID": "Only an OUTCOME_UNKNOWN action can be reconciled, once.",
+    # C1 (ADR-0034)
+    "CODING_DEVICE_REQUIRED": "This credential is not a registered coding device key.",
+    "CODING_SESSION_CLOSED": "The coding session has ended; start a new session.",
+    # C2 (ADR-0035)
+    "CONFLICT": "The resource already exists.",
+    "SSRF_BLOCKED": "The outbound request was refused by the network policy.",
+    "AUTHORIZATION_PENDING": "The device authorization is still pending.",
 }
 
 

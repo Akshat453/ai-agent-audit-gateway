@@ -1,0 +1,4 @@
+tool,status,packages,findings,detail
+pip-audit@2.9.0,OK,138,0,
+npm audit,OK,,0,
+bandit@1.8.3,OK,,30,"{""LOW"": 30} | "

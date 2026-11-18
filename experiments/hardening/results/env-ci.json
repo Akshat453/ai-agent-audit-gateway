@@ -1,0 +1,12 @@
+{
+ "captured_at": "2026-11-16T13:08:51.363563+00:00",
+ "cpu": "Apple M2",
+ "cpu_count": 8,
+ "docker": "29.2.0",
+ "git_commit": "dad55bc0842739f80626f131248ad3ed94e84062",
+ "git_dirty": true,
+ "os": "Darwin 25.2.0 (arm64)",
+ "postgres_image": "postgres:16",
+ "python": "3.13.2",
+ "ram_bytes": 17179869184
+}

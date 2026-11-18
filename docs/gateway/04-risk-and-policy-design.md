@@ -13,6 +13,15 @@ Status: Accepted (Phase 0). ADRs: 0001 (deny by default), 0002 (deterministic po
 > kept for records written before Phase 4. Sources: Paper A §5 (*Risk-based evidence selection*, Table 1),
 Paper B §III-B (policy evaluation field).
 
+> **C1 (implemented, ADR-0034).** Coding-agent actions use a **separate policy family**:
+> `coding-mintrail` v1 (`agw_gateway/coding/policies/coding-mintrail-v1.toml` + pure rule
+> modules). It is deterministic and has no LLM. It combines deny > ask > allow, max level, and
+> mandatory denies (secrets, network/exfiltration commands, diff content rules). Its digest is
+> recorded as `risk.cv = coding-policy-v1`. "ask" is a Phase 5 approval routed to a role
+> (`security` for CRITICAL, `ledger_lead` for `ledger/**`, else `maintainer`) and bound to the
+> coding action digest. The agent's identical retry consumes it once. Summary:
+> [coding-agents.md](coding-agents.md) §4.
+
 Risk and policy are **separate pure functions** with different jobs:
 
 | | Risk classifier | Policy engine |

@@ -29,6 +29,7 @@ from enum import StrEnum
 from typing import Any, Final, Literal
 
 from agw_gateway.auth.models import AuthenticatedAgent
+from agw_gateway.connectors.constraint import ConnectorConstraint
 from agw_gateway.delegation.constraint import DelegationConstraint
 from agw_gateway.policies.models import PolicyDocument, PolicyRule
 from agw_gateway.risk import RiskLevel, RiskResult
@@ -66,6 +67,14 @@ class ReasonCode(StrEnum):
     DELEGATION_SCOPE_MISSING = "DELEGATION_SCOPE_MISSING"
     DELEGATION_TOOL_NOT_ALLOWED = "DELEGATION_TOOL_NOT_ALLOWED"
     DELEGATION_RISK_EXCEEDED = "DELEGATION_RISK_EXCEEDED"
+    # C2 (ADR-0035): connector classification.
+    CONNECTOR_ACTION_UNCLASSIFIED = "CONNECTOR_ACTION_UNCLASSIFIED"
+    CONNECTOR_DISABLED = "CONNECTOR_DISABLED"
+    CONNECTOR_AGENT_NOT_ALLOWED = "CONNECTOR_AGENT_NOT_ALLOWED"
+    CONNECTOR_ARG_CONSTRAINT = "CONNECTOR_ARG_CONSTRAINT"
+    CONNECTOR_ACTION_DENIED = "CONNECTOR_ACTION_DENIED"
+    CONNECTOR_REQUIRES_APPROVAL = "CONNECTOR_REQUIRES_APPROVAL"
+    CONNECTOR_CONTENT_DENIED = "CONNECTOR_CONTENT_DENIED"
 
 
 @dataclass(frozen=True)
@@ -80,6 +89,8 @@ class EvaluationInput:
     now: datetime  # approval expiry (Phase 5); unused by v2 rules
     # Phase 8: the resolved delegation chain the agent presented (None = direct call).
     delegation: DelegationConstraint | None = None
+    # C2: the classification of a connector action (None = not a connector tool).
+    connector: ConnectorConstraint | None = None
 
 
 @dataclass(frozen=True)
@@ -114,6 +125,9 @@ def _system_check(inp: EvaluationInput) -> tuple[str, ReasonCode] | None:
             return "SYS-DELEGATION-SCOPE", ReasonCode.DELEGATION_SCOPE_MISSING
         if inp.tool.tool_id not in d.tools:
             return "SYS-DELEGATION-TOOL", ReasonCode.DELEGATION_TOOL_NOT_ALLOWED
+    c = inp.connector
+    if c is not None and c.failure is not None:
+        return f"SYS-{c.failure.replace('_', '-')}", ReasonCode(c.failure)
     return None
 
 
@@ -158,7 +172,8 @@ def _level_default(
         if exempt:
             return "ALLOW", None, None
         return "REQUIRE_APPROVAL", "CAP-HIGH-APPROVAL", ReasonCode.HIGH_REQUIRES_APPROVAL
-    if any(r.critical_exception for r in matched):
+    c = inp.connector
+    if any(r.critical_exception for r in matched) or (c is not None and c.critical_exception):
         return (
             "REQUIRE_APPROVAL",
             "CAP-CRITICAL-EXCEPTION",
@@ -173,11 +188,16 @@ def evaluate(inp: EvaluationInput) -> Decision:
     failed = _system_check(inp)
     if failed is not None:
         rule_id, reason = failed
+        refs = (
+            (inp.connector.policy_ref, *inp.connector.content_rules)
+            if inp.connector is not None
+            else ()
+        )
         return Decision(
             effect="DENY",
             policy_id=policy.policy_id,
             policy_version=policy.version,
-            matched_rule_ids=(rule_id,),
+            matched_rule_ids=(rule_id, *refs),
             reasons=(reason,),
             risk=inp.risk,
             control_ids=inp.risk.control_ids,
@@ -206,6 +226,16 @@ def evaluate(inp: EvaluationInput) -> Decision:
         doc_effect, doc_reason = "REQUIRE_APPROVAL", ReasonCode.POLICY_REQUIRES_APPROVAL
     elif "ALLOW" in effects:
         doc_effect = "ALLOW"
+    elif (
+        inp.connector is not None
+        and inp.connector.critical_exception
+        and inp.risk.level is RiskLevel.CRITICAL
+    ):
+        # C3 (ADR-0036): a CRITICAL *content* finding on a connector action (e.g. a CI change in
+        # a submitted diff) is approvable by the routed role instead of the implicit default
+        # deny. Explicit DENY rules above still win; nothing here can produce ALLOW.
+        doc_effect, doc_reason = "REQUIRE_APPROVAL", ReasonCode.CONNECTOR_REQUIRES_APPROVAL
+        doc_ids.append("CX-CRITICAL-EXCEPTION")
     else:
         doc_effect, doc_reason = "DENY", ReasonCode.NO_MATCHING_ALLOW
         doc_ids.append("default-deny")
@@ -234,6 +264,13 @@ def evaluate(inp: EvaluationInput) -> Decision:
     if d is not None and _LEVELS.index(risk.level.name) > _LEVELS.index(d.max_risk):
         final, reasons = "DENY", [ReasonCode.DELEGATION_RISK_EXCEEDED]
         rule_ids.append("SYS-DELEGATION-RISK")
+    c = inp.connector
+    if c is not None:
+        rule_ids.append(c.policy_ref)  # the classification version that decided
+        rule_ids.extend(c.content_rules)  # C3: what the content assessment matched
+        if c.approval_always and final == "ALLOW":  # can only make it stricter
+            final, reasons = "REQUIRE_APPROVAL", [ReasonCode.CONNECTOR_REQUIRES_APPROVAL]
+            rule_ids.append("CX-APPROVAL-ALWAYS")
     return Decision(
         effect=final,
         policy_id=policy.policy_id,

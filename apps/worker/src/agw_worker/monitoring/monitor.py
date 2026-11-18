@@ -27,6 +27,7 @@ import hmac
 import io
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Final
 from uuid import UUID
@@ -120,6 +121,8 @@ class Monitor:
         self._writer = writer
         self._cfg = config
         self._http = http
+        # C3 (ADR-0036): called after each recorded report (e.g. the GitHub evidence check).
+        self.on_report: Callable[[TenantReport], object] | None = None
 
     # ---------------------------------------------------------------- loop entry points
     def tick(self) -> int:
@@ -174,6 +177,13 @@ class Monitor:
             sp.set_attribute("agw.result", rep.result)
         self._deliver(rep)
         MONITOR_RUNS.labels(rep.result).inc()
+        if self.on_report is not None:
+            try:
+                self.on_report(rep)
+            except Exception as exc:
+                logging.getLogger("agw.monitor").warning(
+                    "report hook failed: %s", type(exc).__name__
+                )
         return rep
 
     def _verify(self, tenant: str) -> TenantReport:

@@ -1,0 +1,1 @@
+{"tool_name":"Shell","tool_input":{"command":"npm test"},"tool_output":"{\"exitCode\":0,\"stdout\":\"All tests passed\"}","tool_use_id":"abc123","cwd":"/project","duration":5432,"model":"claude-opus-4-7-thinking-max","model_id":"claude-opus-4-7","model_params":[]}

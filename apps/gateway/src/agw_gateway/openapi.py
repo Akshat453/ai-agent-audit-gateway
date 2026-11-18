@@ -15,15 +15,29 @@ from fastapi import FastAPI
 
 from agw_gateway import __version__
 from agw_gateway.api.approval_routes import router as approval_router
+from agw_gateway.api.c2_routes import router as c2_router
+from agw_gateway.api.coding_routes import coding_router
+from agw_gateway.api.console_routes import router as console_router
 from agw_gateway.api.dashboard_routes import router as dashboard_router
 from agw_gateway.api.delegation_routes import router as delegation_router
 from agw_gateway.api.disclosure_routes import router as disclosure_router
+from agw_gateway.api.mcp_routes import router as mcp_router
 from agw_gateway.api.routes import router
 
 
 def schema() -> dict[str, object]:
     app = FastAPI(title="AI Agent Audit Gateway", version=__version__)
-    for r in (router, approval_router, disclosure_router, delegation_router, dashboard_router):
+    routers = (
+        router,
+        approval_router,
+        disclosure_router,
+        delegation_router,
+        console_router,
+        coding_router,
+        c2_router,
+        mcp_router,
+    )  # C1/C2 (ADR-0034, ADR-0035)
+    for r in (*routers, dashboard_router):
         app.include_router(r)
     return app.openapi()
 

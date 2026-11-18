@@ -531,6 +531,12 @@ def make_settings(app_url: str, tmp_path: Path, **overrides: Any) -> Any:
         # Production default is "*" (every CRITICAL action is pre-anchored, ADR-0028); tests
         # of other phases run without a chain, so they opt out. Phase 6 tests opt back in.
         "pre_anchor_rules": (),
+        # Phase 10: the rate limiter is ON by default in production; tests that issue bursts
+        # turn it off here, and test_limits.py turns it back on.
+        "rate_limit_per_minute": 0,
+        # C1-C3 tests exercise the approval machinery with the STRICT coding profile (v1);
+        # the default "balanced" profile has its own tests (test_coding_balanced*.py).
+        "coding_policy_profile": "strict",
     }
     values.update(overrides)
     return load_settings(**values)
