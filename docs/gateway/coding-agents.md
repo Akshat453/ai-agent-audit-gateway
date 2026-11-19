@@ -90,6 +90,11 @@ A post-action report with no authorized action becomes a `SECURITY_VIOLATION` (`
 
 ### Recommended hook configuration (until `agw init` generates it in C2)
 
+> **PATH:** `agw init` writes every hook as `PATH="$PATH:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin" agw hook …`.
+> Hooks run with the agent's environment, and an editor launched from the Dock/Finder often has no
+> `~/.local/bin` on PATH. A bare `agw` then fails (`agw: command not found`) and the fail-closed
+> PreToolUse hook blocks every tool call. The short forms below show only the `agw hook …` part.
+
 Claude Code (`managed-settings.json` with `allowManagedHooksOnly: true`, or `.claude/settings.json`):
 
 ```json

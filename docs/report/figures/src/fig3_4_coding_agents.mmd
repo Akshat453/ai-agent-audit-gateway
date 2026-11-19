@@ -1,0 +1,13 @@
+flowchart LR
+  subgraph L["Local path: every tool call"]
+    direction TB
+    AG("Coding agent") --> HK("agw hook") --> DE("Gateway decide")
+    DE --> OK("allow, recorded")
+    DE --> NO("deny, reason")
+    DE --> AS("ask: approval")
+  end
+  subgraph S["Submit path: only route to GitHub"]
+    direction TB
+    MT("MCP dev-tools") --> AP("Server-side apply") --> PU("Push, App token") --> CK("Evidence check")
+  end
+  L --> S

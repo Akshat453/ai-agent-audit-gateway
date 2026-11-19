@@ -1,0 +1,15 @@
+flowchart LR
+  subgraph P1["Record (in tx)"]
+    direction TB
+    C1("Capture event") --> C2("Canonical CBOR") --> C3("SHA-256 hash chain")
+  end
+  subgraph P2["Commit (worker)"]
+    direction TB
+    S1("Seal RFC 9162 epoch") --> S2("Anchor R_t, R_t-1") --> S3("Verify offline")
+  end
+  subgraph P3["Anchor states"]
+    direction TB
+    A1("PENDING") --> A2("SUBMITTED") --> A3("INCLUDED") --> A4("FINALIZED")
+  end
+  P1 --> P2
+  P2 --> P3

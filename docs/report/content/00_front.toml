@@ -1,0 +1,18 @@
+# Front matter text (Acknowledgement, Abstract, tools list). Edit freely; rebuild with build_report.py.
+
+acknowledgement = [
+  "I express my sincere gratitude to my guide, {GUIDE_NAME}, {GUIDE_DESIG}, for the guidance, encouragement and constructive feedback provided throughout this seminar work.",
+  "I am grateful to the {DEPARTMENT}, School of Technology, Pandit Deendayal Energy University, for providing the academic environment and facilities that made this work possible.",
+  "I also thank the faculty members and my peers for their suggestions and discussions, and my family for their constant support.",
+]
+
+abstract = [
+  "AI agents increasingly act on the world through tools: they run commands, change code and data, send messages and open pull requests. Two problems follow. An agent with tool access can perform unauthorised actions, including ones induced by prompt injection, and ordinary logs of what it did can be edited by an insider without detection. Two recent papers propose tamper-evident, blockchain-anchored evidence for agent actions, but neither enforces policy and one is not implemented.",
+  "This report presents AgentGuard, a risk-adaptive, tamper-evident security and audit gateway placed on the execution path between agents and their tools. Before any controlled tool runs, the gateway applies a deterministic deny-by-default policy, a versioned risk engine, and human approvals bound to an exact action digest with nonce, expiry and single use. Every lifecycle step is recorded as deterministic CBOR, chained with SHA-256, sealed into RFC 9162 Merkle epochs whose chained roots bind tenant, tree size and sequence range, and anchored on an EVM chain. Risk changes when evidence is sealed, never whether it is recorded; CRITICAL actions run only after their authorisation is anchored. Payloads are encrypted per event and disclosed selectively to auditors. Coding agents (Claude Code, Codex, Cursor, Gemini CLI) are governed through hooks, MCP and a GitHub App check that passes only for gateway-pushed commits, using the fictional MintRail payments monorepo as the test environment.",
+  "Measured results: zero unauthorised executions in 57 approval attacks and 26 prompt-injection runs; every tested tamper class detected given a trusted root at or after the attack; risk-adaptive sealing bounded unsealed time for high-risk events to one 1 s tick against about 300 s for fixed batching (simulated); and a median decision latency of 20.1 ms for the full system against 8.4 ms for authorisation alone with one agent, dominated by durable database writes. The main limitations are a single-machine evaluation, an untested public-testnet deployment and client-side coding-agent hooks; evidence proves integrity, not truth.",
+]
+
+tools = [
+  "Claude Code (Anthropic): drafting report text from the project documentation, and generating figures and tables from project data.",
+  "[add any other tools you used]",
+]

@@ -3,6 +3,7 @@ import "./globals.css";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
 
 import { AppShell, type ShellHealth } from "@/components/shell/app-shell";
@@ -34,8 +35,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const fonts = cn(GeistSans.variable, GeistMono.variable);
   const htmlClass = cn(fonts, p.theme === "dark" ? "dark" : "light", p.density === "compact" && "density-compact");
 
+  const path = (await headers()).get("x-pathname") ?? "";
+  const standalone = /^\/(login|signup)(\/|\?|$)/.test(path);
   let shell: ReactNode = null;
-  if (token) {
+  if (token && !standalone) {
     const gw = gatewayFor(token);
     const repos = ((await gw.GET("/v1/dashboard/repo-choices")).data ?? []) as { repo_id: string; name: string; sessions: number }[];
     const scoped = repos.find((r) => r.repo_id === p.repo)?.repo_id; // ADR-0040

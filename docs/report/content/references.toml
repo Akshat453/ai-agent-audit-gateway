@@ -1,0 +1,65 @@
+# References, IEEE-like style. Listed and numbered in alphabetical order of the first author
+# (or organisation). Cited in the chapters as [@key]. Only sources identifiable from the repository
+# (docs/gateway/**, the two papers in docs/gateway/papers/) are listed.
+
+[anthropic2026hooks]
+sort = "Anthropic"
+text = "Anthropic, \"Hooks reference,\" *Claude Code Docs*, 2026. [Online]. Available: https://code.claude.com/docs/en/hooks (accessed 18 Nov. 2026)."
+
+[barnes2022]
+sort = "Barnes"
+text = "R. Barnes, K. Bhargavan, B. Lipp and C. Wood, \"Hybrid Public Key Encryption,\" RFC 9180, IETF, Feb. 2022. [Online]. Available: https://www.rfc-editor.org/rfc/rfc9180"
+
+[bindschaedler2026]
+sort = "Bindschaedler"
+text = "L. Bindschaedler, Q. Botha and C. Siebenbrunner, \"Agent Flight Recorder: Tamper-Evident Audit Trails with On-Chain Anchoring for Long-Horizon Tool-Using Agents,\" arXiv:2609.01931v1, Sep. 2026. [Online]. Available: https://arxiv.org/abs/2609.01931"
+
+[bormann2020]
+sort = "Bormann"
+text = "C. Bormann and P. Hoffman, \"Concise Binary Object Representation (CBOR),\" RFC 8949, IETF, Dec. 2020. [Online]. Available: https://www.rfc-editor.org/rfc/rfc8949"
+
+[bromme2026]
+sort = "Bromme"
+text = "A. Brömme, \"A Black Box for Agentic Processes: Blockchain-Anchored Evidence for AI Agent Communication, Human Oversight, and GRC Audits,\" arXiv:2609.04017v1, Sep. 2026. [Online]. Available: https://arxiv.org/abs/2609.04017"
+
+[cursor2026hooks]
+sort = "Cursor"
+text = "Cursor, \"Hooks,\" *Cursor Docs*, 2026. [Online]. Available: https://cursor.com/docs/hooks (accessed 18 Nov. 2026)."
+
+[denniss2019]
+sort = "Denniss"
+text = "W. Denniss, J. Bradley, M. Jones and H. Tschofenig, \"OAuth 2.0 Device Authorization Grant,\" RFC 8628, IETF, Aug. 2019. [Online]. Available: https://www.rfc-editor.org/rfc/rfc8628"
+
+[dworkin2007]
+sort = "Dworkin"
+text = "M. Dworkin, \"Recommendation for Block Cipher Modes of Operation: Galois/Counter Mode (GCM) and GMAC,\" NIST SP 800-38D, Nov. 2007. [Online]. Available: https://doi.org/10.6028/NIST.SP.800-38D"
+
+[google2026hooks]
+sort = "Google"
+text = "Google, \"Gemini CLI hooks,\" *GitHub: google-gemini/gemini-cli*, 2026. [Online]. Available: https://github.com/google-gemini/gemini-cli/tree/main/docs/hooks (accessed 18 Nov. 2026)."
+
+[jones2020]
+sort = "Jones 2020"
+text = "M. Jones, A. Nadalin, B. Campbell, J. Bradley and C. Mortimore, \"OAuth 2.0 Token Exchange,\" RFC 8693, IETF, Jan. 2020. [Online]. Available: https://www.rfc-editor.org/rfc/rfc8693"
+
+
+[josefsson2017]
+sort = "Josefsson"
+text = "S. Josefsson and I. Liusvaara, \"Edwards-Curve Digital Signature Algorithm (EdDSA),\" RFC 8032, IETF, Jan. 2017. [Online]. Available: https://www.rfc-editor.org/rfc/rfc8032"
+
+[laurie2021]
+sort = "Laurie"
+text = "B. Laurie, E. Messeri and R. Stradling, \"Certificate Transparency Version 2.0,\" RFC 9162, IETF, Dec. 2021. [Online]. Available: https://www.rfc-editor.org/rfc/rfc9162"
+
+[mcp2026]
+sort = "Model Context Protocol"
+text = "Model Context Protocol, \"Specification, revision 2026-07-28,\" 2026. [Online]. Available: https://modelcontextprotocol.io/specification/2026-07-28"
+
+[openai2026hooks]
+sort = "OpenAI"
+text = "OpenAI, \"Codex hooks,\" *OpenAI Developers*, 2026. [Online]. Available: https://developers.openai.com/codex/hooks (accessed 18 Nov. 2026)."
+
+[rundgren2020]
+sort = "Rundgren"
+text = "A. Rundgren, B. Jordan and S. Erdtman, \"JSON Canonicalization Scheme (JCS),\" RFC 8785, IETF, Jun. 2020. [Online]. Available: https://www.rfc-editor.org/rfc/rfc8785"
+

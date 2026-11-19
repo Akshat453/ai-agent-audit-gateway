@@ -219,7 +219,10 @@ def test_existing_user_config_is_preserved_and_needs_confirmation(
     assert merged["permissions"] == user["permissions"]
     pre = merged["hooks"]["PreToolUse"]
     assert pre[0]["hooks"][0]["command"] == "./lint.sh"  # the user's hook stays first
-    assert pre[1]["hooks"][0]["command"] == "agw hook claude_code PreToolUse"
+    assert pre[1]["hooks"][0]["command"] == (
+        'PATH="$PATH:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin" '
+        "agw hook claude_code PreToolUse"
+    )  # works even when the editor's PATH lacks agw
     assert pre[1]["hooks"][0]["onFailure"] == "block" and pre[1]["hooks"][0]["timeout"] == 660
     md = (root / "AGENTS.md").read_text()
     assert md.startswith("# Team rules\n\nUse pytest.\n") and "agentguard:begin" in md
@@ -265,3 +268,17 @@ def test_unknown_agent_and_outside_repo(env: Path, monkeypatch: pytest.MonkeyPat
 
 def _unused(_: Any) -> None:
     return None
+
+
+def test_hook_command_survives_missing_path() -> None:
+    """Regression: editors launched from the Dock lack ~/.local/bin, so a bare `agw` was
+    "command not found" and the fail-closed PreToolUse hook blocked every tool call."""
+    from agw_cli.wiring import hook_command, is_hook_command
+
+    cmd = hook_command("claude_code", "PreToolUse")
+    assert "$HOME/.local/bin" in cmd and cmd.endswith("agw hook claude_code PreToolUse")
+    assert "/Users/" not in cmd  # committed config stays portable across machines
+    # Legacy bare entries written by older versions are still recognized (replaced/uninstalled).
+    assert is_hook_command("agw hook claude_code PreToolUse", "claude_code")
+    assert is_hook_command(cmd, "claude_code") and not is_hook_command(cmd, "cursor")
+    assert not is_hook_command("./lint.sh")

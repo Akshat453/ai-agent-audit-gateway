@@ -1,0 +1,23 @@
+stateDiagram-v2
+  direction TB
+  state "REQUESTED" as REQ
+  state "POLICY EVALUATED" as EVAL
+  state "DENIED" as DEN
+  state "APPROVAL REQUIRED" as APR
+  state "AUTHORIZED" as AUT
+  state "DISPATCHED" as DIS
+  state "COMPLETED" as COM
+  state "FAILED" as FAI
+  state "OUTCOME UNKNOWN" as UNK
+  state "RECONCILED" as REC
+  [*] --> REQ
+  REQ --> EVAL
+  EVAL --> DEN: DENY
+  EVAL --> APR: REQUIRE_APPROVAL
+  EVAL --> AUT: ALLOW
+  APR --> AUT: granted
+  AUT --> DIS: outbox job
+  DIS --> COM
+  DIS --> FAI
+  DIS --> UNK: crash
+  UNK --> REC: human

@@ -6,7 +6,33 @@ import { NextRequest, NextResponse } from "next/server";
  * no eval (production), no third-party origins. The page never needs connect-src beyond
  * 'self': the browser talks only to this dashboard, never to the gateway.
  */
+const SESSION_COOKIE = "__Host-agw_session";
+
+/** A top-level navigation that arrives from another site (GitHub after "Create GitHub App" or
+ *  "Install") carries no SameSite=Strict session cookie, so the page would send the admin to the
+ *  login screen. Answer it once with a script-free same-site hop to the same URL: the browser
+ *  then sends the cookie, and a signed-out user still lands on /login as before. */
+function sameSiteBounce(request: NextRequest): NextResponse | null {
+  if (request.method !== "GET") return null;
+  if (request.headers.get("sec-fetch-site") !== "cross-site") return null;
+  if (request.headers.get("sec-fetch-mode") !== "navigate") return null;
+  if (request.cookies.has(SESSION_COOKIE)) return null;
+  const target = request.nextUrl.pathname + request.nextUrl.search;
+  const esc = target.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  const html = `<!doctype html><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta http-equiv="refresh" content="0;url=${esc}"><title>Continuing...</title><a href="${esc}">Continue</a>`;
+  return new NextResponse(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Content-Security-Policy": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    },
+  });
+}
+
 export function proxy(request: NextRequest) {
+  const bounce = sameSiteBounce(request);
+  if (bounce) return bounce;
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDev = process.env.NODE_ENV === "development";
   const https = request.nextUrl.protocol === "https:";
@@ -28,6 +54,7 @@ export function proxy(request: NextRequest) {
   ].join("; ");
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname + request.nextUrl.search);
   requestHeaders.set("Content-Security-Policy", csp);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);

@@ -1,6 +1,7 @@
 import "server-only";
 
 import createClient from "openapi-fetch";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import type { components, paths } from "@/lib/api/schema";
@@ -19,28 +20,35 @@ export function gatewayFor(token: string | null) {
   });
 }
 
+/** Redirect to /login and come back to the requested page afterwards. */
+export async function toLogin(): Promise<never> {
+  const here = (await headers()).get("x-pathname") ?? "/";
+  redirect(here.startsWith("/") && !here.startsWith("//") && here !== "/" && !here.startsWith("/login")
+    ? `/login?next=${encodeURIComponent(here)}` : "/login");
+}
+
 /** For pages: the typed client for the logged-in human, or a redirect to /login. */
 export async function gateway() {
   const token = await sessionToken();
-  if (!token) redirect("/login");
+  if (!token) return toLogin();
   return gatewayFor(token);
 }
 
 export async function me(): Promise<Schemas["DashboardConfig"]> {
   const { data, response } = await (await gateway()).GET("/v1/dashboard/config");
-  if (response.status === 401 || !data) redirect("/login");
+  if (response.status === 401 || !data) return toLogin();
   return data;
 }
 
 /** Untyped JSON from endpoints whose schema is free-form (the approval view). */
 export async function getJson<T>(path: string): Promise<{ status: number; body: T | null }> {
   const token = await sessionToken();
-  if (!token) redirect("/login");
+  if (!token) return toLogin();
   const r = await fetch(GATEWAY_URL + path, {
     headers: { Authorization: `Session ${token}` },
     cache: "no-store",
   });
-  if (r.status === 401) redirect("/login");
+  if (r.status === 401) return toLogin();
   return { status: r.status, body: r.ok ? ((await r.json()) as T) : null };
 }
 

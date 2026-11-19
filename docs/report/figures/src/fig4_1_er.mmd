@@ -1,0 +1,8 @@
+erDiagram
+  agents ||--o{ actions : requests
+  actions ||--o{ outbox_jobs : schedules
+  actions ||--o{ approvals : needs
+  actions ||--o{ evidence_events : records
+  evidence_events ||--o| evidence_payloads : encrypts
+  epochs ||--|{ evidence_events : seals
+  epochs ||--o| anchors : anchors

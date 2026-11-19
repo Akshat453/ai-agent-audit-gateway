@@ -23,7 +23,7 @@ from agw_cli.client import GatewayClient, GatewayRefused, GatewayUnavailable
 from agw_cli.config import ConfigError, load, read_file_config
 from agw_cli.detect import installed_agents, scan
 from agw_cli.normalize import find_repo_root, git_info
-from agw_cli.wiring import HOOK_PREFIX, SERVER_KEY, TIERS
+from agw_cli.wiring import HOOK_PATH_DIRS, HOOK_PREFIX, SERVER_KEY, TIERS, is_hook_command
 
 HOOK_FILES = {
     "claude_code": ".claude/settings.json",
@@ -92,7 +92,7 @@ def agent_checks(root: Path, kind: str, gateway: str) -> list[Check]:
         ours = [
             h
             for h in _hook_entries(doc, PRE_EVENT[kind])
-            if str(h.get("command", "")).startswith(f"{HOOK_PREFIX}{kind} ")
+            if is_hook_command(h.get("command"), kind)
         ]
         if not ours:
             checks.append(
@@ -284,12 +284,17 @@ def run(cwd: str | None = None) -> list[Check]:
     except (ConfigError, GatewayUnavailable, GatewayRefused, KeyError) as exc:
         client = None
         checks.append(Check("FAIL", "logged in", type(exc).__name__, "run: agw login"))
+    # Hooks search PATH plus HOOK_PATH_DIRS (see wiring.hook_command), so check the same places.
+    hook_path = os.pathsep.join(
+        [os.environ.get("PATH", "")] + [os.path.expandvars(p) for p in HOOK_PATH_DIRS]
+    )
+    agw_bin = shutil.which("agw", path=hook_path)
     checks.append(
         Check(
-            "OK" if shutil.which("agw") else "FAIL",
-            "agw on PATH",
-            shutil.which("agw") or "not found",
-            "" if shutil.which("agw") else "pipx install agw-cli (hooks call `agw`)",
+            "OK" if agw_bin else "FAIL",
+            "agw reachable by hooks",
+            agw_bin or "not found",
+            "" if agw_bin else "pipx install agw-cli (hooks call `agw`)",
         )
     )
     root = find_repo_root(cwd or os.getcwd())

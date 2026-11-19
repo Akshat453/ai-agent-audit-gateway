@@ -47,7 +47,7 @@ export default async function Consent({ searchParams }: { searchParams: Promise<
 
   return (
     <div className="mx-auto max-w-xl">
-      <PageHeader title="Allow access?" crumbs={[{ label: "Setup" }, { label: "Allow access" }]}
+      <PageHeader toggle={false} title="Allow access?" crumbs={[{ label: "Setup" }, { label: "Allow access" }]}
         description="A coding agent wants to use the gateway's MCP tools on your behalf." />
       {decisionError ? <Notice kind="bad">{ERRORS[decisionError] ?? `The gateway answered ${decisionError}. Nothing was shared.`}</Notice> : null}
       {!info ? (

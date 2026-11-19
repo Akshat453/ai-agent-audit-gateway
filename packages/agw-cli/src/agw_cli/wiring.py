@@ -2,9 +2,10 @@
 
 Ownership is by MARKERS, so init is idempotent and uninstall removes only what init added:
 
-* JSON configs: a hook entry is ours iff its command starts with ``agw hook``; an MCP server
-  entry is ours iff its key is ``agentguard``. Re-running init removes our entries and adds
-  fresh ones; everything else in the file is preserved byte-for-byte (key order kept).
+* JSON configs: a hook entry is ours iff its command is ``agw hook …`` (optionally behind our
+  PATH prefix); an MCP server entry is ours iff its key is ``agentguard``. Re-running init
+  removes our entries and adds fresh ones; everything else in the file is preserved
+  byte-for-byte (key order kept).
 * Text files (AGENTS.md, Codex ``config.toml``): a marked block
   ``agentguard:begin`` … ``agentguard:end`` updated in place.
 * Files init creates from scratch (``.agentguard.yaml``, ``.devcontainer/devcontainer.json``)
@@ -24,7 +25,29 @@ from pathlib import Path
 from typing import Any, Final
 
 AGENT_KINDS: Final = ("claude_code", "codex", "cursor", "gemini_cli", "vscode", "antigravity")
-HOOK_PREFIX: Final = "agw hook "
+HOOK_PREFIX: Final = "agw hook "  # ownership marker: matched anywhere in the command
+# Hook commands run under the agent's environment, not the user's login shell: an editor started
+# from the Dock/Finder often lacks ~/.local/bin (pipx/uv) or Homebrew on PATH, so a bare `agw`
+# fails with "command not found" and a fail-closed hook then blocks every tool call. Every hook
+# therefore appends the usual install locations to PATH itself. $HOME keeps the committed config
+# portable across machines (no user-specific absolute path).
+HOOK_PATH_DIRS: Final = ("$HOME/.local/bin", "/opt/homebrew/bin", "/usr/local/bin")
+HOOK_ENV: Final = 'PATH="$PATH:' + ":".join(HOOK_PATH_DIRS) + '" '
+
+
+def hook_command(kind: str, event: str) -> str:
+    """The shell command an agent runs for ``event`` (works even when PATH lacks agw)."""
+    return f"{HOOK_ENV}{HOOK_PREFIX}{kind} {event}"
+
+
+def is_hook_command(command: Any, kind: str | None = None) -> bool:
+    """True for commands init wrote: current (PATH-prefixed) and legacy bare ``agw hook``."""
+    cmd = str(command or "")
+    if cmd.startswith(HOOK_ENV):
+        cmd = cmd[len(HOOK_ENV) :]
+    return cmd.startswith(HOOK_PREFIX + (f"{kind} " if kind else ""))
+
+
 SERVER_KEY: Final = "agentguard"
 TIMEOUT_S: Final = 660  # > the 600 s approval wait (+ margin)
 CLAUDE_MATCHER: Final = (
@@ -68,7 +91,7 @@ class Plan:
 
 # --------------------------------------------------------------------------- JSON helpers
 def _is_ours(entry: Any) -> bool:
-    return isinstance(entry, dict) and str(entry.get("command", "")).startswith(HOOK_PREFIX)
+    return isinstance(entry, dict) and is_hook_command(entry.get("command"))
 
 
 def strip_hooks(hooks: dict[str, Any], nested: bool) -> dict[str, Any]:
@@ -204,7 +227,7 @@ def agent_changes(kind: str, root: Path, mcp_url: str, plan: Plan) -> None:
                     "hooks": [
                         {
                             **hook,
-                            "command": f"{HOOK_PREFIX}claude_code PreToolUse",
+                            "command": hook_command("claude_code", "PreToolUse"),
                             "onFailure": "block",
                         }
                     ],
@@ -212,7 +235,7 @@ def agent_changes(kind: str, root: Path, mcp_url: str, plan: Plan) -> None:
             )
             for ev in ("PostToolUse", "PostToolUseFailure", "SessionStart", "SessionEnd"):
                 entry: dict[str, Any] = {
-                    "hooks": [{"type": "command", "command": f"{HOOK_PREFIX}claude_code {ev}"}]
+                    "hooks": [{"type": "command", "command": hook_command("claude_code", ev)}]
                 }
                 if ev.startswith("Post"):
                     entry["matcher"] = "*"
@@ -243,7 +266,7 @@ def agent_changes(kind: str, root: Path, mcp_url: str, plan: Plan) -> None:
                     "hooks": [
                         {
                             **hook,
-                            "command": f"{HOOK_PREFIX}codex PreToolUse",
+                            "command": hook_command("codex", "PreToolUse"),
                             "statusMessage": "AgentGuard check",
                         }
                     ],
@@ -255,7 +278,7 @@ def agent_changes(kind: str, root: Path, mcp_url: str, plan: Plan) -> None:
                     ev,
                     {
                         "matcher": "*",
-                        "hooks": [{"type": "command", "command": f"{HOOK_PREFIX}codex {ev}"}],
+                        "hooks": [{"type": "command", "command": hook_command("codex", ev)}],
                     },
                 )
             return doc
@@ -275,13 +298,13 @@ def agent_changes(kind: str, root: Path, mcp_url: str, plan: Plan) -> None:
             doc.setdefault("version", 1)
             pre = {"timeout": TIMEOUT_S, "failClosed": True}
             for ev in ("beforeShellExecution", "beforeMCPExecution", "beforeReadFile"):
-                _merge_event(doc, ev, {**pre, "command": f"{HOOK_PREFIX}cursor {ev}"})
+                _merge_event(doc, ev, {**pre, "command": hook_command("cursor", ev)})
             _merge_event(
                 doc,
                 "preToolUse",
                 {
                     **pre,
-                    "command": f"{HOOK_PREFIX}cursor preToolUse",
+                    "command": hook_command("cursor", "preToolUse"),
                     "matcher": "Write|Delete|Grep|Task|MCP:.*",
                 },
             )
@@ -292,7 +315,7 @@ def agent_changes(kind: str, root: Path, mcp_url: str, plan: Plan) -> None:
                 "sessionStart",
                 "sessionEnd",
             ):
-                _merge_event(doc, ev, {"command": f"{HOOK_PREFIX}cursor {ev}"})
+                _merge_event(doc, ev, {"command": hook_command("cursor", ev)})
             return doc
 
         _json_change(root, ".cursor/hooks.json", cursor, plan)
@@ -312,7 +335,7 @@ def agent_changes(kind: str, root: Path, mcp_url: str, plan: Plan) -> None:
                 h: dict[str, Any] = {
                     "name": "agentguard",
                     "type": "command",
-                    "command": f"{HOOK_PREFIX}gemini_cli {ev}",
+                    "command": hook_command("gemini_cli", ev),
                 }
                 if ev == "BeforeTool":
                     h["timeout"] = TIMEOUT_S * 1000  # Gemini timeouts are milliseconds

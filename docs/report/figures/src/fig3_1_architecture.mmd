@@ -1,0 +1,28 @@
+flowchart TB
+  subgraph AZ["Agent zone (untrusted)"]
+    direction LR
+    AG("AI and coding agents") ~~~ HU("Human approver")
+  end
+  subgraph GW["Gateway trust zone"]
+    direction LR
+    subgraph EX["Execution plane"]
+      direction TB
+      POL("Risk and policy") --> APR("Approvals") --> OUT("Outbox executor")
+    end
+    subgraph EV["Evidence plane"]
+      direction TB
+      CH[("Event hash chain")] --> SE("Merkle sealer") --> AN("Anchorer")
+    end
+    subgraph AU["Audit plane"]
+      direction TB
+      CON("Console") ~~~ MON("Monitor")
+    end
+    EX --> EV
+    EV --> AU
+  end
+  subgraph OZ["Outside the gateway"]
+    direction LR
+    TL("Controlled tools") ~~~ BC[("EVM chain")] ~~~ VF("Independent verifier")
+  end
+  AZ --> GW
+  GW -- "dispatch, 32-byte roots" --> OZ
