@@ -17,7 +17,7 @@ const STEPS: Step[] = [
 
 /** Requested > Evaluated > Approval > Authorized > Dispatched > Completed | Failed | Unknown,
  *  with the time of each step from the evidence events (§5 Action detail). */
-export function LifecycleStepper({ events, status, decision, tz }: { events: Ev[]; status: string; decision: string; tz: "utc" | "local" }) {
+export function LifecycleStepper({ events, status, decision, tz }: { events: Ev[]; status: string; decision: string; tz: string }) {
   const at = (s: Step) => [...events].reverse().find((e) => s.types.includes(e.type));
   const needsApproval = decision === "REQUIRE_APPROVAL" || events.some((e) => e.type.startsWith("APPROVAL_"));
   const steps = STEPS.filter((s) => s.key !== "approval" || needsApproval);

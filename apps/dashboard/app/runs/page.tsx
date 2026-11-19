@@ -24,9 +24,9 @@ export default async function Runs() {
             {rows.map((r) => (
               <li key={r.run_id} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3 text-dense">
                 <a href={`/runs/${r.run_id}`} className="font-medium text-gray-12">
-                  {r.session ? sessionTitle(r.session, r.first_at, p.tz) : r.repos?.length ? githubRunTitle(r.agents, r.repos) : `Session by ${r.agents.map(agentName).join(", ")}`}
+                  {r.session ? sessionTitle(r.session, r.first_at, p.zone) : r.repos?.length ? githubRunTitle(r.agents, r.repos) : `Session by ${r.agents.map(agentName).join(", ")}`}
                 </a>
-                <span className="text-gray-11">{runCounts(r)} · last active <Timestamp iso={r.last_at} tz={p.tz} compact /></span>
+                <span className="text-gray-11">{runCounts(r)} · last active <Timestamp iso={r.last_at} tz={p.zone} compact /></span>
               </li>
             ))}
           </ul>

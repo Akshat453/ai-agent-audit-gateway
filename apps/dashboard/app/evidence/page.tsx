@@ -28,7 +28,7 @@ export default async function Evidence({ searchParams }: { searchParams: Promise
   ]);
   const auditor = who.roles.includes("auditor") || who.roles.includes("admin");
   const events = data?.events ?? [];
-  const plain = (h: Record<string, unknown>) => explainHeader(h, book, { tz: p.tz }).headline;
+  const plain = (h: Record<string, unknown>) => explainHeader(h, book, { tz: p.zone }).headline;
   return (
     <Page title="Evidence explorer" help="events" lead={p.view === "simple" ? "The tamper-evident log: every step every agent took, each record chained to the one before it." : "Event headers (structural, non-sensitive) as committed in the hash chain."}>
       <RepoBanner name={scope.name} />

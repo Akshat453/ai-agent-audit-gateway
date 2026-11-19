@@ -64,7 +64,7 @@ export default async function Incidents({ searchParams }: { searchParams: Promis
             <li key={`${i.kind}-${i.action_id ?? n}`} className="rounded-md border border-gray-6 bg-gray-1 px-4 py-3 text-dense">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span><strong>{INCIDENT_KINDS[i.kind]?.label ?? i.kind}:</strong> {incidentSentence(i)}</span>
-                <Timestamp iso={i.at} tz={p.tz} compact />
+                <Timestamp iso={i.at} tz={p.zone} compact />
               </div>
               <p className="mt-1 text-caption text-gray-11">What to do: {INCIDENT_KINDS[i.kind]?.todo ?? "Look at the details."}{" "}
                 {i.action_id ? <a href={`/actions/${i.action_id}`}>Open the action</a> : null}{i.run_id ? <> · <a href={`/runs/${i.run_id}`}>Open the session</a></> : null}

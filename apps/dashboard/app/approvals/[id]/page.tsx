@@ -118,7 +118,7 @@ export default async function Approval({ params, searchParams }: { params: Promi
         help="approvals"
         crumbs={[{ label: "Operations" }, { label: "Approvals", href: "/approvals" }, { label: middle(v.approval_id, 8, 4) }]}
         description="Review exactly what will run. Values are shown escaped; secret fields are redacted markers."
-        meta={<><StatusBadge value={shownState} /><RiskBadge level={a.risk.level} /><span className="text-caption text-gray-11">requested <Timestamp iso={v.requested_at} tz={p.tz} /></span></>}
+        meta={<><StatusBadge value={shownState} /><RiskBadge level={a.risk.level} /><span className="text-caption text-gray-11">requested <Timestamp iso={v.requested_at} tz={p.zone} /></span></>}
       />
       {msgText ? (
         <>
@@ -186,7 +186,7 @@ export default async function Approval({ params, searchParams }: { params: Promi
               <div>
                 <div className="mb-1 text-caption font-medium text-gray-11">Expiry</div>
                 {pending ? <Countdown expiresAt={v.expires_at} initialSeconds={secondsLeft} /> : <span data-testid="countdown" className="font-semibold">{expired ? "EXPIRED" : v.state}</span>}
-                <div className="mt-0.5 text-caption text-gray-11"><Timestamp iso={v.expires_at} tz={p.tz} /></div>
+                <div className="mt-0.5 text-caption text-gray-11"><Timestamp iso={v.expires_at} tz={p.zone} /></div>
               </div>
               <div>
                 <div className="mb-1 text-caption font-medium text-gray-11"><Term term="digest">Action digest</Term></div>
@@ -238,7 +238,7 @@ export default async function Approval({ params, searchParams }: { params: Promi
                         <li className="break-all"><span className="text-gray-11">Target</span> <code className="font-mono text-caption">{target.length > 240 ? `${target.slice(0, 240)}… [TRUNCATED]` : target}</code></li>
                         <li><span className="text-gray-11">Risk</span> <RiskBadge level={a.risk.level} size="sm" /> <span className="text-gray-11">score {a.risk.score}</span></li>
                         <li className="break-all"><span className="text-gray-11">Digest</span> <code className="font-mono text-caption">{a.action_id ? middle(v.action_digest, 12, 8) : ""}</code></li>
-                        <li><span className="text-gray-11">Single-use; expires</span> <Timestamp iso={v.expires_at} tz={p.tz} /></li>
+                        <li><span className="text-gray-11">Single-use; expires</span> <Timestamp iso={v.expires_at} tz={p.zone} /></li>
                       </ul>
                       {critical ? <p className="text-caption text-gray-11" data-testid="confirm-code">{last6}</p> : null}
                     </ConfirmDialog>

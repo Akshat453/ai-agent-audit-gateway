@@ -32,7 +32,7 @@ export type SessionLike = {
 };
 
 /** "Claude Code session by akshat on MintRail - issue #12" (fallback: "Session started 18 Nov, 11:18 PM"). */
-export function sessionTitle(s: SessionLike | null | undefined, startedAt?: string | null, tz: "local" | "utc" = "local"): string {
+export function sessionTitle(s: SessionLike | null | undefined, startedAt?: string | null, tz: string = "local"): string {
   if (!s) return startedAt ? `Session started ${shortDate(startedAt, tz)}` : "Agent session";
   const who = s.developer ? ` by ${s.developer}` : "";
   const where = s.repo ? ` on ${s.repo}` : "";

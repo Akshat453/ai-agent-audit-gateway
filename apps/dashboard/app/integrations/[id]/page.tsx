@@ -151,7 +151,7 @@ export default async function Integration({ params, searchParams }: { params: Pr
                   <li key={e.event_id} className="flex flex-wrap items-center gap-3 px-4 py-2">
                     <span className="w-14 font-mono text-caption tabular text-gray-11">#{e.seq}</span>
                     <a href={`/events/${e.event_id}`} className="font-mono">{e.type}</a>
-                    <Timestamp iso={e.occurred_at} tz={p.tz} />
+                    <Timestamp iso={e.occurred_at} tz={p.zone} />
                   </li>
                 ))}
               </ul>
@@ -182,7 +182,7 @@ export default async function Integration({ params, searchParams }: { params: Pr
                   <li key={`${h.checked_at}-${i}`} className="flex flex-wrap items-center gap-2 px-4 py-2">
                     <StatusBadge value={h.ok ? "HEALTH_OK" : "HEALTH_FAILED"} size="sm" />
                     <code className="font-mono text-caption">{h.code}</code>
-                    <Timestamp iso={h.checked_at} tz={p.tz} className="ml-auto whitespace-nowrap text-caption text-gray-11" />
+                    <Timestamp iso={h.checked_at} tz={p.zone} className="ml-auto whitespace-nowrap text-caption text-gray-11" />
                   </li>
                 ))}
               </ul>

@@ -102,7 +102,7 @@ export default async function Integrations({ searchParams }: { searchParams: Pro
                       {c.unclassified_actions ? <span className="font-medium text-bad-11" data-testid="unclassified-count">{c.unclassified_actions}</span> : <span className="text-gray-11">0</span>}
                     </td>
                     <td className="px-4 py-2 text-right tabular">{c.read_only ? <span className="text-gray-11">—</span> : `v${c.policy_version}`}</td>
-                    <td className="px-4 py-2">{c.created_at ? <Timestamp iso={c.created_at} tz={p.tz} /> : <span className="text-gray-11">operator settings</span>}</td>
+                    <td className="px-4 py-2">{c.created_at ? <Timestamp iso={c.created_at} tz={p.zone} /> : <span className="text-gray-11">operator settings</span>}</td>
                   </tr>
                 ))}
               </tbody>

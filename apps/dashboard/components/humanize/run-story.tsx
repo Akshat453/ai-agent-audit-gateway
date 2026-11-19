@@ -42,7 +42,7 @@ function person(l: StoryLine): string | null {
   return null;
 }
 
-export function RunStory({ lines, tz, filter, baseHref }: { lines: StoryLine[]; tz: "local" | "utc"; filter: StoryFilter; baseHref: string }) {
+export function RunStory({ lines, tz, filter, baseHref }: { lines: StoryLine[]; tz: string; filter: StoryFilter; baseHref: string }) {
   const shown = lines.filter((l) => keep(l, filter));
   return (
     <section aria-label="Session story" data-testid="run-story">

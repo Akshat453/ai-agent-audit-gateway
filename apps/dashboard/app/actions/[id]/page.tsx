@@ -47,13 +47,13 @@ export default async function ActionDetail({ params, searchParams }: { params: P
   const broken = a.events.filter((e) => !e.hash_ok || e.link_ok === false || e.stored_copy_ok === false).length;
   const tab = sp.tab && ["overview", "evidence", "related"].includes(sp.tab) ? sp.tab : "evidence";
   const reasons = [...new Set(a.events.flatMap((e) => e.reasons))];
-  const story = actionStory(a, book, p.tz);
+  const story = actionStory(a, book, p.zone);
   const phrase = phraseOf(a);
   const tone = a.status === "DENIED" || a.status === "FAILED" ? "bad" : a.status === "PENDING_APPROVAL" || a.status === "OUTCOME_UNKNOWN" ? "warn" : "ok";
   const headline = (
     <>{story.headline.lead}: {story.headline.actor} {story.headline.verb} <PhraseView phrase={phrase} />{story.headline.where}.</>
   );
-  const steps = plainSteps(a).map((st) => ({ ...st, at: st.at ? <Timestamp iso={st.at} tz={p.tz} compact className="text-gray-11" /> : undefined }));
+  const steps = plainSteps(a).map((st) => ({ ...st, at: st.at ? <Timestamp iso={st.at} tz={p.zone} compact className="text-gray-11" /> : undefined }));
 
   return (
     <div className="mx-auto max-w-[1280px]">
@@ -75,7 +75,7 @@ export default async function ActionDetail({ params, searchParams }: { params: P
       <PullRequestsCard runId={a.run_id} />
       <Technical view={p.view}>
       <Card className="mb-4">
-        <CardBody><LifecycleStepper events={a.events} status={a.status} decision={a.decision} tz={p.tz} /></CardBody>
+        <CardBody><LifecycleStepper events={a.events} status={a.status} decision={a.decision} tz={p.zone} /></CardBody>
       </Card>
 
       <Tabs defaultValue={tab}>
@@ -88,7 +88,7 @@ export default async function ActionDetail({ params, searchParams }: { params: P
         <TabsContent value="evidence">
           <Card>
             <CardHeader title="Evidence timeline" description="Each lifecycle event, its hash, and the hash the next event commits to. Arguments and results are never shown." />
-            <CardBody><EvidenceTimeline nodes={a.events} tz={p.tz} toolId={a.tool.id} /></CardBody>
+            <CardBody><EvidenceTimeline nodes={a.events} tz={p.zone} toolId={a.tool.id} /></CardBody>
           </Card>
         </TabsContent>
 
@@ -116,8 +116,8 @@ export default async function ActionDetail({ params, searchParams }: { params: P
                 <dt className="text-gray-11">Environment</dt><dd>{a.environment}</dd>
                 <dt className="text-gray-11">Policy</dt><dd>{a.policy.id} v{a.policy.version} <a href="/policies" className="ml-1 text-caption">view policies</a></dd>
                 <dt className="text-gray-11">Policy reasons</dt><dd>{reasons.length ? <ul className="list-disc pl-4">{reasons.map((r) => <li key={r}>{r}</li>)}</ul> : <span className="text-gray-11">{EMPTY}</span>}</dd>
-                <dt className="text-gray-11">Created</dt><dd><Timestamp iso={a.created_at} tz={p.tz} /></dd>
-                <dt className="text-gray-11">Last update</dt><dd><Timestamp iso={a.updated_at} tz={p.tz} /></dd>
+                <dt className="text-gray-11">Created</dt><dd><Timestamp iso={a.created_at} tz={p.zone} /></dd>
+                <dt className="text-gray-11">Last update</dt><dd><Timestamp iso={a.updated_at} tz={p.zone} /></dd>
               </dl>
               <p className="mt-4 rounded-md border border-gray-6 bg-gray-2 p-3 text-caption text-gray-11">
                 Arguments and results are encrypted per event. An admin can grant an auditor a disclosure for specific events; it is opened with <code className="font-mono">agw-verify --auditor-key</code>.
@@ -141,7 +141,7 @@ export default async function ActionDetail({ params, searchParams }: { params: P
                       {a.approvals.map((ap) => (
                         <li key={ap.approval_id} className="flex flex-wrap items-center gap-2">
                           <HashChip value={ap.approval_id} href={`/approvals/${ap.approval_id}`} label="approval" /><StatusBadge value={ap.state} />
-                          <span className="text-caption text-gray-11">requested <Timestamp iso={ap.requested_at} tz={p.tz} /></span>
+                          <span className="text-caption text-gray-11">requested <Timestamp iso={ap.requested_at} tz={p.zone} /></span>
                         </li>
                       ))}
                     </ul>

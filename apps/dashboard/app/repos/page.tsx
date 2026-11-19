@@ -88,7 +88,7 @@ export default async function Repos({ searchParams }: { searchParams: Promise<Re
                       {r.proposals.map((pr) => (
                         <div key={pr.proposal_id} className="rounded-md border border-warn-7 p-3" data-testid="proposal">
                           <div className="mb-2 flex flex-wrap items-center gap-2 text-caption text-gray-11">
-                            <StatusBadge value="PROPOSAL_PENDING" size="sm" />proposed <Timestamp iso={pr.created_at} tz={p.tz} />
+                            <StatusBadge value="PROPOSAL_PENDING" size="sm" />proposed <Timestamp iso={pr.created_at} tz={p.zone} />
                           </div>
                           <CodeView text={pr.diff || "(no textual change)"} max={6000} label="proposed policy diff" />
                           {isAdmin ? (

@@ -9,7 +9,8 @@ import { describeRule, reasonInWords, ruleReasons, type RuleBook } from "./rules
 import { RISK_MEANING, plainStatus, riskWord } from "./statuses";
 import { ago, clock, later, shortDate } from "./time";
 
-export type Tz = "local" | "utc";
+import type { Tz } from "./time";
+export type { Tz };
 export type Link = { label: string; href: string; external?: boolean };
 
 // ------------------------------------------------------------------ shared inputs (subsets)

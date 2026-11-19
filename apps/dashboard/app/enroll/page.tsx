@@ -71,7 +71,7 @@ export default async function Enroll({ searchParams }: { searchParams: Promise<R
               <dt className="text-gray-11">Code</dt><dd className="font-mono">{req.user_code}</dd>
               <dt className="text-gray-11">Agent</dt><dd className="font-mono">{req.agent_kind}</dd>
               <dt className="text-gray-11">Device label</dt><dd>{req.label}</dd>
-              <dt className="text-gray-11">Requested</dt><dd><Timestamp iso={req.created_at} tz={p.tz} /></dd>
+              <dt className="text-gray-11">Requested</dt><dd><Timestamp iso={req.created_at} tz={p.zone} /></dd>
               <dt className="text-gray-11">Developer</dt><dd>{who.username} <span className="text-gray-11">(you, if you approve)</span></dd>
             </dl>
             {req.status === "pending" ? (

@@ -16,7 +16,7 @@ function actorWords(actor: unknown): string {
   return { agent: "the AI agent", human: "a person", gateway: "AgentGuard", system: "AgentGuard (background job)" }[a.kind ?? ""] ?? "someone";
 }
 
-export function explainHeader(h: Header, book?: RuleBook, opts: { people?: Record<string, string>; tz?: "local" | "utc" } = {}): Explained {
+export function explainHeader(h: Header, book?: RuleBook, opts: { people?: Record<string, string>; tz?: string } = {}): Explained {
   const type = String(h.type ?? "");
   const tool = (h.tool ?? {}) as { id?: string };
   const what = tool.id ? toolPhrase(tool.id).text : null;

@@ -24,7 +24,7 @@ export default async function Run({ params, searchParams }: { params: Promise<{ 
   const s = data.session ?? null;
   const first = data.events[0]?.occurred_at ?? null;
   const ghRun = !s && (data.repos?.length ?? 0) > 0; // ADR-0042: the agent's GitHub steps
-  const title = ghRun ? githubRunTitle([...new Set(data.events.map((e) => e.agent).filter((x): x is string => !!x))], data.repos) : sessionTitle(s, first, p.tz);
+  const title = ghRun ? githubRunTitle([...new Set(data.events.map((e) => e.agent).filter((x): x is string => !!x))], data.repos) : sessionTitle(s, first, p.zone);
   const coding = data.coding as Record<string, CodingLike>;
   const story = runStory(data.events, coding, data.people ?? {}, book);
   const actions = new Set(data.events.map((e) => e.action_id).filter(Boolean)).size;
@@ -32,7 +32,7 @@ export default async function Run({ params, searchParams }: { params: Promise<{ 
   const who: [string, string][] = s
     ? ([["Developer", s.developer ?? "—"], ["Agent", agentKindLabel(s.agent_kind, s.agent_version)], ["Device", s.device ?? "—"], ["Repository", s.repo ?? "—"], ["Issue", s.issue_number ? `#${s.issue_number}` : "—"]] as [string, string][])
     : [["Agents", agents.join(", ") || "—"]];
-  const storyView = <RunStory lines={story} tz={p.tz} filter={filter} baseHref={`/runs/${id}`} />;
+  const storyView = <RunStory lines={story} tz={p.zone} filter={filter} baseHref={`/runs/${id}`} />;
   const summary = `${title}: ${actions} action${actions === 1 ? "" : "s"}${s?.status ? `, session ${s.status}` : ""}.`;
   return (
     <Page title={p.view === "simple" ? title : `Run ${short(id, 13)}`} help="run" lead={p.view === "simple" ? "Everything the agent asked to do in this session, in order, and what AgentGuard decided." : "Lifecycle events in recording order (seq). Payloads (args, results) are never shown here."}>
@@ -109,7 +109,7 @@ export default async function Run({ params, searchParams }: { params: Promise<{ 
           ))}
         </tbody>
       </table>
-      {s ? <p className="mt-2 text-caption text-gray-11">Session {s.session_id} · {s.agent_kind} {s.agent_version ?? ""} · started <Timestamp iso={s.started_at} tz={p.tz} /></p> : null}
+      {s ? <p className="mt-2 text-caption text-gray-11">Session {s.session_id} · {s.agent_kind} {s.agent_version ?? ""} · started <Timestamp iso={s.started_at} tz={p.zone} /></p> : null}
       </Technical>
     </Page>
   );

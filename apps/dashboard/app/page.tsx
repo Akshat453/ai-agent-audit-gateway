@@ -100,7 +100,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
           sub={o.pending_approvals ? `oldest waiting ${duration(o.oldest_pending_approval_seconds)}` : "nothing waiting"} href="/approvals?state=PENDING" linkLabel="review pending approvals" />
         <KpiTile label="Evidence health" tone={evidenceTone}
           value={<StatusBadge value={evidence} size="lg" />}
-          sub={o.last_verification ? <>last check <Timestamp iso={o.last_verification.at as string} tz={p.tz} /></> : "no verification yet"}
+          sub={o.last_verification ? <>last check <Timestamp iso={o.last_verification.at as string} tz={p.zone} /></> : "no verification yet"}
           href="/verification" linkLabel="open verification" />
       </section>
 
@@ -189,7 +189,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
                   <RiskBadge level={r.risk_level} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-dense font-medium"><code className="font-mono">{r.tool.id}</code> by {r.agent.name}{r.delegated_by ? <span className="text-gray-11"> (delegated by {r.delegated_by})</span> : null}</div>
-                    <div className="text-caption text-gray-11">Approval requested <Timestamp iso={r.requested_at} tz={p.tz} className="text-gray-11" /> · expires <Timestamp iso={r.expires_at} tz={p.tz} className="text-gray-11" /></div>
+                    <div className="text-caption text-gray-11">Approval requested <Timestamp iso={r.requested_at} tz={p.zone} className="text-gray-11" /> · expires <Timestamp iso={r.expires_at} tz={p.zone} className="text-gray-11" /></div>
                   </div>
                   <a href={`/approvals/${r.approval_id}`} className="inline-flex h-7 items-center rounded-md border border-gray-7 px-2.5 text-caption font-medium text-gray-12 no-underline hover:bg-gray-3 hover:no-underline">Review</a>
                 </li>
@@ -199,7 +199,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
                   <StatusBadge value={i.kind === "outcome_unknown" ? "OUTCOME_UNKNOWN" : i.status ?? "ERROR"} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-dense font-medium">{i.kind === "outcome_unknown" ? <>Unknown outcome: <code className="font-mono">{i.tool ?? "tool"}</code></> : <>Alert: {i.code ?? i.kind}</>}</div>
-                    <div className="text-caption text-gray-11"><Timestamp iso={i.at} tz={p.tz} className="text-gray-11" /></div>
+                    <div className="text-caption text-gray-11"><Timestamp iso={i.at} tz={p.zone} className="text-gray-11" /></div>
                   </div>
                   {i.action_id ? <a href={`/actions/${i.action_id}`} className="inline-flex h-7 items-center rounded-md border border-gray-7 px-2.5 text-caption font-medium text-gray-12 no-underline hover:bg-gray-3 hover:no-underline">Open</a> : <a href="/incidents" className="text-caption">Incidents</a>}
                 </li>
@@ -261,7 +261,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
               <span aria-hidden="true" className={cn("size-2 rounded-full", { ok: "bg-ok-9", degraded: "bg-warn-9", down: "bg-bad-9", off: "bg-gray-8" }[c.status])} />
               <span className="font-medium capitalize">{c.name}</span>
               <span className="text-gray-11">{c.status === "ok" ? "OK" : c.status === "off" ? "Off" : c.status === "down" ? "Down" : "Degraded"} · {c.detail}</span>
-              {c.at ? <Timestamp iso={c.at} tz={p.tz} className="text-caption text-gray-11" /> : null}
+              {c.at ? <Timestamp iso={c.at} tz={p.zone} className="text-caption text-gray-11" /> : null}
             </li>
           ))}
         </ul>

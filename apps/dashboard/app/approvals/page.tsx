@@ -103,7 +103,7 @@ export default async function Approvals({ searchParams }: { searchParams: Promis
         );
       })() : null}
       {list.data ? (
-        <ApprovalsTable rows={list.data.rows} total={list.data.total} pageSize={PAGE} fetchedAt={fetchedAt} panel={panel} tz={p.tz} nowMs={Date.parse(fetchedAt)} />
+        <ApprovalsTable rows={list.data.rows} total={list.data.total} pageSize={PAGE} fetchedAt={fetchedAt} panel={panel} tz={p.zone} nowMs={Date.parse(fetchedAt)} />
       ) : (
         <ErrorState
           what={list.response.status === 403 ? "Your role cannot see approvals. Ask an admin to give you the approver or auditor role." : "AgentGuard could not load the approvals list. Try again in a moment."}

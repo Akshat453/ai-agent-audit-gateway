@@ -51,7 +51,7 @@ export default async function EventDetail({ params }: { params: Promise<{ id: st
   const actor = (header.actor ?? {}) as { id?: string; kind?: string };
   const payload = header.payload as { len?: number; ref?: string; digest?: string } | undefined;
   const epoch = d.epoch as Record<string, unknown> | null;
-  const plain = explainHeader(header, book, { tz: p.tz });
+  const plain = explainHeader(header, book, { tz: p.zone });
   const intact = intactness([n]);
 
   return (
@@ -130,8 +130,8 @@ export default async function EventDetail({ params }: { params: Promise<{ id: st
                 <dt className="text-gray-11">Type</dt><dd className="font-mono">{n.type}</dd>
                 <dt className="text-gray-11">Sequence</dt><dd className="tabular">#{n.seq}</dd>
                 <dt className="text-gray-11">Tenant</dt><dd>{d.tenant}</dd>
-                <dt className="text-gray-11">Recorded</dt><dd><Timestamp iso={n.occurred_at} tz={p.tz} /></dd>
-                <dt className="text-gray-11">Observed</dt><dd>{typeof header.obs === "number" ? <Timestamp iso={new Date(Number(header.obs) / 1000).toISOString()} tz={p.tz} /> : EMPTY}</dd>
+                <dt className="text-gray-11">Recorded</dt><dd><Timestamp iso={n.occurred_at} tz={p.zone} /></dd>
+                <dt className="text-gray-11">Observed</dt><dd>{typeof header.obs === "number" ? <Timestamp iso={new Date(Number(header.obs) / 1000).toISOString()} tz={p.zone} /> : EMPTY}</dd>
                 <dt className="text-gray-11">Actor</dt><dd>{actor.kind ?? EMPTY} <span className="text-gray-11">{actor.id ?? ""}</span></dd>
                 <dt className="text-gray-11">Action</dt><dd><HashChip value={d.action_id} href={d.action_id ? `/actions/${d.action_id}` : undefined} label="action" /></dd>
                 <dt className="text-gray-11">Run</dt><dd><HashChip value={d.run_id} href={d.run_id ? `/runs/${d.run_id}` : undefined} label="run" /></dd>

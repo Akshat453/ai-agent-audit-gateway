@@ -21,7 +21,7 @@ export type EvidenceNode = {
  * this event's stored hash; red dashed = the link (or the record's own hash) no longer matches,
  * with the reason. Interleaved events of other actions are summarised on the connector.
  */
-export function EvidenceTimeline({ nodes, tz, toolId }: { nodes: EvidenceNode[]; tz: "utc" | "local"; toolId?: string | null }) {
+export function EvidenceTimeline({ nodes, tz, toolId }: { nodes: EvidenceNode[]; tz: string; toolId?: string | null }) {
   if (!nodes.length) return <p className="text-dense text-gray-11">No evidence events recorded for this action yet.</p>;
   const firstBroken = nodes.find((n) => !n.hash_ok || n.link_ok === false || n.stored_copy_ok === false);
   return (

@@ -3,11 +3,12 @@ import "./globals.css";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import { cookies as cookieJar, headers } from "next/headers";
 import type { ReactNode } from "react";
 
 import { AppShell, type ShellHealth } from "@/components/shell/app-shell";
 import { NonceSetter } from "@/components/shell/nonce";
+import { ZoneCookie } from "@/components/shell/zone-cookie";
 import { PRODUCT_NAME } from "@/lib/brand";
 import { cn } from "@/lib/cn";
 import { gatewayFor } from "@/lib/gateway";
@@ -71,6 +72,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang="en" className={htmlClass} suppressHydrationWarning>
       <body>
         <NonceSetter nonce={nonce} />
+        <ZoneCookie current={(await cookieJar()).get("agw_zone")?.value ?? ""} />
         {shell ?? children}
         {/* Logout is a plain CSRF-protected form POST; the user menu submits it. */}
         {token ? (

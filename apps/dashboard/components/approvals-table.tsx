@@ -24,7 +24,7 @@ export type ApprovalRow = {
 
 /** Approvals list (§5): soonest expiry first. Deliberately NO approve button in rows. */
 export function ApprovalsTable({ rows, total, pageSize, fetchedAt, panel, tz, nowMs }: {
-  rows: ApprovalRow[]; total: number; pageSize: number; fetchedAt: string; panel?: ReactNode; tz: "utc" | "local"; nowMs: number;
+  rows: ApprovalRow[]; total: number; pageSize: number; fetchedAt: string; panel?: ReactNode; tz: string; nowMs: number;
 }) {
   const columns: ColumnDef<ApprovalRow, unknown>[] = [
     { id: "request", header: "Request", meta: { label: "Request (plain English)" }, enableHiding: false,

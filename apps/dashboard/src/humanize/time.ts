@@ -4,9 +4,24 @@
 
 const MS = { s: 1000, min: 60_000, h: 3_600_000, d: 86_400_000 };
 
-function zoneName(d: Date): string {
+/** "utc", "local" (the runtime's zone) or an IANA zone such as "Asia/Kolkata". The server runs on
+ *  UTC, so pages pass the viewer's zone from the agw_zone cookie (lib/prefs.ts). */
+export type Tz = string;
+
+function validZone(z: string): boolean {
+  try { new Intl.DateTimeFormat("en-GB", { timeZone: z }); return true; } catch { return false; }
+}
+
+/** Intl options for a Tz. */
+export function zoneOpts(tz: Tz): Intl.DateTimeFormatOptions {
+  if (tz === "utc") return { timeZone: "UTC" };
+  if (tz === "local" || !validZone(tz)) return {};
+  return { timeZone: tz };
+}
+
+function zoneName(d: Date, tz: Tz = "local"): string {
   try {
-    const parts = new Intl.DateTimeFormat("en-IN", { timeZoneName: "short" }).formatToParts(d);
+    const parts = new Intl.DateTimeFormat("en-IN", { timeZoneName: "short", ...zoneOpts(tz) }).formatToParts(d);
     return parts.find((p) => p.type === "timeZoneName")?.value ?? "";
   } catch {
     return "";
@@ -14,34 +29,34 @@ function zoneName(d: Date): string {
 }
 
 /** "18 Nov 2026, 11:18:15 PM IST" (local) or "18 Nov 2026, 5:48:15 PM UTC". */
-export function longTime(iso: string | null | undefined, tz: "local" | "utc" = "local"): string {
+export function longTime(iso: string | null | undefined, tz: Tz = "local"): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   const opts: Intl.DateTimeFormatOptions = {
     day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true,
-    ...(tz === "utc" ? { timeZone: "UTC" } : {}),
+    ...zoneOpts(tz),
   };
   const text = new Intl.DateTimeFormat("en-GB", opts).format(d).replace(/\b(am|pm)\b/, (m) => m.toUpperCase());
-  return `${text} ${tz === "utc" ? "UTC" : zoneName(d)}`.trim();
+  return `${text} ${tz === "utc" ? "UTC" : zoneName(d, tz)}`.trim();
 }
 
 /** "18 Nov, 11:18 PM" */
-export function shortDate(iso: string | null | undefined, tz: "local" | "utc" = "local"): string {
+export function shortDate(iso: string | null | undefined, tz: Tz = "local"): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true, ...(tz === "utc" ? { timeZone: "UTC" } : {}),
+    day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true, ...zoneOpts(tz),
   }).format(d).replace(/\b(am|pm)\b/, (m) => m.toUpperCase());
 }
 
 /** "11:18 PM" */
-export function clock(iso: string | null | undefined, tz: "local" | "utc" = "local"): string {
+export function clock(iso: string | null | undefined, tz: Tz = "local"): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("en-GB", { hour: "numeric", minute: "2-digit", hour12: true, ...(tz === "utc" ? { timeZone: "UTC" } : {}) })
+  return new Intl.DateTimeFormat("en-GB", { hour: "numeric", minute: "2-digit", hour12: true, ...zoneOpts(tz) })
     .format(d).replace(/\b(am|pm)\b/, (m) => m.toUpperCase());
 }
 

@@ -40,12 +40,13 @@ export function relative(iso: string | null | undefined, now: number): string {
 }
 
 /** Exact time in UTC ("2026-11-16 13:38:54Z") or the viewer's local zone. */
-export function exact(iso: string | null | undefined, tz: "utc" | "local" = "utc"): string {
+export function exact(iso: string | null | undefined, tz: string = "utc"): string {
   if (!iso) return EMPTY;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return EMPTY;
   if (tz === "utc") return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, "Z");
-  return d.toLocaleString("en-GB", { hour12: false, timeZoneName: "short" });
+  const zone = tz === "local" ? {} : (() => { try { new Intl.DateTimeFormat("en-GB", { timeZone: tz }); return { timeZone: tz }; } catch { return {}; } })();
+  return d.toLocaleString("en-GB", { hour12: false, timeZoneName: "short", ...zone });
 }
 
 /** Percent change vs the previous period; null when there is nothing to compare. */

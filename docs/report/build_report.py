@@ -40,7 +40,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_LINE_SPACING, WD_TAB_ALIGNMENT, WD_TAB_LEADER
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Inches, Pt, RGBColor
+from docx.shared import Emu, Inches, Pt, RGBColor
 
 HERE = Path(__file__).resolve().parent
 CONTENT = HERE / "content"
@@ -367,7 +367,7 @@ def cant_split(row):
     el = OxmlElement("w:cantSplit"); el.set(qn("w:val"), "true"); trPr.append(el)
 
 
-# ----------------------------------------------------------------------------------- booktabs tables
+# ----------------------------------------------------------------------------------- tables
 NUMERIC = re.compile(r"^[~<>\u2264\u2265]?[-+]?[\d.,]+( ?(%|ms|s|req/s|x))?( ?\[[\d., ]+\])?$|^[\d.,]+ ?/ ?[\d.,]+( ?/ ?[\d.,]+)?$|^-$")
 
 
@@ -380,21 +380,14 @@ def _border(parent, tag, sz, color="000000", val="single"):
 
 
 def booktabs(table, header_rows=1, light_rules=False):
-    """Academic table style: 1.5 pt rule above the header, 0.75 pt below it, 1.5 pt at the bottom,
-    no vertical lines; optional 0.25 pt light-grey separators for long tables; 4 pt cell padding."""
+    """Plain Word "Table Grid" look: 0.5 pt black border around and between every cell, 4 pt padding.
+    (Name kept for the call sites; header_rows/light_rules are accepted and ignored.)"""
     tblPr = table._tbl.tblPr
     for old in tblPr.findall(qn("w:tblBorders")) + tblPr.findall(qn("w:tblCellMar")):
         tblPr.remove(old)
     bd = OxmlElement("w:tblBorders")
-    _border(bd, "top", 12)
-    _border(bd, "left", 0, val="nil")
-    _border(bd, "bottom", 12)
-    _border(bd, "right", 0, val="nil")
-    if light_rules:
-        _border(bd, "insideH", 2, color="BFBFBF")
-    else:
-        _border(bd, "insideH", 0, val="nil")
-    _border(bd, "insideV", 0, val="nil")
+    for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        _border(bd, side, 4)
     mar = OxmlElement("w:tblCellMar")
     for side, w in (("top", 80), ("left", 90), ("bottom", 80), ("right", 90)):
         e = OxmlElement(f"w:{side}"); e.set(qn("w:w"), str(w)); e.set(qn("w:type"), "dxa"); mar.append(e)
@@ -409,13 +402,6 @@ def booktabs(table, header_rows=1, light_rules=False):
         look.addprevious(mar)
     else:
         tblPr.append(mar)
-    for ri in range(header_rows):
-        for cell in table.rows[ri].cells:
-            tcPr = cell._element.get_or_add_tcPr()
-            tb = OxmlElement("w:tcBorders")
-            _border(tb, "bottom", 6)
-            tcPr.append(tb)
-            shade(cell, "F2F2F2")
 
 
 # ----------------------------------------------------------------------------------- builder
@@ -493,74 +479,130 @@ class Builder:
         return self.pages.get((kind, text), "")
 
     # -------------------------------------------------------------- front pages
+    # Cover, title page, certificate and declaration copy the department template
+    # ("Projet Report Format.docx", Appendix 1-3) exactly: font sizes, bold/underline, line spacing and
+    # paragraph spacing are the template's own values (twips / 20 = pt). Lines the template breaks with
+    # narrow indents are broken explicitly here so they wrap the same on A4 with the report margins.
+    def fp(self, lines, size, bold=False, align=WD_ALIGN_PARAGRAPH.CENTER, before=0, line=1.0, exact=None,
+           first=None, underline=False, color=BLACK, keep_next=False):
+        p = self.doc.add_paragraph()
+        f = p.paragraph_format
+        p.alignment = align
+        f.space_before = Pt(before / 20)
+        f.space_after = Pt(0)
+        f.left_indent = Inches(0); f.right_indent = Inches(0)
+        f.first_line_indent = Inches(first / 1440) if first else Inches(0)
+        f.keep_with_next = keep_next
+        if getattr(self, "_new_page", False):
+            f.page_break_before = True; self._new_page = False
+        if exact:
+            f.line_spacing_rule = WD_LINE_SPACING.EXACTLY; f.line_spacing = Pt(exact / 20)
+        else:
+            f.line_spacing = line
+        self._mark(p, size, bold)
+        if isinstance(lines, str):
+            lines = [lines]
+        for i, t in enumerate(lines):
+            r = p.add_run(t); set_run_font(r, size, bold=bold, color=color)
+            if underline:
+                r.font.underline = True
+            if i < len(lines) - 1:
+                r.add_break()
+        return p
+
+    def blank(self, size, bold=False, before=0):
+        return self.fp("", size, bold=bold, before=before)
+
+    @staticmethod
+    def _mark(p, size, bold):
+        """Paragraph-mark font, so an empty paragraph is as tall as the template's."""
+        ppr = p._p.get_or_add_pPr()
+        rpr = OxmlElement("w:rPr")
+        if bold:
+            rpr.append(OxmlElement("w:b"))
+        for tag in ("w:sz", "w:szCs"):
+            e = OxmlElement(tag); e.set(qn("w:val"), str(int(size * 2))); rpr.append(e)
+        ppr.append(rpr)
+
     def title_page(self, colour: bool):
-        d = self.doc
-        lines = [
-            (S("A {REPORT_KIND}"), 14, False, 0), ("on", 12, False, 18),
-            (S("{PROJECT_TITLE}"), 18, True, 18), ("by", 12, True, 18),
-            (S("{STUDENT_NAME}"), 15, True, 0), (S("{ROLL_NUMBER}"), 15, True, 20),
-            ("Under the Guidance of", 13, True, 10), (S("{GUIDE_NAME}"), 13, True, 0),
-            (S("{GUIDE_DESIG},"), 13, True, 18), ("Submitted to", 13, True, 6),
-        ]
-        first = True
-        for text, size, bold, after in lines:
-            p = d.add_paragraph()
-            pfmt(p, align=WD_ALIGN_PARAGRAPH.CENTER, after=after, line=1.15, before=12 if first else 0)
-            first = False
-            r = p.add_run(text)
-            set_run_font(r, size, bold=bold, color=BLUE if (colour and text == SETTINGS["PROJECT_TITLE"]) else BLACK)
+        """Appendix 1 of the template (cover in colour accent on the title, title page in black)."""
+        title_colour = BLUE if colour else BLACK
+        self.fp([S("A {REPORT_KIND}"), "on"], 14, before=155, line=3.0)
+        self.fp(S("{PROJECT_TITLE}"), 18, bold=True, before=5, line=1.0, color=title_colour)
+        self.blank(18, bold=True, before=277)
+        self.fp("by", 14, bold=True)
+        self.blank(14, bold=True, before=320)
+        self.fp([S("{STUDENT_NAME}"), S("{ROLL_NUMBER}")], 16, bold=True, line=1.5)
+        self.blank(16, bold=True, before=116)
+        self.fp("Under the Guidance of", 14, bold=True)
+        self.blank(14, bold=True)
+        self.blank(14, bold=True, before=1)
+        self.fp([S("{GUIDE_NAME}"), S("{GUIDE_DESIG},")], 14, bold=True, line=1.5)
+        self.blank(14, bold=True, before=160)
+        self.fp("Submitted to", 14, bold=True)
         logo = ASSETS / "pdeu-logo.png"
-        p = d.add_paragraph()
-        pfmt(p, align=WD_ALIGN_PARAGRAPH.CENTER, after=6, line=1.0)
-        if logo.exists():
-            p.add_run().add_picture(str(logo), height=Inches(1.4))
-        else:  # reserved space for the university logo
-            p.paragraph_format.space_before = Pt(0)
+        p = self.fp("", 6, before=160)
+        if logo.exists():  # template size: 1242417 x 1311783 EMU
+            p.runs[0].add_picture(str(logo), width=Emu(1242417), height=Emu(1311783))
+        else:
             p.paragraph_format.space_after = Pt(100)
-        for text, size, after in ((S("{DEPARTMENT},"), 16, 0), ("School of Technology,", 16, 0),
-                                  ("Pandit Deendayal Energy University", 16, 18), (S("{YEAR}"), 16, 0)):
-            p = d.add_paragraph()
-            pfmt(p, align=WD_ALIGN_PARAGRAPH.CENTER, after=after, line=1.15)
-            set_run_font(p.add_run(text), size, bold=True)
+        self.fp([S("{DEPARTMENT},"), "School of Technology,"], 18, bold=True, before=137, line=1.5)
+        self.fp(["Pandit Deendayal Energy University", S("{YEAR}")], 18, bold=True, line=640 / 240)
 
     def certificate(self):
-        d = self.doc
-        p = d.add_paragraph(); pfmt(p, align=WD_ALIGN_PARAGRAPH.CENTER, after=24, line=1.15, before=12)
-        r = p.add_run("CERTIFICATE"); set_run_font(r, 16, bold=True); r.font.underline = True
+        """Appendix 2 of the template."""
+        self.fp("CERTIFICATE", 16, bold=True, underline=True, before=70)
+        dep = SETTINGS["DEPARTMENT"]
+        dep_short = dep[len("Department of "):] if dep.startswith("Department of ") else dep
         text = S("This is to certify that the seminar report entitled “{PROJECT_TITLE},” submitted by "
                  "{STUDENT_NAME}, has been conducted under the supervision of {GUIDE_NAME}, {GUIDE_DESIG}, and is "
                  "hereby approved for the partial fulfillment of the requirements for the award of the degree of "
-                 "{DEGREE} in the Department of {DEPARTMENT_SHORT} at Pandit Deendayal Energy University, "
-                 "Gandhinagar. This work is original and has not been submitted to any other institution for the "
-                 "award of any degree.")
-        dep = SETTINGS["DEPARTMENT"]
-        text = text.replace("{DEPARTMENT_SHORT}", dep[len("Department of "):] if dep.startswith("Department of ") else dep)
-        p = d.add_paragraph(); pfmt(p, after=60, line=1.5, first=0.5)
-        set_run_font(p.add_run(text), 12)
-        for who, name in (("Guide", SETTINGS["GUIDE_NAME"]), ("Examiner", SETTINGS["EXAMINER_NAME"] or "")):
-            block = ["Sign:", name if name else f"Name of {who}", SETTINGS["GUIDE_DESIG"] if who == "Guide" else "Designation",
-                     "Department", "School of Technology", "Pandit Deendayal Energy University"]
-            for i, t in enumerate(block):
-                p = d.add_paragraph(); pfmt(p, align=WD_ALIGN_PARAGRAPH.LEFT, after=0, line=1.15)
-                set_run_font(p.add_run(t), 12, bold=True)
-            p = d.add_paragraph(); pfmt(p, after=48, line=1.0)
+                 "{DEGREE} in the Department of ") + dep_short + (
+                 " at Pandit Deendayal Energy University, Gandhinagar. This work is original and has not been "
+                 "submitted to any other institution for the award of any degree.")
+        self.fp(text, 16, align=WD_ALIGN_PARAGRAPH.JUSTIFY, before=359, first=1759)
+        self.blank(16); self.blank(16); self.blank(16, before=8)
+        guide = [S("{GUIDE_NAME}"), S("{GUIDE_DESIG}")]
+        examiner = [SETTINGS["EXAMINER_NAME"] or "Name of Examiner", "Designation"]
+        for i, (name, desig) in enumerate((guide, examiner)):
+            if i:
+                self.blank(16, bold=True); self.blank(16, bold=True, before=367)
+            L = WD_ALIGN_PARAGRAPH.LEFT
+            self.fp("Sign:", 16, bold=True, align=L, before=1, exact=368, keep_next=True)
+            self.fp([name, desig, "Department"], 16, bold=True, align=L, keep_next=True)
+            self.fp("School of Technology", 16, bold=True, align=L, keep_next=True)
+            self.fp("Pandit Deendayal Energy University", 16, bold=True, align=L, before=1)
 
     def declaration(self):
-        d = self.doc
-        self.heading("DECLARATION", 1, toc_level=0, toc_text="Declaration")
-        self.para(S("I hereby declare that the seminar report entitled “{PROJECT_TITLE}” is the result of "
-                    "my own work and has been written by me."))
-        self.para("[STUDENT TO COMPLETE: declaration wording about AI tool use, as approved by the guide]")
-        self.para("This declaration is to affirm that the work presented in this report is genuinely conducted by me "
-                  "and to the best of my knowledge, it is original.", after=18)
-        for t in (S("{STUDENT_NAME}"), S("{ROLL_NUMBER}"), S("{DEPARTMENT}"), "School of Technology",
-                  "Pandit Deendayal Energy University", "Gandhinagar"):
-            self.para(t, align=WD_ALIGN_PARAGRAPH.LEFT, bold=True, after=0, line=1.15)
-        self.para(S("Date: {DATE}"), align=WD_ALIGN_PARAGRAPH.LEFT, bold=True, before=12, after=0, line=1.15)
-        self.para(S("Place: {PLACE}"), align=WD_ALIGN_PARAGRAPH.LEFT, bold=True, after=12, line=1.15)
-        self.para("List of Tools Used for the Report with Purpose:", align=WD_ALIGN_PARAGRAPH.LEFT, bold=True, after=4)
+        """Appendix 3 of the template (Declaration for using AI Tools)."""
+        h = self.heading("DECLARATION", 1, toc_level=0, toc_text="Declaration")
+        h.paragraph_format.space_before = Pt(70 / 20)
+        h.paragraph_format.space_after = Pt(0)
+        h.paragraph_format.line_spacing = 2.0
+        J, L = WD_ALIGN_PARAGRAPH.JUSTIFY, WD_ALIGN_PARAGRAPH.LEFT
+        self.fp(S("I hereby declare that the seminar report entitled “{PROJECT_TITLE}” is the result of my own work "
+                  "and has been written by me. This report has not utilized any language model or natural language "
+                  "processing artificial intelligence tools for the creation or generation of content, including "
+                  "the literature survey."), 16, align=J)
+        self.fp("The use of any such artificial intelligence-based tools was strictly confined to the polishing of "
+                "content, spellchecking, and grammar correction after the initial draft of the report was completed. "
+                "No part of this report has been directly sourced from the output of such tools for the final "
+                "submission.", 16, align=J, before=360)
+        self.blank(16, before=1)
+        self.fp("This declaration is to affirm that the work presented in this report is genuinely conducted by me "
+                "and to the best of my knowledge, it is original.", 16, align=J)
+        self.blank(16, before=7)
+        self.fp([S("{STUDENT_NAME}"), S("{ROLL_NUMBER}"), S("{DEPARTMENT}"), "School of Technology"],
+                16, bold=True, align=L, keep_next=True)
+        self.fp(["Pandit Deendayal Energy University", "Gandhinagar"], 16, bold=True, align=L)
+        self.fp([S("Date: {DATE}"), S("Place: {PLACE}")], 16, bold=True, align=L, before=368)
+        self.fp("List of Tools Used for the Report with Purpose:", 16, bold=True, align=L, before=368,
+                keep_next=True)
         for t in self.front["tools"]:
-            self.bullet(t)
+            p = self.fp("\u2022\t" + t, 16, bold=True, align=L, exact=392)
+            f = p.paragraph_format
+            f.left_indent = Inches(0.5); f.first_line_indent = Inches(-0.25)
+            f.tab_stops.add_tab_stop(Inches(0.5))
 
     def acknowledgement(self):
         self.heading("ACKNOWLEDGEMENT", 1, toc_level=0, toc_text="Acknowledgement", page_break_before=True)
@@ -742,11 +784,15 @@ class Builder:
         d = self.doc
         s1 = d.sections[0]
         set_section(s1)
+        # template's own short vertical margins for the unnumbered cover/title/certificate pages
+        # (kept just inside the 24 pt page border); side margins stay at the binding values
+        s1.top_margin = Inches(0.5)
+        s1.bottom_margin = Inches(0.45)
         footer_page_number(s1, show=False)
         self.title_page(colour=True)                 # 1 cover (colour accent on the title only)
-        page_break(d)
+        self._new_page = True                        # page-break-before, so a full page never spills
         self.title_page(colour=False)                # 2 title page (black and white)
-        page_break(d)
+        self._new_page = True
         self.certificate()                           # 3 certificate
 
         s2 = d.add_section(WD_SECTION.NEW_PAGE)      # front matter: roman numerals from i
