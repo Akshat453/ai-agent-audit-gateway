@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Countdown } from "@/components/expiry-countdown";
 import { ErrorState } from "@/components/empty-state";
 import { HashChip } from "@/components/hash-chip";
+import { FullTarget } from "@/components/humanize/full-target";
 import { PhraseView } from "@/components/humanize/phrase";
 import { Term } from "@/components/humanize/term";
 import { PlainLine, PlainStory } from "@/components/humanize/plain";
@@ -134,8 +135,10 @@ export default async function Approval({ params, searchParams }: { params: Promi
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <div className="min-w-0 space-y-4">
           {p.view === "simple" ? (
-            <PlainStory headline={headline} tone={pending ? "warn" : "neutral"} happened={happened} why={why} who={whoRows} canDo={canDoList} />
-          ) : <PlainLine>{headline}</PlainLine>}
+            <PlainStory headline={headline} tone={pending ? "warn" : "neutral"} happened={happened} why={why} who={whoRows} canDo={canDoList}>
+              <FullTarget value={phrase.object} kind={phrase.kind} />
+            </PlainStory>
+          ) : <><PlainLine>{headline}</PlainLine><FullTarget value={phrase.object} kind={phrase.kind} /></>}
           <Technical view={p.view}>
           <div className="space-y-4">
           <Card>

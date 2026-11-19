@@ -2313,6 +2313,8 @@ export interface components {
             delegation: {
                 [key: string]: unknown;
             } | null;
+            /** Detail */
+            detail?: string | null;
             /** Epoch No */
             epoch_no: number | null;
             /** Event Hash */

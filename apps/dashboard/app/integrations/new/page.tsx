@@ -9,7 +9,6 @@ import { SetupPanel } from "@/components/connectors/setup-panel";
 import { Stepper } from "@/components/connectors/stepper";
 import { ErrorState } from "@/components/empty-state";
 import { CsrfField } from "@/components/legacy";
-import { PlainLine } from "@/components/humanize/plain";
 import { Notice } from "@/components/notice";
 import { PageHeader } from "@/components/page-header";
 import { RiskBadge, StatusBadge } from "@/components/status-badge";
@@ -41,7 +40,7 @@ export default async function NewIntegration({ searchParams }: { searchParams: P
   if (!type) {
     return (
       <div className="mx-auto max-w-5xl">
-        <PageHeader title="Add integration" crumbs={crumbs} help="integrations" />
+        <PageHeader toggle={false} title="Add integration" crumbs={crumbs} help="integrations" />
         <ErrorState what="Unknown integration type. Pick one from the catalog." retryHref="/integrations" />
       </div>
     );
@@ -53,16 +52,13 @@ export default async function NewIntegration({ searchParams }: { searchParams: P
   const origin = await dashboardOrigin();
   const isAgent = type.category === "agent_client";
   const header = (
-    <>
-    <PageHeader
+    <PageHeader toggle={false}
       title={`Add ${type.name}`}
       help="integrations"
       crumbs={crumbs}
       description={type.description}
       meta={<span className="text-caption text-gray-11">{CATEGORY_LABEL[type.category]} · auth: {type.auth}</span>}
     />
-    <PlainLine>Adding an integration takes four steps: fill in its settings, test that AgentGuard can reach it, decide which of its actions agents may use (allowed, needs approval, or blocked), then review. Nothing it offers can run until step 3 is done.</PlainLine>
-    </>
   );
   const stepUp = isAdmin ? <StepUpCard csrf={csrf} next={here} remaining={stepUpRemaining} windowSeconds={stepUpWindow} what="add or change connectors" /> : null;
   const notice = msg ? (

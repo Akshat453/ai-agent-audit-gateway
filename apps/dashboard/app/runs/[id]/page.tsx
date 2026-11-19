@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { AgentText } from "@/components/humanize/agent-text";
+import { RunStory, STORY_FILTERS, type StoryFilter } from "@/components/humanize/run-story";
 import { PlainLine, PlainStory } from "@/components/humanize/plain";
 import { Technical } from "@/components/humanize/technical";
 import { Badge, Card, Page, short } from "@/components/legacy";
@@ -10,13 +10,14 @@ import { cn } from "@/lib/cn";
 import { gateway } from "@/lib/gateway";
 import { prefs } from "@/lib/prefs";
 import { ruleBook } from "@/lib/rulebook";
-import { agentKindLabel, agentName, clock, githubRunTitle, runStory, sessionTitle, type CodingLike } from "@/src/humanize";
+import { agentKindLabel, agentName, githubRunTitle, runStory, sessionTitle, type CodingLike } from "@/src/humanize";
 
 const INDENT = ["ml-0", "ml-6", "ml-12", "ml-18"];
-const TONE = { ok: "text-ok-11", bad: "text-bad-11", warn: "text-warn-11", info: "text-info-11" } as const;
 
-export default async function Run({ params }: { params: Promise<{ id: string }> }) {
+export default async function Run({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string>> }) {
   const { id } = await params;
+  const sp = await searchParams;
+  const filter = (STORY_FILTERS.map((f) => f[0]) as string[]).includes(sp.show ?? "") ? (sp.show as StoryFilter) : "all";
   if (!/^[0-9a-fA-F-]{36}$/.test(id)) notFound();
   const [{ data }, p, book] = await Promise.all([(await gateway()).GET("/v1/dashboard/runs/{run_id}", { params: { path: { run_id: id } } }), prefs(), ruleBook()]);
   if (!data) notFound();
@@ -31,23 +32,7 @@ export default async function Run({ params }: { params: Promise<{ id: string }> 
   const who: [string, string][] = s
     ? ([["Developer", s.developer ?? "—"], ["Agent", agentKindLabel(s.agent_kind, s.agent_version)], ["Device", s.device ?? "—"], ["Repository", s.repo ?? "—"], ["Issue", s.issue_number ? `#${s.issue_number}` : "—"]] as [string, string][])
     : [["Agents", agents.join(", ") || "—"]];
-  const storyView = (
-          <section aria-label="Session story">
-      <h2 className="mb-2 text-caption font-semibold uppercase tracking-wide text-gray-11">Story</h2>
-      <ol className="space-y-2 text-dense" data-testid="run-story">
-        {story.map((l, i) => (
-          <li key={`${l.actionId ?? "e"}-${i}`} className="flex flex-wrap items-baseline gap-x-2">
-            <span className="w-20 shrink-0 tabular text-gray-11">{clock(l.at, p.tz)}</span>
-            <span>
-              {l.actionId ? <a href={`/actions/${l.actionId}`} className="text-gray-12">{l.object ? <>{l.verb} <AgentText value={l.object} /></> : l.verb}</a> : l.verb}
-              {l.steps.map((st, k) => <span key={k} className={cn("ml-1", TONE[st.tone])}>→ {st.text}</span>)}
-              {l.why ? <span className="block text-caption text-gray-11" data-testid="story-why">Why: {l.why}</span> : null}
-            </span>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
+  const storyView = <RunStory lines={story} tz={p.tz} filter={filter} baseHref={`/runs/${id}`} />;
   const summary = `${title}: ${actions} action${actions === 1 ? "" : "s"}${s?.status ? `, session ${s.status}` : ""}.`;
   return (
     <Page title={p.view === "simple" ? title : `Run ${short(id, 13)}`} help="run" lead={p.view === "simple" ? "Everything the agent asked to do in this session, in order, and what AgentGuard decided." : "Lifecycle events in recording order (seq). Payloads (args, results) are never shown here."}>

@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 
 import { ALL_RISKS, ALL_STATUSES } from "../../lib/status";
 import {
-  CODING_VERBS, EVENT_TYPES, GLOSSARY, PLAIN_STATUS, REASON_CODES, TOOL_PHRASES, actionStory, agentKindLabel, agentName,
+  CODING_VERBS, EVENT_TYPES, commandSummary, splitCommand, GLOSSARY, PLAIN_STATUS, REASON_CODES, TOOL_PHRASES, actionStory, agentKindLabel, agentName,
   approvalRequest, codingPhrase, githubRunTitle, describeRule, epochSentence, eventSentence, explainHeader, gitVerb, intactness, later,
   plainSteps, policyChanges, proposalItem, runCounts, runStory, ruleReasons, sessionTitle, today, toolPhrase, verificationWords,
   type ActionLike, type RuleBook,
@@ -113,8 +113,10 @@ test("intactness reports a changed record", () => {
 });
 
 test("phrases, names and times", () => {
-  expect(codingPhrase("command_exec", { command: "pnpm test" }).text).toBe("run `pnpm test`");
-  expect(codingPhrase("git_op", { command: "git checkout -b fix/MR-1" }).text).toBe("switch branches (git checkout -b fix/MR-1)");
+  expect(codingPhrase("command_exec", { command: "pnpm test" }).text).toBe("run the tests");
+  expect(codingPhrase("command_exec", { command: "pnpm test" }).object).toBe("pnpm test"); // the whole command stays available
+  expect(codingPhrase("git_op", { command: "git checkout -b fix/MR-1" }).text).toBe("switch branches");
+  expect(codingPhrase("mcp_call", { mcp_tool: "agentguard/cx_gh_github_issue_get" }).text).toBe("read a GitHub issue");
   expect(codingPhrase("mcp_call", { mcp_tool: "issue_get", mcp_server: "agentguard" }).text).toBe("use agentguard/issue_get via MCP");
   expect(gitVerb("git -c core.x=1 commit -m x")).toBe("commit changes");
   expect(toolPhrase("cx_gh_github_pr_create").text).toBe("open a pull request");
@@ -130,6 +132,23 @@ test("phrases, names and times", () => {
   expect(later("2026-11-18T10:00:00Z", "2026-11-18T10:00:02Z")).toBe("right away");
 });
 
+test("commands are summarised for titles (ADR-0043)", () => {
+  const cases: [string, string][] = [
+    ["cd /Users/akshatsingh/Desktop/MintRail/dashboard && pnpm typecheck 2>&1 | tail -15", "Type-check the code"],
+    ['cat "dashboard/app/(app)/refunds/page.tsx"; grep -rn "revalidate" dashboard --include=*.ts | grep -v node_modules', "Read refunds/page.tsx and search the code"],
+    ["cd /Users/akshatsingh/Desktop/MintRail && git rev-parse HEAD && git status --short && git diff --stat && git diff --binary", "Check the git state and compare changes"],
+    ['git ls-files | grep -iv node_modules | grep -i refund; grep -rniE "max-age|s-maxage" .', "List files and search the code"],
+    ["pnpm exec playwright test e2e/smoke.spec.ts 2>&1 | tail -30", "Run the browser tests"],
+    ["head -40 test-results/smoke-overview-*/error-context.md", "Read smoke-overview-*/error-context.md"],
+    ["cd dashboard && pnpm typecheck 2>&1 | tail -15; curl -s -o /dev/null -w \"%{http_code}\" http://localhost:13000/ || true", "Type-check the code and call localhost"],
+    ["API_KEY=[REDACTED] make release", "Run make release"],
+    ["python -c 'print(1)'", "Run inline code"],
+    ["cd x", "Run a command"],
+  ];
+  for (const [cmd, want] of cases) expect(commandSummary(cmd), cmd).toBe(want);
+  expect(splitCommand('echo "a | b; c" && ls')).toEqual([["echo", "a | b; c"], ["ls"]]);
+});
+
 test("run, approval, overview, epoch, verification, proposal and policy sentences", () => {
   expect(runCounts({ actions: 14, statuses: {}, decisions: { ALLOW: 11, DENY: 2, REQUIRE_APPROVAL: 1 } })).toBe("14 actions: 11 allowed, 2 blocked, 1 needed approval");
   const story = runStory([
@@ -139,9 +158,11 @@ test("run, approval, overview, epoch, verification, proposal and policy sentence
     { seq: 4, type: "POLICY_EVALUATED", action_id: "a", decision: "REQUIRE_APPROVAL" }, // the retry's re-check
     { seq: 5, type: "ACTION_COMPLETED", action_id: "a" },
   ], { a: { action_type: "file_write", target: { paths: ["api/src/refunds/service.ts"] } } }, { h1: "akshat" });
-  expect(story[0]?.verb).toBe("Asked to edit");
+  expect(story[0]?.label).toBe("Edit file");
   expect(story[0]?.object).toBe("api/src/refunds/service.ts");
   expect(story[0]?.steps.map((x) => x.text)).toEqual(["needed approval", "approved by akshat 5 min later", "done"]);
+  expect(story[0]?.approval).toEqual(["needed approval", "approved by akshat 5 min later"]);
+  expect(story[0]?.outcome).toEqual({ text: "Approved · ran", tone: "ok" });
   const q = approvalRequest({ tool: { id: "coding.file_write" }, agent: { name: "device:a:b" }, risk_level: "HIGH", state: "PENDING", action_type: "file_write", target: "ledger/src/journal.ts", agent_kind: "claude_code", issue_number: 1 });
   expect(`${q.actor} wants to ${q.verb} ${q.object}${q.tail}.`).toBe("Claude Code wants to edit ledger/src/journal.ts for issue #1.");
   expect(today({ actions: 342, denied: 12, pending: 3, evidence: "VERIFIED", rangeLabel: "24 h" })).toBe(

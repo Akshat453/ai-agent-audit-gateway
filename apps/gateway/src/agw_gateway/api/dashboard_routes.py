@@ -137,6 +137,7 @@ class TimelineEvent(_Out):
     code: str | None
     reasons: list[str]
     rules: list[str] = []  # ADR-0040: matched rule ids (sealed record), for the run story
+    detail: str | None = None  # SECURITY_VIOLATION: what was claimed (an action type, endpoint)
     risk: dict[str, Any] | None
     approval: dict[str, Any] | None
     delegation: dict[str, Any] | None
@@ -647,9 +648,11 @@ def run_detail(request: Request, human: Human, run_id: UUID) -> RunDetail:
                 tool=b.get("tool"),
                 decision=policy.get("effect"),
                 status=outcome.get("status"),
-                code=outcome.get("code"),
+                # SECURITY_VIOLATION: the violation kind (ADR-0042 run story), else the outcome
+                code=outcome.get("code") or (b.get("violation") or {}).get("kind"),
                 reasons=list(policy.get("reasons", [])),
                 rules=[str(x) for x in policy.get("rules", [])],
+                detail=(b.get("violation") or {}).get("claimed"),
                 risk=(
                     {k: b["risk"].get(k) for k in ("level", "score", "rules", "reasons")}
                     if "risk" in b

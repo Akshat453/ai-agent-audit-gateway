@@ -5,8 +5,6 @@ import { CodeView } from "@/components/code-view";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { CsrfField } from "@/components/legacy";
-import { PlainLine } from "@/components/humanize/plain";
-import { Technical } from "@/components/humanize/technical";
 import { Notice } from "@/components/notice";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
@@ -17,7 +15,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { message, viewer } from "@/lib/c2";
 import { tierKey, type Repo } from "@/lib/connectors";
 import { prefs } from "@/lib/prefs";
-import { agentKindLabel, plainStatus, proposalItem } from "@/src/humanize";
+
 
 export const metadata: Metadata = { title: "Repositories" };
 
@@ -35,7 +33,7 @@ export default async function Repos({ searchParams }: { searchParams: Promise<Re
   const { gw, isAdmin, csrf, stepUpRemaining, stepUpWindow } = await viewer();
   const [res, p] = await Promise.all([gw.GET("/v1/repos"), prefs()]);
   const header = (
-    <PageHeader title="Repositories" help="repos" crumbs={[{ label: "Setup" }, { label: "Repositories" }]}
+    <PageHeader toggle={false} title="Repositories" help="repos" crumbs={[{ label: "Setup" }, { label: "Repositories" }]}
       description="Repositories registered by agw init, the tighten-only policy overlay from their .agentguard.yaml, and loosening proposals waiting for an admin." />
   );
   if (!res.data) {
@@ -54,7 +52,6 @@ export default async function Repos({ searchParams }: { searchParams: Promise<Re
     <div className="mx-auto max-w-6xl">
       {header}
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
-      <PlainLine>{repos.length ? `${repos.length} repositor${repos.length === 1 ? "y is" : "ies are"} protected. ${pending ? `${pending} change${pending === 1 ? "" : "s"} to a repository's rules ${pending === 1 ? "is" : "are"} waiting for an admin.` : "No rule changes are waiting."} A repository can make its rules stricter on its own; relaxing them always needs an admin.` : "No repositories yet."}</PlainLine>
       {isAdmin && pending ? <StepUpCard csrf={csrf} next="/repos" remaining={stepUpRemaining} windowSeconds={stepUpWindow} what="decide proposals" /> : null}
       {repos.length === 0 ? (
         <Card><EmptyState title="No repositories yet">A developer runs <code className="font-mono">agw init</code> inside a repository on an enrolled device; it registers here with its .agentguard.yaml.</EmptyState></Card>
@@ -68,15 +65,6 @@ export default async function Repos({ searchParams }: { searchParams: Promise<Re
                 <CardHeader title={r.name} description={r.remote_url}
                   action={<span className="text-caption text-gray-12">policy v{r.policy_version}</span>} />
                 <CardBody className="space-y-4">
-                  <p className="text-dense text-gray-12" data-testid="repo-sentence">
-                    {r.name}: registered by agw init, rules version {r.policy_version}.{" "}
-                    {Object.keys(r.agents ?? {}).length ? `Set up for ${Object.entries(r.agents).map(([k, a]) => `${agentKindLabel(k)} (${plainStatus(`TIER_${String(a.tier ?? "").toUpperCase()}`).toLowerCase()})`).join(", ")}. ` : ""}
-                    {(o.deny_paths ?? []).length ? `Agents may never touch ${(o.deny_paths ?? []).join(", ")}. ` : ""}
-                    {sensitive.length ? `${sensitive.length} sensitive path${sensitive.length === 1 ? "" : "s"} get extra review. ` : ""}
-                    {r.proposals.length ? `${r.proposals.length} change${r.proposals.length === 1 ? "" : "s"} waiting for an admin.` : ""}
-                  </p>
-                  <Technical view={p.view} hint="the exact rules of this repository">
-                  <div className="space-y-4">
                   {Object.keys(r.agents ?? {}).length ? (
                     <div>
                       <h3 className="mb-1 text-caption font-medium text-gray-11">Coding agents set up here</h3>
@@ -94,8 +82,6 @@ export default async function Repos({ searchParams }: { searchParams: Promise<Re
                     <List label="Allowed paths (approved loosening)" items={o.allow_paths ?? []} />
                     <List label="Allowed commands (approved loosening)" items={o.allow_commands ?? []} />
                   </dl>
-                  </div>
-                  </Technical>
                   {r.proposals.length ? (
                     <section aria-label={`Proposals for ${r.name}`} className="space-y-3">
                       <h3 className="text-dense font-semibold">Loosening proposals</h3>
@@ -104,12 +90,7 @@ export default async function Repos({ searchParams }: { searchParams: Promise<Re
                           <div className="mb-2 flex flex-wrap items-center gap-2 text-caption text-gray-11">
                             <StatusBadge value="PROPOSAL_PENDING" size="sm" />proposed <Timestamp iso={pr.created_at} tz={p.tz} />
                           </div>
-                          <ul className="mb-2 list-disc pl-5 text-dense text-gray-12" data-testid="proposal-words">
-                            {pr.items.map((it, k) => <li key={k}>{proposalItem(it)}</li>)}
-                          </ul>
-                          <Technical view={p.view} label="Technical details: proposed policy diff" hint=" ">
-                            <CodeView text={pr.diff || "(no textual change)"} max={6000} label="proposed policy diff" />
-                          </Technical>
+                          <CodeView text={pr.diff || "(no textual change)"} max={6000} label="proposed policy diff" />
                           {isAdmin ? (
                             <>
                               <form id={`prop-${pr.proposal_id}`} method="post" action={`/api/repos/proposals/${pr.proposal_id}/decision`}><CsrfField csrf={csrf} /></form>

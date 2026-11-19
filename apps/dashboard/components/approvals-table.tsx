@@ -12,7 +12,7 @@ import { RiskBadge, StatusBadge } from "@/components/status-badge";
 import { Timestamp } from "@/components/timestamp";
 import { APPROVAL_STATES } from "@/lib/approval";
 import { ALL_RISKS } from "@/lib/status";
-import { approvalRequest, approvalRisk } from "@/src/humanize";
+import { agentName, approvalRequest, approvalRisk, wantsTo } from "@/src/humanize";
 
 export type ApprovalRow = {
   approval_id: string; action_id: string; run_id: string; state: string;
@@ -32,7 +32,7 @@ export function ApprovalsTable({ rows, total, pageSize, fetchedAt, panel, tz, no
         const q = approvalRequest(row.original);
         return (
           <div className="min-w-64 max-w-md whitespace-normal" data-testid="approval-sentence">
-            <div className="text-dense text-gray-12">{q.actor} wants to {q.verb}{q.object ? <> <AgentText value={q.object} /></> : null}{q.tail}.</div>
+            <div className="text-dense text-gray-12">{q.actor} {wantsTo(row.original.state)} {q.verb}{q.object ? <> <AgentText value={q.object} /></> : null}{q.tail}.</div>
             <div className="text-caption text-gray-11">{approvalRisk(row.original, nowMs)}</div>
           </div>
         );
@@ -41,13 +41,13 @@ export function ApprovalsTable({ rows, total, pageSize, fetchedAt, panel, tz, no
       cell: ({ row }) => <RiskBadge level={row.original.risk_level} /> },
     { id: "tool", header: "Tool", meta: { label: "Tool", sortKey: "tool" },
       cell: ({ row }) => <code className="font-mono text-dense">{row.original.tool.id}<span className="text-gray-11">@{row.original.tool.version ?? "?"}</span></code> },
-    { id: "agent", header: "Agent", meta: { label: "Agent" }, cell: ({ row }) => row.original.agent.name },
+    { id: "agent", header: "Agent", meta: { label: "Agent" }, cell: ({ row }) => <span title={row.original.agent.name}>{agentName(row.original.agent.name)}</span> },
     { id: "chain", header: "Requested by", meta: { label: "Requested by (delegation)" },
       cell: ({ row }) => row.original.delegated_by
         ? <span>{row.original.delegated_by} <span className="text-gray-11">→</span> {row.original.agent.name} <span className="text-caption text-gray-11">(depth {row.original.delegation_depth ?? 1})</span></span>
         : <span className="text-gray-11">direct</span> },
     { id: "requested", header: "Requested", meta: { label: "Requested", sortKey: "requested_at" },
-      cell: ({ row }) => <Timestamp iso={row.original.requested_at} tz={tz} /> },
+      cell: ({ row }) => <Timestamp iso={row.original.requested_at} tz={tz} compact /> },
     { id: "expires", header: "Expires in", meta: { label: "Expires in", sortKey: "expires_at" },
       cell: ({ row }) => {
         const r = row.original;

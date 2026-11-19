@@ -10,10 +10,10 @@ import { ALL_RISKS } from "@/lib/status";
  *  the new shell. All text is rendered by React (escaped); nothing uses dangerouslySetInnerHTML,
  *  so tool args/results can never become markup (ADR-0031 §2). */
 
-export function Page({ title, children, lead, help }: { title: string; lead?: ReactNode; children: ReactNode; help?: string }) {
+export function Page({ title, children, lead, help, toggle = true }: { title: string; lead?: ReactNode; children: ReactNode; help?: string; toggle?: boolean }) {
   return (
     <div className="legacy mx-auto max-w-7xl">
-      <PageHeader title={title} description={lead} help={help ?? "default"} />
+      <PageHeader title={title} description={lead} help={help ?? "default"} toggle={toggle} />
       {children}
     </div>
   );

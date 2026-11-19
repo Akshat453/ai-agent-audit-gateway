@@ -3,9 +3,7 @@ import type { Metadata } from "next";
 
 import { ActivityChart } from "@/components/charts/activity-chart";
 import { EmptyState, ErrorState } from "@/components/empty-state";
-import { PlainLine } from "@/components/humanize/plain";
 import { RepoBanner } from "@/components/humanize/repo-switcher";
-import { Technical } from "@/components/humanize/technical";
 import { KpiTile } from "@/components/kpi-tile";
 import { OnboardingChecklist } from "@/components/onboarding/checklist";
 import { PageHeader } from "@/components/page-header";
@@ -20,7 +18,7 @@ import { gateway } from "@/lib/gateway";
 import { prefs } from "@/lib/prefs";
 import { repoScope } from "@/lib/repo-scope";
 import { SERIES } from "@/lib/series";
-import { approvalRequest, plainStatus, today } from "@/src/humanize";
+
 
 export const metadata: Metadata = { title: "Overview" };
 
@@ -50,7 +48,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
   if (!ov.data || !act.data) {
     return (
       <div className="mx-auto max-w-7xl">
-        <PageHeader title="Overview" help="overview" />
+        <PageHeader toggle={false} title="Overview" help="overview" />
         {checklist}
         <ErrorState what="The gateway did not return the overview." requestId={ov.response.headers.get("x-request-id")} retryHref="/" />
       </div>
@@ -71,7 +69,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
 
   return (
     <div className="mx-auto max-w-[1440px]">
-      <PageHeader
+      <PageHeader toggle={false}
         title="Overview"
         help="overview"
         description="What your agents asked to do, what the policy decided, what waits for a human, and how far the evidence is from an on-chain anchor."
@@ -91,53 +89,21 @@ export default async function Overview({ searchParams }: { searchParams: Promise
       {checklist}
       <RepoBanner name={scope.name} />
 
-      {p.view === "simple" ? (
-        <Card className="mb-6" data-testid="today">
-          <CardHeader title="Today in plain English" />
-          <CardBody><p className="text-body text-gray-12" data-testid="plain-headline">{today({ actions: a.current.actions, denied: a.current.denied, pending: o.pending_approvals, evidence, rangeLabel })}</p></CardBody>
-        </Card>
-      ) : <PlainLine>{today({ actions: a.current.actions, denied: a.current.denied, pending: o.pending_approvals, evidence, rangeLabel })}</PlainLine>}
 
       {/* KPI row */}
       <section aria-label="Key figures" className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiTile label={`Actions (${rangeLabel})`} value={count(a.current.actions)} delta={delta(a.current.actions, a.previous.actions)} goodWhen="neutral"
-          spark={a.buckets.map((b) => b.total)} href="/runs" linkLabel="open runs" explain="Everything agents asked AgentGuard to do." />
+          spark={a.buckets.map((b) => b.total)} href="/runs" linkLabel="open runs" />
         <KpiTile label={`Denied (${rangeLabel})`} value={count(a.current.denied)} delta={delta(a.current.denied, a.previous.denied)} goodWhen="down"
-          spark={a.buckets.map((b) => b.DENY)} href="/incidents" linkLabel="open denied incidents" tone={a.current.denied ? "warn" : undefined} explain="Requests AgentGuard stopped. Nothing was done for these." />
+          spark={a.buckets.map((b) => b.DENY)} href="/incidents" linkLabel="open denied incidents" tone={a.current.denied ? "warn" : undefined} />
         <KpiTile label="Pending approvals" value={count(o.pending_approvals)} tone={o.pending_approvals ? "warn" : undefined}
-          sub={o.pending_approvals ? `oldest waiting ${duration(o.oldest_pending_approval_seconds)}` : "nothing waiting"} href="/approvals?state=PENDING" linkLabel="review pending approvals" explain="Requests paused until a person says yes or no." />
+          sub={o.pending_approvals ? `oldest waiting ${duration(o.oldest_pending_approval_seconds)}` : "nothing waiting"} href="/approvals?state=PENDING" linkLabel="review pending approvals" />
         <KpiTile label="Evidence health" tone={evidenceTone}
           value={<StatusBadge value={evidence} size="lg" />}
           sub={o.last_verification ? <>last check <Timestamp iso={o.last_verification.at as string} tz={p.tz} /></> : "no verification yet"}
-          href="/verification" linkLabel="open verification" explain={`Whether the log is untouched: ${plainStatus(evidence).toLowerCase()}.`} />
+          href="/verification" linkLabel="open verification" />
       </section>
 
-      {p.view === "simple" ? (
-        <Card className="mb-6">
-          <CardHeader title="Needs you" description="Approvals waiting for a person, results nobody can confirm, and monitoring alerts" />
-          {attention === 0 ? (
-            <EmptyState title="Nothing needs you right now">When an agent needs a yes or no, it appears here and under Approvals.</EmptyState>
-          ) : (
-            <ul className="divide-y divide-gray-4 text-dense" data-testid="needs-you">
-              {(pend.data?.rows ?? []).map((r) => {
-                const q = approvalRequest(r);
-                return (
-                  <li key={r.approval_id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                    <span>{q.actor} wants to {q.verb}{q.object ? <> <code className="rounded-sm bg-gray-3 px-1 font-mono">{q.object}</code></> : null}{q.tail}. <span className="text-gray-11">Expires <Timestamp iso={r.expires_at} tz={p.tz} compact className="text-gray-11" />.</span></span>
-                    <a href={`/approvals/${r.approval_id}`} className="text-caption font-medium">Review</a>
-                  </li>
-                );
-              })}
-              {(inc.data ?? []).map((i, n) => (
-                <li key={`${i.kind}-${i.action_id ?? n}-${i.at ?? ""}`} className="px-4 py-3">
-                  {i.kind === "outcome_unknown" ? <>Nobody knows whether <code className="font-mono">{i.tool ?? "an action"}</code> happened. <a href="/incidents?kind=outcome_unknown">Record the result</a></> : <>Monitoring alert: {i.code ?? i.kind}. <a href="/verification">Open Verification</a></>}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      ) : null}
-      <Technical view={p.view} hint="charts, the evidence pipeline and system health">
       {/* Row 2 */}
       <div className="mb-6 grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">
@@ -300,7 +266,6 @@ export default async function Overview({ searchParams }: { searchParams: Promise
           ))}
         </ul>
       </section>
-      </Technical>
     </div>
   );
 }

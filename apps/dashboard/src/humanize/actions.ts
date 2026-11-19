@@ -1,3 +1,5 @@
+import { commandSummary } from "./commands";
+
 /** Action type + target -> a verb phrase ("edit api/src/x.ts", "run `pnpm test`") (ADR-0039).
  *  Targets come from the agent (paths, commands): callers render `object` as escaped text and
  *  label it "reported by the agent". Never HTML. */
@@ -9,10 +11,16 @@ export type Target = {
 
 export type Phrase = {
   verb: string; // "edit", "run", "open a pull request"
-  object: string | null; // the agent-reported target, shown in code style
+  /** The agent-reported target, in full (a path, the WHOLE command). Shown where a step is
+   *  opened; titles and lists use `text` (ADR-0043). */
+  object: string | null;
   kind: "path" | "command" | "url" | "query" | "tool" | null;
-  text: string; // the whole phrase as plain text
+  /** The phrase for titles and lists. Commands are summarised ("type-check the code"); paths
+   *  stay ("edit api/src/x.ts"). */
+  text: string;
 };
+
+const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 /** Coding action types (agw.coding-action/1) -> verb (with {x} = target). */
 export const CODING_VERBS: Record<string, { verb: string; none: string; kind: Phrase["kind"] }> = {
@@ -85,12 +93,18 @@ export function codingPhrase(actionType: string, target: Target | null | undefin
   else if (spec.kind === "url" && t.url) object = shorten(t.url);
   else if (spec.kind === "query" && t.query) object = shorten(t.query, 80);
   else if (spec.kind === "tool" && t.mcp_tool) object = t.mcp_server ? `${t.mcp_server}/${t.mcp_tool}` : t.mcp_tool;
-  if (actionType === "git_op" && command) {
-    const verb = gitVerb(command);
-    return { verb, object, kind: "command", text: `${verb} (${object})` };
+  if ((actionType === "git_op" || actionType === "command_exec") && command) {
+    const text = lower(commandSummary(command));
+    return { verb: text, object: command, kind: "command", text };
+  }
+  if (spec.kind === "tool" && t.mcp_tool) {
+    // AgentGuard's own tools (cx_<slug>_<action>) and known actions read as words
+    const name = t.mcp_tool.replace(/^agentguard\//, "");
+    const known = Object.keys(TOOL_PHRASES).find((k) => name === k || name.endsWith(`_${k}`));
+    if (known) return { verb: TOOL_PHRASES[known] as string, object: null, kind: null, text: TOOL_PHRASES[known] as string };
   }
   if (!object) return { verb: spec.none, object: null, kind: null, text: spec.none };
-  const text = spec.kind === "command" ? `run \`${object}\`` : spec.kind === "tool" ? `use ${object} via MCP` : `${spec.verb} ${object}`;
+  const text = spec.kind === "tool" ? `use ${object} via MCP` : `${spec.verb} ${object}`;
   return { verb: spec.verb, object, kind: spec.kind, text };
 }
 

@@ -40,13 +40,24 @@ test("repository switcher scopes runs, approvals, events and incidents; remember
   expect(problems).toEqual([]);
 });
 
-test("run story: every action in plain words, with why it was blocked", async ({ page }) => {
+test("run story: structured rows, one outcome each, why, and filters", async ({ page }) => {
   await login(page, "adam", "technical");
   await page.goto(`/runs/${fx.coding_run}`);
   const story = page.getByTestId("run-story"); // shown in Technical view too
-  await expect(story).toContainText("Asked to read README.md");
-  await expect(story).toContainText("Asked to run pnpm test");
-  await expect(story.getByTestId("story-why").first()).toBeVisible();
-  await expect(story).toContainText("Why: The change would remove webhook signature checks.");
-  await expect(story).toContainText("Why: The command talks to another computer");
+  await expect(story.getByTestId("story-counts")).toContainText("steps:");
+  const row = (text: string) => story.getByRole("listitem").filter({ hasText: text });
+  await expect(row("README.md")).toContainText("Read file");
+  await expect(row("README.md")).toContainText("Allowed");
+  await expect(row("pnpm test").first()).toContainText("Command");
+  await expect(row("pnpm test").first().getByTestId("story-summary")).toHaveText("Run the tests"); // meaning, not the raw command
+  await expect(row("signal/src/sign.ts")).toContainText("Why: The change would remove webhook signature checks.");
+  await expect(row("uploads.example.com")).toContainText("Why: The command talks to another computer");
+  await expect(row(".claude/settings.json")).toContainText("Waiting for approval");
+  // an allow-only rule never shows up as the reason for a block or an approval
+  await expect(story.getByText("Why: A routine command")).toHaveCount(0);
+  await story.getByRole("link", { name: "Blocked" }).click();
+  await expect(page).toHaveURL(/show=blocked/);
+  await expect(page.getByTestId("story-rows").getByRole("listitem")).toHaveCount(2);
+  await page.getByTestId("run-story").getByRole("link", { name: "Commands" }).click();
+  await expect(page.getByTestId("story-rows")).not.toContainText("README.md");
 });

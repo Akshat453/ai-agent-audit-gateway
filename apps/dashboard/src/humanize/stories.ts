@@ -180,7 +180,7 @@ export function actionStory(a: ActionLike, book: RuleBook, tz: Tz = "local"): St
 
 /** The headline as one plain string (tests, titles, screen readers). */
 export function headlineText(s: Story, p: Phrase): string {
-  const what = p.object ? `${p.verb} ${p.object}` : p.text;
+  const what = p.object && p.kind !== "command" ? `${p.verb} ${p.object}` : p.text;
   return `${s.headline.lead}: ${s.headline.actor} ${s.headline.verb} ${what}${s.headline.where}.`;
 }
 
@@ -200,41 +200,108 @@ export function runCounts(r: Pick<RunRowLike, "actions" | "decisions" | "statuse
 export type RunEventLike = {
   seq: number; type: string; occurred_at?: string | null; action_id?: string | null; tool?: { id?: string } | Record<string, unknown> | null;
   decision?: string | null; status?: string | null; approval?: Record<string, unknown> | null; actor?: Record<string, unknown>;
-  rules?: string[]; reasons?: string[];
+  rules?: string[]; reasons?: string[]; code?: string | null; detail?: string | null;
 };
+
+export type StepKind = "command" | "edit" | "read" | "delete" | "search" | "web" | "tool" | "git" | "github" | "security" | "other";
+export type Outcome = { text: string; tone: "ok" | "bad" | "warn" | "info" };
+
 export type StoryLine = {
-  at?: string | null; actionId?: string | null; verb: string; object: string | null;
-  steps: { text: string; tone: "ok" | "bad" | "warn" | "info" }[];
-  /** Why it was blocked or needed a person, in words (from the rule descriptions). */
+  at?: string | null; actionId?: string | null;
+  kind: StepKind;
+  /** Short noun for the step: "Command", "Edit file", "GitHub". */
+  label: string;
+  /** The agent-reported target (command, path, tool), shown as escaped code; or plain text. */
+  object: string | null;
+  /** When there is no object: what it was, in words. */
+  text: string;
+  outcome: Outcome;
+  /** "needed approval", "approved by akshat 2 min later" ... (only when a person was involved). */
+  approval: string[];
   why?: string | null;
+  /** Legacy: every decision step, in order. */
+  steps: { text: string; tone: "ok" | "bad" | "warn" | "info" }[];
+  verb: string;
+};
+
+const KIND_OF: Record<string, [StepKind, string]> = {
+  command_exec: ["command", "Command"], git_op: ["git", "Git"], file_write: ["edit", "Edit file"], file_read: ["read", "Read file"],
+  file_delete: ["delete", "Delete file"], search: ["search", "Search"], web_fetch: ["web", "Web page"], mcp_call: ["tool", "Tool"],
+};
+
+const SECURITY_WORDS: Record<string, string> = {
+  CODING_UNDECIDED_ACTION: "The agent reported doing something AgentGuard had not been asked about",
+  AGENT_ON_HUMAN_ENDPOINT: "The agent tried to use a page meant only for people",
+  AGENT_ID_MISMATCH: "An agent used credentials that are not its own",
+  DELEGATION_REFUSED: "An agent tried to give another agent more power than it has",
 };
 
 export function runStory(events: RunEventLike[], coding: Record<string, CodingLike>, people: Record<string, string>, book?: RuleBook): StoryLine[] {
   const lines: StoryLine[] = [];
-  const byAction = new Map<string, StoryLine & { requestedAt?: string | null }>();
+  const byAction = new Map<string, StoryLine & { requestedAt?: string | null; decided?: boolean }>();
   for (const e of events) {
+    if (e.type === "SECURITY_VIOLATION") {
+      const what = SECURITY_WORDS[e.code ?? ""] ?? "Security problem detected";
+      lines.push({ at: e.occurred_at, kind: "security", label: "Security", object: null, verb: "",
+        text: `${what}${e.detail ? ` (${e.detail.replaceAll("_", " ")})` : ""}.`, outcome: { text: "Flagged", tone: "warn" }, approval: [], steps: [] });
+      continue;
+    }
     if (!e.action_id) {
-      lines.push({ at: e.occurred_at, verb: eventLabel(e.type), object: null, steps: [] });
+      lines.push({ at: e.occurred_at, kind: "other", label: "Log", object: null, verb: "", text: eventLabel(e.type), outcome: { text: "Recorded", tone: "info" }, approval: [], steps: [] });
       continue;
     }
     let line = byAction.get(e.action_id);
     if (!line) {
       const toolId = (e.tool as { id?: string } | null)?.id ?? null;
-      const p = toolPhrase(toolId, coding[e.action_id] ?? null);
-      line = { at: e.occurred_at, actionId: e.action_id, verb: p.object ? `Asked to ${p.verb}` : `Asked to ${p.text}`, object: p.object, steps: [], requestedAt: e.occurred_at };
+      const c = coding[e.action_id] ?? null;
+      const p = toolPhrase(toolId, c);
+      let [kind, label] = c ? KIND_OF[c.action_type] ?? ["other", "Step"] : toolId?.startsWith("cx_") ? (["github", "GitHub"] as [StepKind, string]) : (["other", "Step"] as [StepKind, string]);
+      let object = p.object;
+      let text = p.text;
+      const mcp = c?.target?.mcp_tool ?? "";
+      if (kind === "tool" && /^agentguard\//.test(mcp)) {
+        // AgentGuard's own tools (read issue, submit, open PR) in words
+        kind = "github"; label = "GitHub"; object = null; text = toolPhrase(mcp.slice("agentguard/".length)).text;
+      }
+      if (!object || kind === "command" || kind === "git") text = text.charAt(0).toUpperCase() + text.slice(1);
+      line = { at: e.occurred_at, actionId: e.action_id, kind, label, object, text, verb: p.object ? `Asked to ${p.verb}` : `Asked to ${p.text}`,
+        outcome: { text: "Allowed", tone: "ok" }, approval: [], steps: [], requestedAt: e.occurred_at };
       byAction.set(e.action_id, line);
       lines.push(line);
     }
-    // After a person decided, the identical retry is checked again; that re-check only matters
-    // when it turns stricter (blocked), otherwise it would read "needed approval" twice.
-    const decided = line.steps.some((x) => x.text.startsWith("approved") || x.text.startsWith("rejected"));
-    if (e.type === "POLICY_EVALUATED" && decided && e.decision !== "DENY") continue;
+    const decided = line.decided === true;
+    if (e.type === "POLICY_EVALUATED" && decided && e.decision !== "DENY") continue; // re-check of the approved retry
     const step = storyStep(e, people, line.requestedAt);
     if (step) line.steps.push(step);
-    if (e.type === "POLICY_EVALUATED" && e.decision && e.decision !== "ALLOW") {
-      const why = book ? ruleReasons(book, e.rules ?? []) : [];
-      const best = why.find((r) => !/^(PATH-|REPO-OVERLAY)/.test(r.id)) ?? why[0];
-      line.why = best ? best.why : e.reasons?.[0] ? reasonInWords(e.reasons[0]) : null;
+    switch (e.type) {
+      case "POLICY_EVALUATED":
+        if (e.decision === "DENY") line.outcome = { text: "Blocked", tone: "bad" };
+        else if (e.decision === "REQUIRE_APPROVAL") { line.outcome = { text: "Waiting for approval", tone: "warn" }; line.approval.push("needed approval"); }
+        else line.outcome = { text: "Allowed", tone: "ok" };
+        if (e.decision && e.decision !== "ALLOW") {
+          const why = book ? ruleReasons(book, e.rules ?? []) : [];
+          // the specific finding (content, command, network...) over the generic "sensitive path"
+          const best = why.find((r) => !r.id.startsWith("PATH-")) ?? why[0];
+          line.why = best?.why ?? (e.reasons?.[0] ? reasonInWords(e.reasons[0]) : null);
+        }
+        break;
+      case "APPROVAL_GRANTED":
+        line.decided = true;
+        line.approval.push(`approved by ${people[String(e.approval?.approver ?? "")] ?? "a person"} ${later(line.requestedAt, e.occurred_at)}`.trim());
+        line.outcome = { text: "Approved", tone: "ok" };
+        break;
+      case "APPROVAL_DENIED":
+        line.decided = true;
+        line.approval.push(`rejected by ${people[String(e.approval?.approver ?? "")] ?? "a person"}`);
+        line.outcome = { text: "Rejected", tone: "bad" };
+        break;
+      case "APPROVAL_EXPIRED": line.outcome = { text: "Expired - did not run", tone: "bad" }; break;
+      case "ACTION_DENIED": line.outcome = { text: "Blocked", tone: "bad" }; break;
+      case "ACTION_COMPLETED": line.outcome = { text: line.decided ? "Approved · ran" : "Ran", tone: "ok" }; break;
+      case "ACTION_FAILED": line.outcome = { text: "Failed", tone: "bad" }; break;
+      case "ACTION_OUTCOME_UNKNOWN": line.outcome = { text: "Result unknown", tone: "warn" }; break;
+      case "ACTION_RECONCILED": line.outcome = { text: "Checked by a person", tone: "info" }; break;
+      default: break;
     }
   }
   return lines;
@@ -257,9 +324,16 @@ function storyStep(e: RunEventLike, people: Record<string, string>, since?: stri
     case "ACTION_FAILED": return { text: "failed", tone: "bad" };
     case "ACTION_OUTCOME_UNKNOWN": return { text: "result unknown", tone: "warn" };
     case "ACTION_RECONCILED": return { text: "checked by a person", tone: "info" };
-    case "ACTION_DENIED": return null; // already "blocked"
     default: return null;
   }
+}
+
+/** Counts for the story header: "43 steps: 33 allowed, 2 blocked, 8 needed a person". */
+export function storyCounts(lines: StoryLine[]): string {
+  const steps = lines.filter((l) => l.actionId);
+  const blocked = steps.filter((l) => l.outcome.tone === "bad").length;
+  const person = steps.filter((l) => l.approval.length && l.outcome.tone !== "bad").length;
+  return `${steps.length} step${steps.length === 1 ? "" : "s"}: ${steps.length - blocked - person} went ahead on their own, ${person} needed a person, ${blocked} blocked or did not run`;
 }
 
 // ----------------------------------------------------------------------------- approvals
@@ -270,9 +344,12 @@ export type ApprovalRowLike = {
 
 export function approvalRequest(r: ApprovalRowLike): { actor: string; verb: string; object: string | null; tail: string } {
   const actor = r.agent_kind ? agentKindLabel(r.agent_kind) : agentName(r.agent.name);
+  void r.state;
   const p = r.action_type ? toolPhrase(null, { action_type: r.action_type, target: targetFromShort(r.action_type, r.target) }) : toolPhrase(r.tool.id);
   const tail = r.issue_number ? ` for issue #${r.issue_number}` : "";
-  return { actor, verb: p.object ? p.verb : p.text, object: p.object, tail };
+  // A command is summarised in lists; the whole command is on the approval page (ADR-0043).
+  if (p.kind === "command" || !p.object) return { actor, verb: p.text, object: null, tail };
+  return { actor, verb: p.verb, object: p.object, tail };
 }
 
 function targetFromShort(actionType: string, short: string | null | undefined): Target | null {
@@ -282,6 +359,11 @@ function targetFromShort(actionType: string, short: string | null | undefined): 
   if (actionType === "search") return { query: short };
   if (actionType === "mcp_call") return { mcp_tool: short };
   return { command: short };
+}
+
+/** "wants to" while waiting, "asked to" once decided. */
+export function wantsTo(state: string): string {
+  return state === "PENDING" ? "wants to" : "asked to";
 }
 
 export function approvalRisk(r: Pick<ApprovalRowLike, "risk_level" | "expires_at" | "state">, now: number): string {

@@ -53,3 +53,23 @@ The owner's requirement:
 - **Existing browser specs** pin Technical view through the login helper, because they test today's layout. The new `plain.spec.ts` tests Simple view, and the accessibility scan covers both views (light theme = Simple, dark = Technical).
 - **Loading state.** A route-level loading screen (`app/loading.tsx`) was tried and removed: React's streaming applies `style="display:none"`, which the CSP (unchanged) blocks. Pages are server-rendered and never had a loading screen; error and empty states now say what to do next.
 - **Rate limit.** The per-session API rate limit (burst 60) is reachable when a script opens many pages within seconds. The rule-description cache keeps the plain layer from adding to it.
+
+## Amendment (2026-11-19, owner)
+The Simple / Technical switch is kept only where a page has a plain story next to raw records:
+- Runs and a run (session);
+- an action;
+- Approvals and an approval;
+- Events and an event;
+- Incidents.
+
+These pages are back to their original console, with no switch and no plain-English additions:
+- Overview;
+- Integrations (list, detail, add);
+- Repositories;
+- People;
+- Enroll a device;
+- Verification;
+- Policies, which keeps one line explaining a rule when opened from an action's "see rule" link;
+- Epochs & anchors.
+
+The repository switcher (ADR-0040) still applies to the Overview. `e2e/plain.spec.ts` checks both sets.

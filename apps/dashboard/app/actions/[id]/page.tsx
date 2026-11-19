@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { ErrorState } from "@/components/empty-state";
+import { FullTarget } from "@/components/humanize/full-target";
 import { PhraseView } from "@/components/humanize/phrase";
 import { IntactBadge, PlainLine, PlainSteps, PlainStory } from "@/components/humanize/plain";
 import { Technical } from "@/components/humanize/technical";
@@ -66,10 +67,11 @@ export default async function ActionDetail({ params, searchParams }: { params: P
 
       {p.view === "simple" ? (
         <PlainStory headline={headline} tone={tone} happened={story.happened} why={story.why} who={story.who} canDo={story.canDo}>
+          <FullTarget value={phrase.object} kind={phrase.kind} />
           <IntactBadge intact={story.intact} />
           <PlainSteps steps={steps} />
         </PlainStory>
-      ) : <PlainLine>{headline}</PlainLine>}
+      ) : <><PlainLine>{headline}</PlainLine><div className="mb-4"><FullTarget value={phrase.object} kind={phrase.kind} /></div></>}
       <PullRequestsCard runId={a.run_id} />
       <Technical view={p.view}>
       <Card className="mb-4">

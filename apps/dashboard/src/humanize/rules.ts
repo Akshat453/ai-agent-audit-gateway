@@ -7,8 +7,13 @@ export type RuleBook = { rules: Record<string, RuleText>; patterns: Record<strin
 
 export const EMPTY_BOOK: RuleBook = { rules: {}, patterns: {} };
 
-/** Rules that only say "this was an ordinary file" add nothing when a real reason exists. */
-const NOISE = new Set(["PATH-LOW", "PATH-READ"]);
+/** Rules that only ALLOW (an ordinary file, a known-safe command...) never explain a block or
+ *  an approval; they are dropped whenever another rule matched. */
+const NOISE = new Set([
+  "PATH-LOW", "PATH-READ", "CMD-ALLOW", "CMD-ASSIGN", "CMD-SHELL-SETTING", "MCP-ALLOWED", "WEB-DOCS",
+  "REPO-ALLOW-CMD", "REPO-ALLOW-PATH",
+]);
+const isNoise = (id: string) => NOISE.has(id) || id.startsWith("REPO-OVERLAY-");
 
 export function describeRule(book: RuleBook, id: string): RuleText & { id: string; known: boolean } {
   const exact = book.rules[id];
@@ -23,7 +28,7 @@ export function describeRule(book: RuleBook, id: string): RuleText & { id: strin
 
 /** The human reasons for a set of matched rules, most specific first, without duplicates. */
 export function ruleReasons(book: RuleBook, ids: readonly string[]): (RuleText & { id: string })[] {
-  const useful = ids.some((i) => !NOISE.has(i)) ? ids.filter((i) => !NOISE.has(i)) : ids;
+  const useful = ids.some((i) => !isNoise(i)) ? ids.filter((i) => !isNoise(i)) : ids;
   const seen = new Set<string>();
   const out: (RuleText & { id: string })[] = [];
   for (const id of useful) {
