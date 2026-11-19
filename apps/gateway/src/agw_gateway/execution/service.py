@@ -443,6 +443,15 @@ class ActionService:
             approval_map = (
                 approval.insert(conn, agent.tenant_id, action_id) if approval is not None else None
             )
+            # ADR-0042: which repository this integration action targets (console scope only;
+            # no effect on the decision).
+            repo = _action_repo(conn, agent.tenant_id, spec, validated)
+            if repo is not None:
+                conn.execute(
+                    insert(t.action_repos).values(
+                        action_id=action_id, tenant_id=agent.tenant_id, repo=repo
+                    )
+                )
             # Minimization (ADR-0029 §4): secret fields -> salted markers; unvalidated args
             # are not stored at all (key names + salted digest only).
             intent_args = (
@@ -740,3 +749,29 @@ def _tx1_events(
             )
         )
     return events
+
+
+_REPO_FULL = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+
+
+def _action_repo(
+    conn: Any, tenant: str, spec: ToolSpec | None, validated: BaseModel | None
+) -> str | None:
+    """The repository ("owner/name") a GitHub connector action targets: its ``repo`` argument,
+    else the connector's default (first configured) repository. None for every other tool."""
+    if not (isinstance(spec, ConnectorToolSpec) and spec.binding is not None):
+        return None
+    if spec.binding.type_id != "github":
+        return None
+    requested = getattr(validated, "repo", None) if validated is not None else None
+    repo = requested if isinstance(requested, str) and requested else None
+    if repo is None:
+        cfg = conn.execute(
+            select(t.connectors.c.config).where(
+                t.connectors.c.connector_id == spec.binding.connector_id,
+                t.connectors.c.tenant_id == tenant,
+            )
+        ).scalar_one_or_none()
+        repos = (cfg or {}).get("repos") if isinstance(cfg, dict) else None
+        repo = repos[0] if isinstance(repos, list) and repos and isinstance(repos[0], str) else None
+    return repo if repo is not None and _REPO_FULL.match(repo) else None

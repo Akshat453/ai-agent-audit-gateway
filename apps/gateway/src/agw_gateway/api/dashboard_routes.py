@@ -118,6 +118,7 @@ class RunSummary(_Out):
     # ADR-0039: coding sessions only: developer, device, agent, repository, issue.
     session: CodingSession | None = None
     decisions: dict[str, int] = {}
+    repos: list[str] = []  # ADR-0042: repositories its integration (GitHub) actions targeted
 
 
 class TimelineEvent(_Out):
@@ -170,6 +171,7 @@ class RunDetail(_Out):
     session: CodingSession | None = None
     coding: dict[str, CodingView] = {}
     people: dict[str, str] = {}  # human id -> username, for approvers named in the events
+    repos: list[str] = []  # ADR-0042
 
 
 class EventHeader(_Out):
@@ -368,7 +370,7 @@ def overview(
 ) -> Overview:
     tenant = human.tenant_id
     a = t.actions
-    scope = [a.c.run_id.in_(coding_view.repo_runs(tenant, repo_id))] if repo_id else []
+    scope = [coding_view.in_repo(tenant, repo_id, a.c.run_id, a.c.action_id)] if repo_id else []
 
     with _state(request).engine.connect() as conn:
         per_day = conn.execute(
@@ -379,7 +381,13 @@ def overview(
                 "AND (CAST(:repo AS uuid) IS NULL OR run_id IN"
                 " (SELECT s.session_id FROM coding_sessions s JOIN repos r"
                 " ON r.tenant_id = s.tenant_id AND r.remote_digest = s.repo_digest"
-                " WHERE r.repo_id = CAST(:repo AS uuid) AND s.tenant_id = :t)) "
+                " WHERE r.repo_id = CAST(:repo AS uuid) AND s.tenant_id = :t)"
+                " OR action_id IN (SELECT ar.action_id FROM action_repos ar JOIN repos r2"
+                " ON r2.tenant_id = ar.tenant_id WHERE r2.repo_id = CAST(:repo AS uuid)"
+                " AND ar.tenant_id = :t AND right(lower(regexp_replace(r2.remote_url,"
+                " '\\.git/?$', '')), length(ar.repo) + 1)"
+                " IN ('/' || lower(ar.repo), ':' || lower(ar.repo))))"
+                " "
                 "GROUP BY 1 ORDER BY 1"
             ),
             {"t": tenant, "n": days, "repo": str(repo_id) if repo_id else None},
@@ -459,7 +467,8 @@ def runs(
     repo_id: UUID | None = None,  # ADR-0040: only this repository's sessions
 ) -> list[RunSummary]:
     a, g = t.actions, t.agents
-    scope = [a.c.run_id.in_(coding_view.repo_runs(human.tenant_id, repo_id))] if repo_id else []
+    tenant = human.tenant_id
+    scope = [coding_view.in_repo(tenant, repo_id, a.c.run_id, a.c.action_id)] if repo_id else []
     with _state(request).engine.connect() as conn:
         rows = conn.execute(
             select(
@@ -491,6 +500,7 @@ def runs(
         ):
             decisions.setdefault(run_id, {})[decision] = int(n)
         info = coding_view.sessions(conn, human.tenant_id, [r.run_id for r in rows])
+        repos_of = coding_view.run_repos(conn, human.tenant_id, [r.run_id for r in rows])
     return [
         RunSummary(
             run_id=str(r.run_id),
@@ -502,6 +512,7 @@ def runs(
             delegated=bool(r.delegated),
             session=info.get(r.run_id),
             decisions=decisions.get(r.run_id, {}),
+            repos=repos_of.get(r.run_id, []),
         )
         for r in rows
     ]
@@ -588,6 +599,7 @@ def run_detail(request: Request, human: Human, run_id: UUID) -> RunDetail:
                 )
             )
         session = coding_view.sessions(conn, tenant, [run_id]).get(run_id)
+        run_repos = coding_view.run_repos(conn, tenant, [run_id]).get(run_id, [])
         sealed_approvals = [
             header_for_display(bytes(r.canonical_bytes)).get("approval") for r in rows
         ]  # from the sealed record (ADR-0038)
@@ -665,6 +677,7 @@ def run_detail(request: Request, human: Human, run_id: UUID) -> RunDetail:
         session=session,
         coding={str(k): v for k, v in coding.items()},
         people=people,
+        repos=run_repos,
         approvals=[
             {
                 "approval_id": str(a.approval_id),
@@ -695,7 +708,7 @@ def events(
     ev = t.evidence_events
     conds = [ev.c.tenant_id == human.tenant_id]
     if repo_id is not None:
-        conds.append(ev.c.run_id.in_(coding_view.repo_runs(human.tenant_id, repo_id)))
+        conds.append(coding_view.in_repo(human.tenant_id, repo_id, ev.c.run_id, ev.c.action_id))
     for col, val in (
         (ev.c.event_type, event_type),
         (ev.c.run_id, run_id),
@@ -842,7 +855,7 @@ IncidentKind = Literal["denied", "outcome_unknown", "failed", "security", "alert
 def _incidents(
     conn: Connection, tenant: str, kinds: list[str], limit: int, repo_id: UUID | None = None
 ) -> list[Incident]:
-    runs = coding_view.repo_runs(tenant, repo_id) if repo_id is not None else None
+    rid = repo_id
     out: list[Incident] = []
     a = t.actions
     status_of = {"denied": "DENIED", "outcome_unknown": "OUTCOME_UNKNOWN", "failed": "FAILED"}
@@ -853,7 +866,7 @@ def _incidents(
                 .where(
                     a.c.tenant_id == tenant,
                     a.c.status == status_of[kind],
-                    *([a.c.run_id.in_(runs)] if runs is not None else []),
+                    *([coding_view.in_repo(tenant, rid, a.c.run_id, a.c.action_id)] if rid else []),
                 )
                 .order_by(a.c.updated_at.desc())
                 .limit(limit)
@@ -878,7 +891,11 @@ def _incidents(
                 .where(
                     ev.c.tenant_id == tenant,
                     ev.c.event_type == "SECURITY_VIOLATION",
-                    *([ev.c.run_id.in_(runs)] if runs is not None else []),
+                    *(
+                        [coding_view.in_repo(tenant, rid, ev.c.run_id, ev.c.action_id)]
+                        if rid
+                        else []
+                    ),
                 )
                 .order_by(ev.c.seq.desc())
                 .limit(limit)

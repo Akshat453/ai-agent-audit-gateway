@@ -9,7 +9,7 @@ from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Connection, and_, func, select
+from sqlalchemy import Connection, and_, func, literal, or_, select
 
 from agw_gateway.api.state import GatewayState
 from agw_gateway.db import tables as t
@@ -194,6 +194,34 @@ def repo_runs(tenant: str, repo_id: UUID) -> Any:
     )
 
 
+def repo_actions(tenant: str, repo_id: UUID) -> Any:
+    """SELECT of the integration (GitHub) actions recorded for one repository (ADR-0042). The
+    repository's remote URL is normalised (https or ssh, with or without .git) and must end in
+    "/owner/name" or ":owner/name"."""
+    ar, r = t.action_repos, t.repos
+    norm = func.lower(func.regexp_replace(r.c.remote_url, r"\.git/?$", ""))
+    tail = func.right(norm, func.length(ar.c.repo) + 1)
+    return (
+        select(ar.c.action_id)
+        .join(r, r.c.tenant_id == ar.c.tenant_id)
+        .where(
+            ar.c.tenant_id == tenant,
+            r.c.repo_id == repo_id,
+            or_(
+                tail == literal("/") + func.lower(ar.c.repo),
+                tail == literal(":") + func.lower(ar.c.repo),
+            ),
+        )
+    )
+
+
+def in_repo(tenant: str, repo_id: UUID, run_col: Any, action_col: Any) -> Any:
+    """A row belongs to the repository when its run is a coding session started there, or its
+    action is an integration action recorded for that repository."""
+    runs, acts = repo_runs(tenant, repo_id), repo_actions(tenant, repo_id)
+    return or_(run_col.in_(runs), action_col.in_(acts))
+
+
 class RepoChoice(_Out):
     repo_id: str
     name: str
@@ -210,3 +238,21 @@ def repo_choices(conn: Connection, tenant: str) -> list[RepoChoice]:
         .order_by(r.c.name)
     ).all()
     return [RepoChoice(repo_id=str(i), name=n, sessions=int(c)) for i, n, c in rows]
+
+
+def run_repos(conn: Connection, tenant: str, run_ids: Iterable[UUID]) -> dict[UUID, list[str]]:
+    """Repositories ("owner/name") that each run's integration actions targeted (ADR-0042)."""
+    ids = list({*run_ids})
+    if not ids:
+        return {}
+    a, ar = t.actions, t.action_repos
+    out: dict[UUID, list[str]] = {}
+    for run_id, repo in conn.execute(
+        select(a.c.run_id, ar.c.repo)
+        .join(ar, ar.c.action_id == a.c.action_id)
+        .where(a.c.tenant_id == tenant, ar.c.tenant_id == tenant, a.c.run_id.in_(ids))
+        .distinct()
+        .order_by(ar.c.repo)
+    ):
+        out.setdefault(run_id, []).append(repo)
+    return out

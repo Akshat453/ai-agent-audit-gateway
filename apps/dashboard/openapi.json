@@ -2481,6 +2481,14 @@
       "title": "People",
       "type": "object"
      },
+     "repos": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Repos",
+      "type": "array"
+     },
      "run_id": {
       "title": "Run Id",
       "type": "string"
@@ -2552,6 +2560,14 @@
        }
       ],
       "title": "Last At"
+     },
+     "repos": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Repos",
+      "type": "array"
      },
      "run_id": {
       "title": "Run Id",

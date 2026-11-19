@@ -173,7 +173,12 @@ def activity(
                 " AND (CAST(:repo AS uuid) IS NULL OR a.run_id IN"
                 " (SELECT s.session_id FROM coding_sessions s JOIN repos r"
                 " ON r.tenant_id = s.tenant_id AND r.remote_digest = s.repo_digest"
-                " WHERE r.repo_id = CAST(:repo AS uuid) AND s.tenant_id = :t))"
+                " WHERE r.repo_id = CAST(:repo AS uuid) AND s.tenant_id = :t)"
+                " OR a.action_id IN (SELECT ar.action_id FROM action_repos ar JOIN repos r2"
+                " ON r2.tenant_id = ar.tenant_id WHERE r2.repo_id = CAST(:repo AS uuid)"
+                " AND ar.tenant_id = :t AND right(lower(regexp_replace(r2.remote_url,"
+                " '\\.git/?$', '')), length(ar.repo) + 1)"
+                " IN ('/' || lower(ar.repo), ':' || lower(ar.repo))))"
                 " GROUP BY b.start ORDER BY b.start"
             ),
             {"t": tenant, "span": span, "step": step, **extra},
@@ -192,7 +197,12 @@ def activity(
                 " AND (CAST(:repo AS uuid) IS NULL OR run_id IN"
                 " (SELECT s.session_id FROM coding_sessions s JOIN repos r"
                 " ON r.tenant_id = s.tenant_id AND r.remote_digest = s.repo_digest"
-                " WHERE r.repo_id = CAST(:repo AS uuid) AND s.tenant_id = :t))"
+                " WHERE r.repo_id = CAST(:repo AS uuid) AND s.tenant_id = :t)"
+                " OR action_id IN (SELECT ar.action_id FROM action_repos ar JOIN repos r2"
+                " ON r2.tenant_id = ar.tenant_id WHERE r2.repo_id = CAST(:repo AS uuid)"
+                " AND ar.tenant_id = :t AND right(lower(regexp_replace(r2.remote_url,"
+                " '\\.git/?$', '')), length(ar.repo) + 1)"
+                " IN ('/' || lower(ar.repo), ':' || lower(ar.repo))))"
             ),
             {"t": tenant, "span": span, **extra},
         ).one()
@@ -284,7 +294,7 @@ def approvals(
     if tool is not None:
         conds.append(ac.c.tool_id == tool)
     if repo_id is not None:
-        conds.append(ac.c.run_id.in_(coding_view.repo_runs(human.tenant_id, repo_id)))
+        conds.append(coding_view.in_repo(human.tenant_id, repo_id, ac.c.run_id, ac.c.action_id))
     rank = case(RISK_RANK, value=ac.c.risk_level, else_=-1)
     key = {
         "expires_at": ap.c.expires_at,

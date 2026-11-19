@@ -2201,6 +2201,11 @@ export interface components {
             people: {
                 [key: string]: string;
             };
+            /**
+             * Repos
+             * @default []
+             */
+            repos: string[];
             /** Run Id */
             run_id: string;
             session?: components["schemas"]["CodingSession"] | null;
@@ -2224,6 +2229,11 @@ export interface components {
             first_at: string | null;
             /** Last At */
             last_at: string | null;
+            /**
+             * Repos
+             * @default []
+             */
+            repos: string[];
             /** Run Id */
             run_id: string;
             session?: components["schemas"]["CodingSession"] | null;

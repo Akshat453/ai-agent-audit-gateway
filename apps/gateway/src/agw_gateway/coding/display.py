@@ -64,16 +64,27 @@ def _clip(s: str) -> str:
 
 def display_target(action: CodingAction) -> dict[str, Any]:
     """The normalized targets, with every free-text field redacted and clipped."""
-    shown = normalized_targets(action)
+    return display_from_targets(normalized_targets(action), action.native_tool)
+
+
+def display_from_targets(targets: dict[str, Any], native_tool: str | None) -> dict[str, Any]:
+    """Same, from an already normalized targets map (the evidence payload's
+    ``intent.action.targets``), used to fill in actions recorded before migration 0015."""
+    shown: dict[str, Any] = {}
     for key in ("command", "url", "query"):
-        if isinstance(shown.get(key), str):
-            shown[key] = _clip(redact(shown[key]))
-    if "argv" in shown:
-        shown["argv"] = [_clip(redact(a)) for a in shown["argv"]]
-    if "paths" in shown:
-        shown["paths"] = [_clip(p) for p in shown["paths"]]
-    if action.native_tool:
-        shown["native_tool"] = action.native_tool
+        if isinstance(targets.get(key), str):
+            shown[key] = _clip(redact(targets[key]))
+    if isinstance(targets.get("argv"), list):
+        shown["argv"] = [_clip(redact(str(a))) for a in targets["argv"]]
+    if isinstance(targets.get("paths"), list):
+        shown["paths"] = [_clip(str(p)) for p in targets["paths"]]
+    mcp = targets.get("mcp")
+    if isinstance(mcp, dict) and mcp.get("tool"):
+        shown["mcp"] = {"tool": str(mcp["tool"])}
+        if mcp.get("server"):
+            shown["mcp"]["server"] = str(mcp["server"])
+    if native_tool:
+        shown["native_tool"] = native_tool
     return shown
 
 

@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
 import { gateway } from "@/lib/gateway";
 import { prefs } from "@/lib/prefs";
 import { ruleBook } from "@/lib/rulebook";
-import { agentKindLabel, agentName, clock, runStory, sessionTitle, type CodingLike } from "@/src/humanize";
+import { agentKindLabel, agentName, clock, githubRunTitle, runStory, sessionTitle, type CodingLike } from "@/src/humanize";
 
 const INDENT = ["ml-0", "ml-6", "ml-12", "ml-18"];
 const TONE = { ok: "text-ok-11", bad: "text-bad-11", warn: "text-warn-11", info: "text-info-11" } as const;
@@ -22,7 +22,8 @@ export default async function Run({ params }: { params: Promise<{ id: string }> 
   if (!data) notFound();
   const s = data.session ?? null;
   const first = data.events[0]?.occurred_at ?? null;
-  const title = sessionTitle(s, first, p.tz);
+  const ghRun = !s && (data.repos?.length ?? 0) > 0; // ADR-0042: the agent's GitHub steps
+  const title = ghRun ? githubRunTitle([...new Set(data.events.map((e) => e.agent).filter((x): x is string => !!x))], data.repos) : sessionTitle(s, first, p.tz);
   const coding = data.coding as Record<string, CodingLike>;
   const story = runStory(data.events, coding, data.people ?? {}, book);
   const actions = new Set(data.events.map((e) => e.action_id).filter(Boolean)).size;
@@ -51,7 +52,8 @@ export default async function Run({ params }: { params: Promise<{ id: string }> 
   return (
     <Page title={p.view === "simple" ? title : `Run ${short(id, 13)}`} help="run" lead={p.view === "simple" ? "Everything the agent asked to do in this session, in order, and what AgentGuard decided." : "Lifecycle events in recording order (seq). Payloads (args, results) are never shown here."}>
       {p.view === "simple" ? (
-        <PlainStory headline={summary} who={who} canDo={[{ label: "See open approvals", href: "/approvals" }, { label: "Run an integrity check", href: "/verification" }]}>
+        <PlainStory headline={summary} who={ghRun ? [...who, ["Repository", data.repos.join(", ")] as [string, string]] : who}
+          happened={ghRun ? ["These are the agent's GitHub steps through AgentGuard (reading issues, submitting the change, opening the pull request). Its coding steps (files, commands) are in its Claude Code session under Runs."] : undefined} canDo={[{ label: "See open approvals", href: "/approvals" }, { label: "Run an integrity check", href: "/verification" }]}>
 {storyView}
         </PlainStory>
       ) : (

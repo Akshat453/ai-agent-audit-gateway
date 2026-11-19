@@ -628,6 +628,16 @@ coding_actions = Table(
     Column("diff_removed", Integer),
 )
 
+# ADR-0042: the repository of each integration (GitHub) action.
+action_repos = Table(
+    "action_repos",
+    metadata,
+    Column("action_id", UUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", Text, nullable=False),
+    Column("repo", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+)
+
 # C2 (ADR-0035): connectors, device enrollment, MCP OAuth, repos.
 connectors = Table(
     "connectors",

@@ -52,3 +52,15 @@ export const ROLE_WORDS: Record<string, string> = {
 export function roleWords(roles: readonly string[]): string {
   return roles.map((r) => ROLE_WORDS[r] ?? r).join(", ");
 }
+
+/** "owner/name" -> "name". */
+export function repoShort(full: string): string {
+  return full.includes("/") ? full.slice(full.lastIndexOf("/") + 1) : full;
+}
+
+/** A run with no coding session whose actions are GitHub steps (ADR-0042):
+ *  "GitHub steps by akshat on MintRail". */
+export function githubRunTitle(agents: readonly string[], repos: readonly string[]): string {
+  const who = agents.length ? ` by ${agents.map(agentName).map((n) => n.split(" on ")[0]).join(", ")}` : "";
+  return `GitHub steps${who} on ${repos.map(repoShort).join(", ")}`;
+}

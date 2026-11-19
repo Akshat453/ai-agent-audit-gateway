@@ -35,6 +35,7 @@ from agw_gateway.api.app import load_blob_store, load_key_provider
 from agw_gateway.approvals.signing import generate_key_file
 from agw_gateway.auth.exchange import new_integration_token
 from agw_gateway.auth.tokens import issue_token
+from agw_gateway.coding.backfill import backfill_action_repos, backfill_targets
 from agw_gateway.config import Settings, load_settings
 from agw_gateway.db import create_db_engine
 from agw_gateway.db import tables as t
@@ -303,6 +304,7 @@ def _operator_store(settings: Settings) -> Any:
 
 PHASE7_COMMANDS = frozenset(
     {
+        "backfill-coding-targets",
         "migrate-payloads",
         "rewrap-keys",
         "erase-payload",
@@ -356,6 +358,11 @@ def phase7_command(args: argparse.Namespace, settings: Settings, engine: Engine)
     store = EncryptedPayloadStore(
         provider, load_blob_store(settings), settings.payload_blob_threshold_bytes
     )
+    if args.cmd == "backfill-coding-targets":  # ADR-0041
+        bf = backfill_targets(engine, store, EnvelopeCipher(provider), tenant=args.tenant)
+        repos = backfill_action_repos(engine, store, tenant=args.tenant)  # ADR-0042
+        print(json.dumps(bf.__dict__ | {"action_repos": repos}))
+        return 0
     if args.cmd == "migrate-payloads":
         rep = migrate_plaintext(engine, store, EnvelopeCipher(provider), batch=args.batch)
         print(json.dumps(rep.__dict__ | {"remaining_blocked": rep.remaining_blocked}))
@@ -438,6 +445,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     gkek.add_argument("--dir", help="default: $AGW_KEK_DIR")
     gkek.add_argument("--kek-id", help="default: $AGW_KEK_ID or 'dev'")
     gkek.add_argument("--if-missing", action="store_true", help="no-op if a version exists")
+    bf = sub.add_parser(
+        "backfill-coding-targets",
+        help="show commands/paths of coding actions recorded before 0015 (redacted, idempotent)",
+    )
+    bf.add_argument("--tenant", default=None)
     mp = sub.add_parser("migrate-payloads", help="re-encrypt Phase 2-6 plaintext (resumable)")
     mp.add_argument("--batch", type=int, default=200)
     sub.add_parser("rewrap-keys", help="re-wrap DEKs under the active KEK version")

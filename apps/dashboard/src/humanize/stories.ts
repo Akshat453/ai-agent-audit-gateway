@@ -225,6 +225,10 @@ export function runStory(events: RunEventLike[], coding: Record<string, CodingLi
       byAction.set(e.action_id, line);
       lines.push(line);
     }
+    // After a person decided, the identical retry is checked again; that re-check only matters
+    // when it turns stricter (blocked), otherwise it would read "needed approval" twice.
+    const decided = line.steps.some((x) => x.text.startsWith("approved") || x.text.startsWith("rejected"));
+    if (e.type === "POLICY_EVALUATED" && decided && e.decision !== "DENY") continue;
     const step = storyStep(e, people, line.requestedAt);
     if (step) line.steps.push(step);
     if (e.type === "POLICY_EVALUATED" && e.decision && e.decision !== "ALLOW") {

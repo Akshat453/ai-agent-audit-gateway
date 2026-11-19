@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 import { ALL_RISKS, ALL_STATUSES } from "../../lib/status";
 import {
   CODING_VERBS, EVENT_TYPES, GLOSSARY, PLAIN_STATUS, REASON_CODES, TOOL_PHRASES, actionStory, agentKindLabel, agentName,
-  approvalRequest, codingPhrase, describeRule, epochSentence, eventSentence, explainHeader, gitVerb, intactness, later,
+  approvalRequest, codingPhrase, githubRunTitle, describeRule, epochSentence, eventSentence, explainHeader, gitVerb, intactness, later,
   plainSteps, policyChanges, proposalItem, runCounts, runStory, ruleReasons, sessionTitle, today, toolPhrase, verificationWords,
   type ActionLike, type RuleBook,
 } from "./index";
@@ -126,6 +126,7 @@ test("phrases, names and times", () => {
   expect(sessionTitle({ agent_kind: "claude_code", developer: "akshat", repo: "MintRail", issue_number: 12 })).toBe("Claude Code session by akshat on MintRail - issue #12");
   expect(sessionTitle(null, "2026-11-18T17:48:00Z", "utc")).toBe("Session started 18 Nov, 5:48 PM");
   expect(later("2026-11-18T10:00:00Z", "2026-11-18T10:05:00Z")).toBe("5 min later");
+  expect(githubRunTitle(["device:akshat:Akshats-MacBook-Air:01a1efb5"], ["Akshat453/MintRail"])).toBe("GitHub steps by akshat on MintRail");
   expect(later("2026-11-18T10:00:00Z", "2026-11-18T10:00:02Z")).toBe("right away");
 });
 
@@ -135,7 +136,8 @@ test("run, approval, overview, epoch, verification, proposal and policy sentence
     { seq: 1, type: "ACTION_REQUESTED", action_id: "a", tool: { id: "coding.file_write" }, occurred_at: "2026-11-18T17:48:00Z" },
     { seq: 2, type: "POLICY_EVALUATED", action_id: "a", decision: "REQUIRE_APPROVAL" },
     { seq: 3, type: "APPROVAL_GRANTED", action_id: "a", approval: { approver: "h1" }, occurred_at: "2026-11-18T17:53:00Z" },
-    { seq: 4, type: "ACTION_COMPLETED", action_id: "a" },
+    { seq: 4, type: "POLICY_EVALUATED", action_id: "a", decision: "REQUIRE_APPROVAL" }, // the retry's re-check
+    { seq: 5, type: "ACTION_COMPLETED", action_id: "a" },
   ], { a: { action_type: "file_write", target: { paths: ["api/src/refunds/service.ts"] } } }, { h1: "akshat" });
   expect(story[0]?.verb).toBe("Asked to edit");
   expect(story[0]?.object).toBe("api/src/refunds/service.ts");

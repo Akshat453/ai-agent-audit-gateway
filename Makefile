@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV ?= uv
 COV_PKGS := */agw_gateway/policies/*,*/agw_gateway/auth/*,*/agw_gateway/tools/*,*/agw_gateway/execution/*,*/agw_gateway/approvals/*,*/agw_gateway/humans/*,*/agw_gateway/anchoring/*,*/agw_worker/anchoring/*,*/agw_gateway/privacy/*,*/agw_gateway/keys/*,*/agw_gateway/delegation/*,*/agw_gateway/auth/*,*/agw_sdk/*,*/agw_langgraph/*,*/agw_mcp/*
 
-.PHONY: dashboard-unit console-inventory start stop rebuild c2-mutations c3-mutations coding-policy coding-cli coding-mutations device-key up down migrate test lint demo sync vectors verify-isolated bench tamper risk-eval seal-compare dev-keys approval-attacks approval-mutations contracts-test contracts-check contracts-gas contracts-slither anchor-deploy-anvil anchor-gas anchor-mutations dev-kek privacy-mutations containment injection-corpus delegation-mutations dev-delegation-key integration-latency dashboard-api dashboard-check dashboard-e2e ui-up ui-screenshots monitoring-mutations rq1 rq2 rq3 rq4 rq5 rq6 rq7 experiments plots hardening hardening-ci
+.PHONY: backfill-targets dashboard-unit console-inventory start stop rebuild c2-mutations c3-mutations coding-policy coding-cli coding-mutations device-key up down migrate test lint demo sync vectors verify-isolated bench tamper risk-eval seal-compare dev-keys approval-attacks approval-mutations contracts-test contracts-check contracts-gas contracts-slither anchor-deploy-anvil anchor-gas anchor-mutations dev-kek privacy-mutations containment injection-corpus delegation-mutations dev-delegation-key integration-latency dashboard-api dashboard-check dashboard-e2e ui-up ui-screenshots monitoring-mutations rq1 rq2 rq3 rq4 rq5 rq6 rq7 experiments plots hardening hardening-ci
 
 .env:
 	cp .env.example .env
@@ -184,6 +184,11 @@ rebuild: .env
 	docker compose --profile ui up -d --build
 	@echo "Dashboard: http://localhost:3000  (new account: /signup; demo users when AGW_UI_SEED_DEMO=1)"
 	@echo "Gateway:   http://localhost:8088  (agw login --url http://localhost:8088; MCP: /mcp)"
+
+# ADR-0041: show the commands/paths of coding actions recorded before migration 0015 (once;
+# idempotent; redacted like new actions; evidence is only read).
+backfill-targets:
+	docker compose --profile ui exec -T ui-gateway bash -c '. /app/infra/docker/ui/env.sh && python -m agw_gateway.admin backfill-coding-targets'
 
 stop:
 	docker compose --profile ui --profile monitoring stop

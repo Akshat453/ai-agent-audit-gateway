@@ -616,3 +616,61 @@ def test_dev_tools_over_mcp_and_descriptions(gw: Any, env: Any) -> None:
         "Still running" in out["content"][0]["text"]
         or "Refund rounding" in out["content"][0]["text"]
     )
+
+
+def test_github_actions_belong_to_their_repository(
+    gw: Any, env: Any, migrator_engine: Engine
+) -> None:
+    """ADR-0042: GitHub tool calls (one MCP run per device) are scoped by the repository they
+    targeted, so selecting a repository shows them and no other repository does."""
+    from agw_gateway.coding.backfill import backfill_action_repos
+
+    e, h = env, env["h"]
+    gw.client.post(f"/v1/connectors/{e['cid']}/classify-proposed", headers=h.headers("adam"))
+    one = call(gw, e, "github_issue_get", {"number": 7})  # default repo
+    two = call(gw, e, "github_issue_get", {"number": 7, "repo": REPO})
+    ids = {}
+    for url in ("https://github.com/Akshat453/MintRail.git", "git@github.com:Akshat453/Other.git"):
+        r = gw.client.post(
+            "/v1/coding/repos",
+            json={"remote_url": url, "agents": {}, "agentguard_yaml": "version: 1\n"},
+            headers={"Authorization": f"Bearer {e['key']}"},
+        )
+        assert r.status_code in (200, 201), r.text
+        ids[url] = r.json()["repo_id"]
+    mint, other = (
+        ids["https://github.com/Akshat453/MintRail.git"],
+        ids["git@github.com:Akshat453/Other.git"],
+    )
+    hd = h.headers("audrey")
+
+    def runs(repo: str) -> list[dict[str, Any]]:
+        return list(gw.client.get(f"/v1/dashboard/runs?repo_id={repo}", headers=hd).json())
+
+    got = [r for r in runs(mint) if r["run_id"] == e["run"]]
+    assert got and got[0]["actions"] == 2 and got[0]["repos"] == [REPO]
+    assert all(r["run_id"] != e["run"] for r in runs(other))
+    ev = gw.client.get(f"/v1/dashboard/events?repo_id={mint}&limit=500", headers=hd).json()
+    assert {x["header"].get("action") for x in ev["events"]} >= {one["action_id"], two["action_id"]}
+    act = gw.client.get(f"/v1/dashboard/activity?repo_id={other}", headers=hd).json()
+    assert act["current"]["actions"] == 0
+    detail = gw.client.get(f"/v1/dashboard/runs/{e['run']}", headers=hd).json()
+    assert detail["repos"] == [REPO]
+
+    # Actions decided before 0016 get their repository back from their own payload.
+    with migrator_engine.begin() as conn:
+        conn.execute(
+            text("DELETE FROM action_repos WHERE tenant_id = :t"), {"t": gw.world.tenant_id}
+        )
+    assert all(r["run_id"] != e["run"] for r in runs(mint))
+    done = backfill_action_repos(
+        migrator_engine, gw.state.writer.payloads, tenant=gw.world.tenant_id
+    )
+    assert done["filled"] == 2
+    assert any(r["run_id"] == e["run"] for r in runs(mint))
+    assert (
+        backfill_action_repos(migrator_engine, gw.state.writer.payloads, tenant=gw.world.tenant_id)[
+            "filled"
+        ]
+        == 0
+    )
