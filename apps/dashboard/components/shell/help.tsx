@@ -7,6 +7,7 @@ import { RiskBadge, StatusBadge } from "@/components/status-badge";
 import { useOptionalShell, useShell } from "@/components/shell/context";
 import { HELP } from "@/lib/help";
 import { ALL_RISKS, riskMeta, statusMeta } from "@/lib/status";
+import { meaning } from "@/src/humanize";
 
 /** The "?" next to a page title: opens the help drawer for that page (§4). */
 export function HelpButton({ topic }: { topic: string }) {
@@ -47,6 +48,14 @@ export function HelpDrawer() {
                         <dd className="mt-1 text-gray-11">{statusMeta(s).help}</dd>
                       </div>
                     ))}
+                  </dl>
+                </section>
+              ) : null}
+              {topic.terms?.length ? (
+                <section>
+                  <h3 className="mb-2 text-caption font-medium uppercase tracking-wide text-gray-11">Words on this page</h3>
+                  <dl className="space-y-2" data-testid="help-terms">
+                    {topic.terms.map((t) => <div key={t}><dt className="font-medium text-gray-12">{t}</dt><dd className="text-gray-11">{meaning(t)}</dd></div>)}
                   </dl>
                 </section>
               ) : null}

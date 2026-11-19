@@ -7,16 +7,19 @@ import { Countdown } from "@/components/expiry-countdown";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { HashChip } from "@/components/hash-chip";
+import { AgentText } from "@/components/humanize/agent-text";
 import { RiskBadge, StatusBadge } from "@/components/status-badge";
 import { Timestamp } from "@/components/timestamp";
 import { APPROVAL_STATES } from "@/lib/approval";
 import { ALL_RISKS } from "@/lib/status";
+import { approvalRequest, approvalRisk } from "@/src/humanize";
 
 export type ApprovalRow = {
   approval_id: string; action_id: string; run_id: string; state: string;
   tool: { id: string; version?: string | null }; environment: string; risk_level: string;
   agent: { id: string; name: string }; delegation_depth?: number | null; delegated_by?: string | null;
   required_approvals: number; decisions: number; requested_at?: string | null; expires_at?: string | null;
+  action_type?: string | null; target?: string | null; agent_kind?: string | null; issue_number?: number | null; // ADR-0039
 };
 
 /** Approvals list (§5): soonest expiry first. Deliberately NO approve button in rows. */
@@ -24,6 +27,16 @@ export function ApprovalsTable({ rows, total, pageSize, fetchedAt, panel, tz, no
   rows: ApprovalRow[]; total: number; pageSize: number; fetchedAt: string; panel?: ReactNode; tz: "utc" | "local"; nowMs: number;
 }) {
   const columns: ColumnDef<ApprovalRow, unknown>[] = [
+    { id: "request", header: "Request", meta: { label: "Request (plain English)" }, enableHiding: false,
+      cell: ({ row }) => {
+        const q = approvalRequest(row.original);
+        return (
+          <div className="min-w-64 max-w-md whitespace-normal" data-testid="approval-sentence">
+            <div className="text-dense text-gray-12">{q.actor} wants to {q.verb}{q.object ? <> <AgentText value={q.object} /></> : null}{q.tail}.</div>
+            <div className="text-caption text-gray-11">{approvalRisk(row.original, nowMs)}</div>
+          </div>
+        );
+      } },
     { id: "risk", header: "Risk", meta: { label: "Risk", sortKey: "risk" }, enableHiding: false,
       cell: ({ row }) => <RiskBadge level={row.original.risk_level} /> },
     { id: "tool", header: "Tool", meta: { label: "Tool", sortKey: "tool" },

@@ -1,13 +1,14 @@
 import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { ViewToggle } from "@/components/humanize/view-toggle";
 import { HelpButton } from "@/components/shell/help";
 
 export type Crumb = { label: string; href?: string };
 
 /** Breadcrumbs, then title + one-line description + "?" help + right-aligned actions (§4). */
-export function PageHeader({ title, description, crumbs = [], help, actions, meta }: {
-  title: ReactNode; description?: ReactNode; crumbs?: Crumb[]; help?: string; actions?: ReactNode; meta?: ReactNode;
+export function PageHeader({ title, description, crumbs = [], help, actions, meta, toggle = true }: {
+  title: ReactNode; description?: ReactNode; crumbs?: Crumb[]; help?: string; actions?: ReactNode; meta?: ReactNode; toggle?: boolean;
 }) {
   return (
     <header className="mb-6">
@@ -32,7 +33,10 @@ export function PageHeader({ title, description, crumbs = [], help, actions, met
           {description ? <p className="mt-1 max-w-3xl text-body text-gray-11">{description}</p> : null}
           {meta ? <div className="mt-2 flex flex-wrap items-center gap-2">{meta}</div> : null}
         </div>
-        {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {actions}
+          {toggle ? <ViewToggle /> : null}
+        </div>
       </div>
     </header>
   );

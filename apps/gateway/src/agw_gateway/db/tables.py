@@ -621,6 +621,11 @@ coding_actions = Table(
     Column("correlation", Text),
     Column("observed_at", DateTime(timezone=True)),
     Column("created_at", DateTime(timezone=True)),
+    # ADR-0039: what the console shows (redacted targets, sealed under the KEK; diff counts).
+    Column("target_sealed", LargeBinary),
+    Column("diff_files", Integer),
+    Column("diff_added", Integer),
+    Column("diff_removed", Integer),
 )
 
 # C2 (ADR-0035): connectors, device enrollment, MCP OAuth, repos.

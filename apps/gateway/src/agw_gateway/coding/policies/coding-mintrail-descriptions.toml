@@ -1,0 +1,310 @@
+# Plain-English descriptions of the coding-mintrail rule ids (ADR-0039).
+#
+# Kept NEXT TO the policy files and versioned with them, but in a companion file: the policy
+# files' bytes are hashed into every decision (policy digest), so editing them would change the
+# recorded digest of an existing version. Descriptions never change a decision.
+#
+# Every rule id the coding policy can emit must have an entry (tests/unit/test_rule_descriptions.py).
+# `name` is a short label; `why` is one sentence a non-expert understands.
+
+policy_id = "coding-mintrail"
+applies_to_versions = [1, 2]
+
+# ------------------------------------------------------------------------------------ paths
+[rules."PATH-LOW"]
+name = "Normal code file"
+why = "Normal code file - low risk on its own."
+
+[rules."PATH-READ"]
+name = "Reading a file"
+why = "Reading a file that holds no secrets."
+
+[rules."PATH-HIGH"]
+name = "Sensitive code"
+why = "This file holds sensitive logic (for example money, ledger or signing code), so changes are reviewed."
+
+[rules."PATH-CRITICAL"]
+name = "Critical file"
+why = "This file controls security, CI, infrastructure or the agent's own guard, so a change needs a specific reviewer."
+
+[rules."PATH-CRITICAL-DEPENDENCIES"]
+name = "Dependency change"
+why = "The change edits the project's dependencies (package.json), which can pull in outside code."
+
+[rules."PATH-DELETE-TEST"]
+name = "Test file deleted"
+why = "Deleting a test file can hide a broken feature, so it is reviewed."
+
+[rules."PATH-OUTSIDE-WORKSPACE"]
+name = "Outside the project"
+why = "The agent tried to touch a file outside the project folder."
+
+[rules."PATH-INVALID"]
+name = "Invalid path"
+why = "The file path is malformed or tries to escape the project folder."
+
+[rules."PATH-SSH"]
+name = "SSH keys"
+why = "Writing SSH keys could give someone remote access, so it is never allowed."
+
+[rules."SECRET-READ"]
+name = "Secret file"
+why = "The file holds secrets (like .env or private keys), so the agent may not read it."
+
+[rules."SECRET-WRITE"]
+name = "Writing secrets"
+why = "The agent tried to write a file that holds secrets."
+
+# --------------------------------------------------------------------------------- commands
+[rules."CMD-ALLOW"]
+name = "Allowed command"
+why = "A routine command (build, test, lint) that is on the allow list."
+
+[rules."CMD-ASSIGN"]
+name = "Shell variable"
+why = "Only sets a shell variable; nothing runs."
+
+[rules."CMD-SHELL-SETTING"]
+name = "Shell setting"
+why = "Only changes a shell setting; nothing runs."
+
+[rules."CMD-UNKNOWN"]
+name = "Unlisted command"
+why = "The command is not on the list of known-safe commands."
+
+[rules."CMD-EMPTY"]
+name = "Empty command"
+why = "The agent asked to run an empty command."
+
+[rules."CMD-UNPARSEABLE"]
+name = "Unclear command"
+why = "The command could not be understood, so AgentGuard cannot tell what it would do."
+
+[rules."CMD-TOO-NESTED"]
+name = "Too complex"
+why = "The command nests other commands too deeply to check safely."
+
+[rules."CMD-REDIRECT-UNKNOWN"]
+name = "Unclear output target"
+why = "The command writes its output somewhere AgentGuard cannot check."
+
+[rules."CMD-NETWORK"]
+name = "Network access"
+why = "The command talks to another computer (curl, ssh, scp...), which could send data out."
+
+[rules."NET-PRODUCTION"]
+name = "Production system"
+why = "The command targets a live production system."
+
+[rules."CMD-PRIVILEGE"]
+name = "Admin rights"
+why = "The command asks for administrator rights (sudo)."
+
+[rules."CMD-DEPLOY"]
+name = "Deploy"
+why = "The command would deploy or change live infrastructure."
+
+[rules."CMD-PUBLISH"]
+name = "Publish"
+why = "The command would publish a package or release to the outside world."
+
+[rules."CMD-PACKAGE-RUNNER"]
+name = "Download and run"
+why = "The command downloads and runs a package in one step (npx, pnpm dlx), so unknown code would run."
+
+[rules."CMD-PIPE-TO-SHELL"]
+name = "Pipe into a shell"
+why = "The command pipes text into a shell, which runs code nobody reviewed."
+
+[rules."CMD-ENV-PRINT"]
+name = "Prints secrets"
+why = "The command prints environment variables, which often contain secrets."
+
+[rules."CMD-INLINE-CODE"]
+name = "Inline code"
+why = "The command runs code written inline (python -c, node -e), which can do anything, including reach the network."
+
+[rules."CMD-SCRIPT"]
+name = "Shell script"
+why = "The command runs a shell script whose contents were not checked."
+
+[rules."CMD-CHMOD"]
+name = "Permissions change"
+why = "The command changes file permissions."
+
+[rules."CMD-CHMOD-HOOKS"]
+name = "Guard permissions"
+why = "The command changes permissions on the agent's own guard or hook files."
+
+[rules."CMD-DOCKER"]
+name = "Docker"
+why = "The command runs a Docker container."
+
+[rules."CMD-DOCKER-PRIVILEGED"]
+name = "Privileged container"
+why = "The container would get full control of the computer."
+
+[rules."CMD-FIND-EXEC"]
+name = "find -exec / -delete"
+why = "find would run a command or delete files for every match."
+
+[rules."CMD-MIGRATION"]
+name = "Database migration"
+why = "The command changes the database structure."
+
+[rules."CMD-RM-RECURSIVE"]
+name = "Deletes a folder"
+why = "The command deletes a whole folder inside the project."
+
+[rules."CMD-RM-GLOB"]
+name = "Wildcard delete"
+why = "The command deletes files matching a wildcard, so it may delete more than intended."
+
+[rules."CMD-RM-OUTSIDE"]
+name = "Deletes outside the project"
+why = "The command deletes files outside the project folder."
+
+[rules."CMD-REPO-DENY"]
+name = "Blocked by the repository"
+why = "The repository's own rules (.agentguard.yaml) forbid this command."
+
+[rules."PKG-INSTALL"]
+name = "Install dependencies"
+why = "Installing dependencies may change the lockfile and pull in outside code."
+
+[rules."PKG-ADD"]
+name = "Add a dependency"
+why = "Adding a new package brings outside code into the project."
+
+# -------------------------------------------------------------------------------------- git
+[rules."GIT-ASK"]
+name = "Git command"
+why = "A git command that can change or discard work."
+
+[rules."GIT-CONFIG"]
+name = "Git option"
+why = "The command sets a one-off git option (git -c)."
+
+[rules."GIT-CONFIG-DENIED"]
+name = "Dangerous git option"
+why = "The git option could run arbitrary programs."
+
+[rules."GIT-NO-VERIFY"]
+name = "Skips git hooks"
+why = "The commit skips the repository's safety hooks (--no-verify)."
+
+[rules."GIT-PUSH"]
+name = "git push"
+why = "Agents may not push; changes go to GitHub only through AgentGuard's reviewed submit."
+
+[rules."GIT-REMOTE"]
+name = "Git remote change"
+why = "Changing where the repository pushes to is not allowed."
+
+# ---------------------------------------------------------------------------------- content
+[rules."CONTENT-SECRET"]
+name = "Hardcoded secret"
+why = "The change would put a password or key directly in the code."
+
+[rules."CONTENT-SIGNATURE-BYPASS"]
+name = "Signature bypass"
+why = "The change would remove webhook signature checks."
+
+[rules."CONTENT-MONEY-NUMBER"]
+name = "Unsafe money math"
+why = "The change turns exact money amounts (bigint) into ordinary numbers, which can lose paise."
+
+[rules."CONTENT-TEST-REMOVED"]
+name = "Tests removed"
+why = "The change removes test cases."
+
+[rules."CONTENT-TEST-SKIP"]
+name = "Tests skipped"
+why = "The change switches tests off (.skip / .only / .todo)."
+
+[rules."CONTENT-CI-DISABLED"]
+name = "CI step disabled"
+why = "The change turns off a check in the CI pipeline."
+
+[rules."CONTENT-AUTHORIZED-KEYS"]
+name = "SSH key added"
+why = "The change adds an SSH key that would grant someone access."
+
+[rules."CONTENT-UNKNOWN"]
+name = "Change not visible"
+why = "The agent did not send the change itself, so its content could not be checked."
+
+# -------------------------------------------------------------------------------- web / MCP
+[rules."WEB-DOCS"]
+name = "Documentation site"
+why = "Fetching a page from an allowed documentation site."
+
+[rules."WEB-ASK"]
+name = "Web page"
+why = "Fetching a page from a site that is not on the documentation list."
+
+[rules."WEB-NO-URL"]
+name = "No URL"
+why = "A web fetch without a URL."
+
+[rules."WEB-SCHEME"]
+name = "Not a web address"
+why = "Only http and https addresses may be fetched."
+
+[rules."MCP-ALLOWED"]
+name = "Allowed tool"
+why = "An MCP tool on the allow list."
+
+[rules."MCP-ASK"]
+name = "Tool needs approval"
+why = "This tool needs a human approval before it runs."
+
+[rules."MCP-DENIED"]
+name = "Tool blocked"
+why = "This MCP tool is on the block list."
+
+[rules."MCP-UNKNOWN"]
+name = "Unnamed tool"
+why = "An MCP call that does not say which tool it uses."
+
+# ------------------------------------------------------------------------- request problems
+[rules."CODE-INCOMPLETE"]
+name = "Request unclear"
+why = "AgentGuard could not fully understand what the agent asked to do."
+
+[rules."CODE-NO-RULE"]
+name = "No rule matched"
+why = "No rule covers this action, so a human decides."
+
+[rules."CODE-NO-TARGET"]
+name = "No file named"
+why = "A write that does not say which file it changes."
+
+[rules."CODE-UNKNOWN-TYPE"]
+name = "Unknown action"
+why = "The agent asked for a kind of action AgentGuard does not know."
+
+[rules."CODE-SESSION-MISMATCH"]
+name = "Wrong session"
+why = "The request did not match the coding session it claimed to belong to."
+
+# ------------------------------------------------------------------------ approvals / repo
+[rules."HITL-APPROVAL"]
+name = "Human approval"
+why = "A person must approve this before it runs."
+
+[rules."APPROVAL-REJECTED"]
+name = "Rejected by a person"
+why = "A person rejected an identical request earlier in this session."
+
+[rules."REPO-ALLOW-PATH"]
+name = "Repository exception"
+why = "An admin approved an exception for this path in the repository's rules."
+
+[rules."REPO-ALLOW-CMD"]
+name = "Repository exception"
+why = "An admin approved this command for the repository."
+
+[patterns."REPO-OVERLAY-v*"]
+name = "Repository rules"
+why = "Extra rules set by the repository (.agentguard.yaml), version {suffix}."

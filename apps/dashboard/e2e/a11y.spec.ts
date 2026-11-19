@@ -13,7 +13,7 @@ const SCREENS = () => [
 
 // Phase 9.5: every page in BOTH themes; zero serious/critical axe findings, zero CSP violations.
 for (const theme of ["light", "dark"] as const) {
-  test(`axe (${theme}): no serious/critical accessibility violations; no CSP violations`, async ({ page, context, baseURL }) => {
+  test(`axe (${theme}, ${theme === "light" ? "simple" : "technical"} view): no serious/critical accessibility violations; no CSP violations`, async ({ page, context, baseURL }) => {
     test.setTimeout(300_000); // 24 pages scanned per theme; the default 30 s is per test
     const problems = watch(page);
     await context.addCookies([{ name: "agw_theme", value: theme, url: baseURL ?? "http://localhost:23000", httpOnly: true, secure: true, sameSite: "Strict" }]);
@@ -23,7 +23,8 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/signup");
     const signupScan = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
     expect(signupScan.violations.filter((v) => v.impact === "serious" || v.impact === "critical")).toEqual([]);
-    await login(page, "adam");
+    // ADR-0039: the light run scans Simple view (the default), the dark run Technical view.
+    await login(page, "adam", theme === "light" ? "simple" : "technical");
     await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${theme}\\b`));
     const screens = SCREENS();
     // an event page (the proof explorer) reached from the action's evidence timeline

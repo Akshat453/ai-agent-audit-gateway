@@ -241,3 +241,11 @@ Approval: send_email@1.0.0 (?)   [PENDING] [HIGH] requested 8 min ago
 - Tabs are WAI-ARIA, with roving tabindex and arrow keys.
 - Reduced motion is respected.
 - **Verification:** `e2e/a11y.spec.ts` runs axe (wcag2a and wcag2aa) on login plus 13 pages, in light **and** dark. Result: zero serious or critical findings.
+
+
+## Plain-English layer (ADR-0039)
+- **Views.** Simple view (default) and Technical view. The `agw_view` cookie is switched from the user menu or the page-header toggle.
+- **Simple view.** Each page opens with a plain headline. Detail pages add the "What happened / Why / Who / What you can do" block; the technical content folds under "Technical details" on the same page.
+- **Technical view.** Today's layout plus the summary line.
+- **Words.** All user-facing words for technical concepts come from `apps/dashboard/src/humanize/`.
+- **Inventory.** `docs/gateway/console-field-inventory.md` lists what must never disappear; `e2e/inventory.spec.ts` enforces it.

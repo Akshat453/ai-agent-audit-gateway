@@ -144,7 +144,7 @@ test("plain-English explanations: action timeline steps and the event page", asy
   await expect(first).toContainText(/asked to/);
   const ev = await page.locator('ol[aria-label="Evidence timeline"] a[href^="/events/"]').first().getAttribute("href");
   await page.goto(ev ?? "/");
-  await expect(page.getByTestId("event-plain")).toContainText(/The AI agent asked to/);
+  await expect(page.getByTestId("event-plain")).toContainText(/The agent asked to/);
   await expect(page.getByRole("heading", { name: "Raw record" })).toBeVisible();
   expect(problems).toEqual([]);
 });

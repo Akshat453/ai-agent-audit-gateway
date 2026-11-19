@@ -17,6 +17,7 @@ independent verifier (agw-verify with pinned trust roots) stays authoritative.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -24,6 +25,7 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import Connection, and_, case, func, select, text
 
+from agw_gateway.api import coding_view
 from agw_gateway.api.approval_routes import Human
 from agw_gateway.api.dashboard_routes import _anchor_view, _iso, _state
 from agw_gateway.crypto.canonical import event_hash
@@ -31,6 +33,7 @@ from agw_gateway.db import tables as t
 from agw_gateway.evidence.bundle import epoch_record
 from agw_gateway.evidence.sealed import header_for_display, stored_copy_ok
 from agw_gateway.execution.errors import Forbidden, NotFound
+from agw_gateway.policies import descriptions
 
 router = APIRouter(prefix="/v1")
 ZERO = "0" * 64
@@ -146,9 +149,11 @@ def activity(
     request: Request,
     human: Human,
     range_: Annotated[Literal["24h", "7d", "30d"], Query(alias="range")] = "24h",
+    repo_id: UUID | None = None,  # ADR-0040
 ) -> Activity:
     span, step = RANGES[range_]
     tenant = human.tenant_id
+    extra = {"repo": str(repo_id) if repo_id else None}
     with _state(request).engine.connect() as conn:
         rows = conn.execute(
             text(
@@ -164,10 +169,14 @@ def activity(
                 " count(a.action_id),"
                 " extract(epoch FROM CAST(:step AS interval)) "
                 "FROM b LEFT JOIN actions a ON a.tenant_id = :t"
-                " AND a.created_at >= b.start AND a.created_at < b.start + CAST(:step AS interval) "
-                "GROUP BY b.start ORDER BY b.start"
+                " AND a.created_at >= b.start AND a.created_at < b.start + CAST(:step AS interval)"
+                " AND (CAST(:repo AS uuid) IS NULL OR a.run_id IN"
+                " (SELECT s.session_id FROM coding_sessions s JOIN repos r"
+                " ON r.tenant_id = s.tenant_id AND r.remote_digest = s.repo_digest"
+                " WHERE r.repo_id = CAST(:repo AS uuid) AND s.tenant_id = :t))"
+                " GROUP BY b.start ORDER BY b.start"
             ),
-            {"t": tenant, "span": span, "step": step},
+            {"t": tenant, "span": span, "step": step, **extra},
         ).all()
         totals = conn.execute(
             text(
@@ -180,8 +189,12 @@ def activity(
                 " count(*) FILTER (WHERE created_at <= now() - CAST(:span AS interval)"
                 "   AND created_at > now() - 2 * CAST(:span AS interval) AND decision = 'DENY') "
                 "FROM actions WHERE tenant_id = :t"
+                " AND (CAST(:repo AS uuid) IS NULL OR run_id IN"
+                " (SELECT s.session_id FROM coding_sessions s JOIN repos r"
+                " ON r.tenant_id = s.tenant_id AND r.remote_digest = s.repo_digest"
+                " WHERE r.repo_id = CAST(:repo AS uuid) AND s.tenant_id = :t))"
             ),
-            {"t": tenant, "span": span},
+            {"t": tenant, "span": span, **extra},
         ).one()
         pipeline = _pipeline(conn, tenant)
     return Activity(
@@ -225,6 +238,11 @@ class ApprovalRow(_Out):
     decisions: int
     requested_at: str | None
     expires_at: str | None
+    # ADR-0039: coding actions only: what it targets (redacted), e.g. a path or a command.
+    action_type: str | None = None
+    target: str | None = None
+    agent_kind: str | None = None
+    issue_number: int | None = None
 
 
 class ApprovalPage(_Out):
@@ -246,6 +264,7 @@ def approvals(
     order: Annotated[Literal["asc", "desc"], Query()] = "asc",
     limit: Annotated[int, Query(ge=1, le=200)] = 25,
     offset: Annotated[int, Query(ge=0, le=100_000)] = 0,
+    repo_id: UUID | None = None,  # ADR-0040: only this repository's approvals
 ) -> ApprovalPage:
     # Same viewers as GET /v1/approvals (ApprovalService._require_viewer).
     if not (human.roles & {"approver", "auditor", "admin"}):
@@ -264,6 +283,8 @@ def approvals(
         conds.append(ac.c.risk_level == risk)
     if tool is not None:
         conds.append(ac.c.tool_id == tool)
+    if repo_id is not None:
+        conds.append(ac.c.run_id.in_(coding_view.repo_runs(human.tenant_id, repo_id)))
     rank = case(RISK_RANK, value=ac.c.risk_level, else_=-1)
     key = {
         "expires_at": ap.c.expires_at,
@@ -304,6 +325,10 @@ def approvals(
             .limit(limit)
             .offset(offset)
         ).all()
+        coding = coding_view.actions(
+            conn, _state(request), human.tenant_id, [r.action_id for r in rows]
+        )
+        sessions = coding_view.sessions(conn, human.tenant_id, [r.run_id for r in rows])
     return ApprovalPage(
         total=int(total),
         rows=[
@@ -322,6 +347,10 @@ def approvals(
                 decisions=int(r.votes),
                 requested_at=_iso(r.requested_at),
                 expires_at=_iso(r.expires_at),
+                action_type=coding[r.action_id].action_type if r.action_id in coding else None,
+                target=coding_view.short_target(coding.get(r.action_id)),
+                agent_kind=sessions[r.run_id].agent_kind if r.run_id in sessions else None,
+                issue_number=sessions[r.run_id].issue_number if r.run_id in sessions else None,
             )
             for r in rows
         ],
@@ -354,6 +383,7 @@ class EvidenceNode(_Out):
     decision: str | None
     status: str | None
     reasons: list[str]
+    rules: list[str] = []  # ADR-0039: matched rule ids (from the sealed record)
 
 
 def _nodes(conn: Connection, request: Request, tenant: str, rows: list[Any]) -> list[EvidenceNode]:
@@ -425,18 +455,32 @@ def _nodes(conn: Connection, request: Request, tenant: str, rows: list[Any]) -> 
                 decision=policy.get("effect"),
                 status=outcome.get("status"),
                 reasons=[str(x) for x in policy.get("reasons", [])],
+                rules=[str(x) for x in policy.get("rules", [])],
             )
         )
     return out
 
 
 # --------------------------------------------------------------------------- action detail
+def _us_iso(us: int | None) -> str | None:
+    if us is None:
+        return None
+    return datetime.fromtimestamp(us / 1_000_000, tz=UTC).isoformat().replace("+00:00", "Z")
+
+
+class DecisionRef(_Out):
+    approver: str  # username
+    decision: str  # APPROVED | REJECTED
+    decided_at: str | None
+
+
 class ApprovalRef(_Out):
     approval_id: str
     state: str
     required_approvals: int
     requested_at: str | None
     expires_at: str | None
+    decisions: list[DecisionRef] = []  # ADR-0039: who decided, and when
 
 
 class DelegationRef(_Out):
@@ -466,6 +510,9 @@ class ActionDetail(_Out):
     updated_at: str | None
     approvals: list[ApprovalRef]
     events: list[EvidenceNode]
+    # ADR-0039: coding actions only (None otherwise): target, diff counts, session context.
+    coding: coding_view.CodingView | None = None
+    session: coding_view.CodingSession | None = None
 
 
 @router.get("/dashboard/actions/{action_id}", response_model=ActionDetail)
@@ -502,6 +549,23 @@ def action_detail(request: Request, human: Human, action_id: UUID) -> ActionDeta
             .order_by(ev.c.seq)
         ).all()
         nodes = _nodes(conn, request, tenant, list(rows))
+        decided: dict[Any, list[DecisionRef]] = {}
+        dec = t.approval_decisions
+        for r in conn.execute(
+            select(dec.c.approval_id, dec.c.decision, dec.c.decided_at_us, t.humans.c.username)
+            .join(t.humans, t.humans.c.human_id == dec.c.approver_id)
+            .where(dec.c.approval_id.in_([p.approval_id for p in aps] or [None]))
+            .order_by(dec.c.decided_at_us)
+        ):
+            decided.setdefault(r.approval_id, []).append(
+                DecisionRef(
+                    approver=r.username,
+                    decision=r.decision,
+                    decided_at=_us_iso(r.decided_at_us),
+                )
+            )
+        coding = coding_view.actions(conn, _state(request), tenant, [a.action_id]).get(a.action_id)
+        session = coding_view.sessions(conn, tenant, [a.run_id]).get(a.run_id) if coding else None
     return ActionDetail(
         action_id=str(a.action_id),
         run_id=str(a.run_id),
@@ -523,10 +587,13 @@ def action_detail(request: Request, human: Human, action_id: UUID) -> ActionDeta
                 required_approvals=int(p.required_approvals),
                 requested_at=_iso(p.requested_at),
                 expires_at=_iso(p.expires_at),
+                decisions=decided.get(p.approval_id, []),
             )
             for p in aps
         ],
         events=nodes,
+        coding=coding,
+        session=session,
     )
 
 
@@ -798,3 +865,35 @@ def search(
                 )
             )
     return hits[:10]
+
+
+# --------------------------------------------------------------------------- rule descriptions
+class RuleDescription(_Out):
+    name: str
+    why: str
+
+
+class RuleDescriptions(_Out):
+    rules: dict[str, RuleDescription]
+    patterns: dict[str, RuleDescription]  # "PREFIX*": {suffix} in `why` is the matched rest
+    policies: list[dict[str, Any]]
+
+
+@router.get("/dashboard/rule-descriptions", response_model=RuleDescriptions)
+def rule_descriptions(human: Human) -> RuleDescriptions:
+    """Plain-English names for every rule id (ADR-0039). Display only; static per release."""
+    d = descriptions.load()
+    return RuleDescriptions(
+        rules={k: RuleDescription(**v) for k, v in d["rules"].items()},
+        patterns={k: RuleDescription(**v) for k, v in d["patterns"].items()},
+        policies=d["policies"],
+    )
+
+
+# --------------------------------------------------------------------------- repository switcher
+@router.get("/dashboard/repo-choices", response_model=list[coding_view.RepoChoice])
+def repo_choices(request: Request, human: Human) -> list[coding_view.RepoChoice]:
+    """Names of this tenant's repositories for the console's repository switcher (ADR-0040).
+    Names only (no overlay, no proposals): any signed-in human may filter by repository."""
+    with _state(request).engine.connect() as conn:
+        return coding_view.repo_choices(conn, human.tenant_id)

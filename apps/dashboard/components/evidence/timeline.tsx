@@ -5,7 +5,7 @@ import { RiskBadge, StatusBadge } from "@/components/status-badge";
 import { Timestamp } from "@/components/timestamp";
 import { Tooltip } from "@/components/ui/overlay";
 import { cn } from "@/lib/cn";
-import { explainNode } from "@/lib/explain";
+import { eventLabel, explainNode } from "@/src/humanize";
 import { middle } from "@/lib/format";
 
 export type EvidenceNode = {
@@ -45,7 +45,8 @@ export function EvidenceTimeline({ nodes, tz, toolId }: { nodes: EvidenceNode[];
                 broken ? "border-bad-9" : "border-ok-9")} />
               <div className={cn("rounded-md border bg-gray-1 px-3 py-2.5", broken ? "border-bad-7" : "border-gray-6")}>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <a href={`/events/${n.event_id}`} className="font-mono text-dense font-medium text-gray-12">{n.type}</a>
+                  <span className="text-dense font-medium text-gray-12">{eventLabel(n.type)}</span>
+                  <a href={`/events/${n.event_id}`} className="font-mono text-caption text-gray-11">{n.type}</a>
                   <span className="text-caption text-gray-11">#{n.seq}</span>
                   {n.risk_level ? <RiskBadge level={n.risk_level} size="sm" /> : null}
                   {n.decision ? <StatusBadge value={n.decision} size="sm" /> : null}
@@ -79,6 +80,7 @@ export function EvidenceTimeline({ nodes, tz, toolId }: { nodes: EvidenceNode[];
                     <span tabIndex={0} className={cn("inline-flex flex-wrap items-center gap-1 rounded-sm px-1.5 py-0.5 font-mono text-[11px]",
                       nextBroken ? "bg-bad-3 text-bad-12" : "bg-ok-3 text-ok-12")}
                       data-testid={`link-${n.seq}-${next.seq}`} data-link={nextBroken ? "broken" : "ok"}>
+                      {!nextBroken ? <span className="font-sans">This record is chained to the one before it (tamper-evident) · </span> : null}
                       {gap > 0 ? <span className="font-sans">{gap} event{gap === 1 ? "" : "s"} of other actions between · </span> : null}
                       #{next.seq}.prev {nextBroken ? "≠" : "="} hash #{next.seq - 1} <span className="opacity-70">({middle(next.prev_hash, 6, 4)})</span>
                       {nextBroken ? <span className="font-sans font-medium"> · broken: {!n.hash_ok ? "this record was edited" : !next.hash_ok ? "the next record was edited" : "stored hash changed"}</span> : null}

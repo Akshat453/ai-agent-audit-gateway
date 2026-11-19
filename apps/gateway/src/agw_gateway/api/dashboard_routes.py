@@ -33,7 +33,9 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Connection, and_, func, select, text
 
+from agw_gateway.api import coding_view
 from agw_gateway.api.approval_routes import Human
+from agw_gateway.api.coding_view import CodingSession, CodingView
 from agw_gateway.api.state import GatewayState
 from agw_gateway.db import tables as t
 from agw_gateway.evidence.bundle import EventNotFound, EventNotSealed, build_bundle
@@ -54,6 +56,13 @@ def _state(request: Request) -> GatewayState:
 def _require(human: AuthenticatedHuman, *roles: str) -> None:
     if not any(human.has(r) for r in roles):
         raise RoleRequired
+
+
+def _uuid_or_none(v: str) -> UUID | None:
+    try:
+        return UUID(v)
+    except ValueError:
+        return None
 
 
 def _iso(v: datetime | None) -> str | None:
@@ -106,6 +115,9 @@ class RunSummary(_Out):
     first_at: str | None
     last_at: str | None
     delegated: bool
+    # ADR-0039: coding sessions only: developer, device, agent, repository, issue.
+    session: CodingSession | None = None
+    decisions: dict[str, int] = {}
 
 
 class TimelineEvent(_Out):
@@ -123,6 +135,7 @@ class TimelineEvent(_Out):
     status: str | None
     code: str | None
     reasons: list[str]
+    rules: list[str] = []  # ADR-0040: matched rule ids (sealed record), for the run story
     risk: dict[str, Any] | None
     approval: dict[str, Any] | None
     delegation: dict[str, Any] | None
@@ -153,6 +166,10 @@ class RunDetail(_Out):
     events: list[TimelineEvent]
     delegations: list[DelegationNode]
     approvals: list[dict[str, Any]]
+    # ADR-0039: coding context (None for non-coding runs) and each coding action's target.
+    session: CodingSession | None = None
+    coding: dict[str, CodingView] = {}
+    people: dict[str, str] = {}  # human id -> username, for approvers named in the events
 
 
 class EventHeader(_Out):
@@ -344,23 +361,33 @@ def config(request: Request, human: Human) -> DashboardConfig:
 
 @router.get("/dashboard/overview", response_model=Overview)
 def overview(
-    request: Request, human: Human, days: Annotated[int, Query(ge=1, le=90)] = 14
+    request: Request,
+    human: Human,
+    days: Annotated[int, Query(ge=1, le=90)] = 14,
+    repo_id: UUID | None = None,  # ADR-0040: action / approval figures of one repository
 ) -> Overview:
     tenant = human.tenant_id
     a = t.actions
+    scope = [a.c.run_id.in_(coding_view.repo_runs(tenant, repo_id))] if repo_id else []
+
     with _state(request).engine.connect() as conn:
         per_day = conn.execute(
             text(
                 "SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS d, count(*) "
                 "FROM actions WHERE tenant_id = :t "
-                "AND created_at > now() - make_interval(days => :n) GROUP BY 1 ORDER BY 1"
+                "AND created_at > now() - make_interval(days => :n) "
+                "AND (CAST(:repo AS uuid) IS NULL OR run_id IN"
+                " (SELECT s.session_id FROM coding_sessions s JOIN repos r"
+                " ON r.tenant_id = s.tenant_id AND r.remote_digest = s.repo_digest"
+                " WHERE r.repo_id = CAST(:repo AS uuid) AND s.tenant_id = :t)) "
+                "GROUP BY 1 ORDER BY 1"
             ),
-            {"t": tenant, "n": days},
+            {"t": tenant, "n": days, "repo": str(repo_id) if repo_id else None},
         ).all()
 
         def counts(col: Any) -> dict[str, int]:
             rows = conn.execute(
-                select(col, func.count()).where(a.c.tenant_id == tenant).group_by(col)
+                select(col, func.count()).where(a.c.tenant_id == tenant, *scope).group_by(col)
             ).all()
             return {str(k): int(v) for k, v in rows}
 
@@ -368,7 +395,19 @@ def overview(
             select(
                 func.count(),
                 func.extract("epoch", func.now() - func.min(t.approvals.c.requested_at)),
-            ).where(t.approvals.c.tenant_id == tenant, t.approvals.c.state == "PENDING")
+            ).where(
+                t.approvals.c.tenant_id == tenant,
+                t.approvals.c.state == "PENDING",
+                *(
+                    [
+                        t.approvals.c.action_id.in_(
+                            select(a.c.action_id).where(a.c.tenant_id == tenant, *scope)
+                        )
+                    ]
+                    if scope
+                    else []
+                ),
+            )
         ).one()
         r = t.monitor_reports
         failures = conn.execute(
@@ -414,9 +453,13 @@ def overview(
 
 @router.get("/dashboard/runs", response_model=list[RunSummary])
 def runs(
-    request: Request, human: Human, limit: Annotated[int, Query(ge=1, le=200)] = 50
+    request: Request,
+    human: Human,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    repo_id: UUID | None = None,  # ADR-0040: only this repository's sessions
 ) -> list[RunSummary]:
     a, g = t.actions, t.agents
+    scope = [a.c.run_id.in_(coding_view.repo_runs(human.tenant_id, repo_id))] if repo_id else []
     with _state(request).engine.connect() as conn:
         rows = conn.execute(
             select(
@@ -428,7 +471,7 @@ def runs(
                 func.bool_or(a.c.delegation_id.is_not(None)).label("delegated"),
             )
             .join(g, g.c.agent_id == a.c.agent_id)
-            .where(a.c.tenant_id == human.tenant_id)
+            .where(a.c.tenant_id == human.tenant_id, *scope)
             .group_by(a.c.run_id)
             .order_by(func.max(a.c.updated_at).desc())
             .limit(limit)
@@ -440,6 +483,14 @@ def runs(
             .group_by(a.c.run_id, a.c.status)
         ):
             statuses.setdefault(run_id, {})[status] = int(n)
+        decisions: dict[Any, dict[str, int]] = {}
+        for run_id, decision, n in conn.execute(
+            select(a.c.run_id, a.c.decision, func.count())
+            .where(a.c.tenant_id == human.tenant_id, a.c.run_id.in_([r.run_id for r in rows]))
+            .group_by(a.c.run_id, a.c.decision)
+        ):
+            decisions.setdefault(run_id, {})[decision] = int(n)
+        info = coding_view.sessions(conn, human.tenant_id, [r.run_id for r in rows])
     return [
         RunSummary(
             run_id=str(r.run_id),
@@ -449,6 +500,8 @@ def runs(
             first_at=_iso(r.first_at),
             last_at=_iso(r.last_at),
             delegated=bool(r.delegated),
+            session=info.get(r.run_id),
+            decisions=decisions.get(r.run_id, {}),
         )
         for r in rows
     ]
@@ -534,6 +587,27 @@ def run_detail(request: Request, human: Human, run_id: UUID) -> RunDetail:
                     child_runs=[str(x) for x in child_runs],
                 )
             )
+        session = coding_view.sessions(conn, tenant, [run_id]).get(run_id)
+        sealed_approvals = [
+            header_for_display(bytes(r.canonical_bytes)).get("approval") for r in rows
+        ]  # from the sealed record (ADR-0038)
+        approver_ids = {
+            str(ap["approver"])
+            for ap in sealed_approvals
+            if isinstance(ap, dict) and ap.get("approver")
+        }
+        people = {
+            str(h.human_id): h.username
+            for h in conn.execute(
+                select(t.humans.c.human_id, t.humans.c.username).where(
+                    t.humans.c.tenant_id == tenant,
+                    t.humans.c.human_id.in_([_uuid_or_none(x) for x in approver_ids] or [None]),
+                )
+            )
+        }
+        coding = coding_view.actions(
+            conn, state, tenant, {r.action_id for r in rows if r.action_id is not None}
+        )
         approvals = conn.execute(
             select(t.approvals)
             .join(t.actions, t.actions.c.action_id == t.approvals.c.action_id)
@@ -563,6 +637,7 @@ def run_detail(request: Request, human: Human, run_id: UUID) -> RunDetail:
                 status=outcome.get("status"),
                 code=outcome.get("code"),
                 reasons=list(policy.get("reasons", [])),
+                rules=[str(x) for x in policy.get("rules", [])],
                 risk=(
                     {k: b["risk"].get(k) for k in ("level", "score", "rules", "reasons")}
                     if "risk" in b
@@ -587,6 +662,9 @@ def run_detail(request: Request, human: Human, run_id: UUID) -> RunDetail:
         run_id=str(run_id),
         events=events,
         delegations=nodes,
+        session=session,
+        coding={str(k): v for k, v in coding.items()},
+        people=people,
         approvals=[
             {
                 "approval_id": str(a.approval_id),
@@ -612,9 +690,12 @@ def events(
     from_seq: Annotated[int | None, Query(ge=0)] = None,
     to_seq: Annotated[int | None, Query(ge=0)] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    repo_id: UUID | None = None,  # ADR-0040
 ) -> EventPage:
     ev = t.evidence_events
     conds = [ev.c.tenant_id == human.tenant_id]
+    if repo_id is not None:
+        conds.append(ev.c.run_id.in_(coding_view.repo_runs(human.tenant_id, repo_id)))
     for col, val in (
         (ev.c.event_type, event_type),
         (ev.c.run_id, run_id),
@@ -758,7 +839,10 @@ def policies(request: Request, human: Human) -> Policies:
 IncidentKind = Literal["denied", "outcome_unknown", "failed", "security", "alerts"]
 
 
-def _incidents(conn: Connection, tenant: str, kinds: list[str], limit: int) -> list[Incident]:
+def _incidents(
+    conn: Connection, tenant: str, kinds: list[str], limit: int, repo_id: UUID | None = None
+) -> list[Incident]:
+    runs = coding_view.repo_runs(tenant, repo_id) if repo_id is not None else None
     out: list[Incident] = []
     a = t.actions
     status_of = {"denied": "DENIED", "outcome_unknown": "OUTCOME_UNKNOWN", "failed": "FAILED"}
@@ -766,7 +850,11 @@ def _incidents(conn: Connection, tenant: str, kinds: list[str], limit: int) -> l
         if kind in status_of:
             for r in conn.execute(
                 select(a)
-                .where(a.c.tenant_id == tenant, a.c.status == status_of[kind])
+                .where(
+                    a.c.tenant_id == tenant,
+                    a.c.status == status_of[kind],
+                    *([a.c.run_id.in_(runs)] if runs is not None else []),
+                )
                 .order_by(a.c.updated_at.desc())
                 .limit(limit)
             ):
@@ -787,7 +875,11 @@ def _incidents(conn: Connection, tenant: str, kinds: list[str], limit: int) -> l
             ev = t.evidence_events
             for r in conn.execute(
                 select(ev.c.occurred_at, ev.c.canonical_bytes, ev.c.event_id)
-                .where(ev.c.tenant_id == tenant, ev.c.event_type == "SECURITY_VIOLATION")
+                .where(
+                    ev.c.tenant_id == tenant,
+                    ev.c.event_type == "SECURITY_VIOLATION",
+                    *([ev.c.run_id.in_(runs)] if runs is not None else []),
+                )
                 .order_by(ev.c.seq.desc())
                 .limit(limit)
             ):
@@ -841,10 +933,11 @@ def incidents(
     human: Human,
     kind: Annotated[list[IncidentKind] | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    repo_id: UUID | None = None,  # ADR-0040 (monitor alerts are tenant-wide and stay)
 ) -> list[Incident]:
     kinds = list(kind or ["denied", "outcome_unknown", "failed", "security", "alerts"])
     with _state(request).engine.connect() as conn:
-        return _incidents(conn, human.tenant_id, kinds, limit)
+        return _incidents(conn, human.tenant_id, kinds, limit, repo_id)
 
 
 @router.get("/dashboard/incidents/export")

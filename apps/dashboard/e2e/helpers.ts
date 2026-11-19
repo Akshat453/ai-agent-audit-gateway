@@ -8,6 +8,7 @@ export type Fixture = {
   xss: string; auditor_view: string; csrf_target: string; critical: string; run: string;
   child_run: string; planner_run: string; xss_subject: string; keyboard: string; keyboard_action: string;
   connector: string; proposal: string; user_code: string; // C2
+  coding_run: string; coding_denied: string; coding_ask: string; coding_ask_approval: string; second_run: string; // ADR-0039/40
 };
 
 export const fx: Fixture = JSON.parse(readFileSync(join(__dirname, ".fixture.json"), "utf8"));
@@ -22,7 +23,10 @@ export function watch(page: Page): string[] {
   return problems;
 }
 
-export async function login(page: Page, user: string) {
+/** Sign in. `view` pins the console view (ADR-0039): the specs written for today's layout use
+ *  "technical"; the plain-English specs pass "simple" (the product default). */
+export async function login(page: Page, user: string, view: "simple" | "technical" = "technical") {
+  await page.context().addCookies([{ name: "agw_view", value: view, url: page.url().startsWith("http") ? new URL(page.url()).origin : (process.env.AGW_E2E_BASE_URL ?? "http://127.0.0.1:23000"), httpOnly: true, secure: true, sameSite: "Strict" }]);
   await page.goto("/login");
   await page.getByLabel("Tenant").fill(fx.tenant);
   await page.getByLabel("Username").fill(user);

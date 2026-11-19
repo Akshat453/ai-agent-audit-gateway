@@ -1,0 +1,2914 @@
+[
+ {
+  "name": "Overview",
+  "route": "/",
+  "sources": [
+   {
+    "file": "app/page.tsx",
+    "items": [
+     {
+      "kind": "column",
+      "text": "Bucket start (UTC)"
+     },
+     {
+      "kind": "section",
+      "text": "Overview"
+     },
+     {
+      "kind": "section",
+      "text": "Actions over time"
+     },
+     {
+      "kind": "section",
+      "text": "No actions in this period"
+     },
+     {
+      "kind": "section",
+      "text": "Risk distribution"
+     },
+     {
+      "kind": "section",
+      "text": "Needs your attention"
+     },
+     {
+      "kind": "section",
+      "text": "Nothing needs you right now"
+     },
+     {
+      "kind": "section",
+      "text": "Evidence pipeline"
+     },
+     {
+      "kind": "heading",
+      "text": "Decisions, all time"
+     },
+     {
+      "kind": "heading",
+      "text": "System health"
+     },
+     {
+      "kind": "section",
+      "text": "Show as table"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge evidence"
+     },
+     {
+      "kind": "badge",
+      "text": "RiskBadge level"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge k"
+     },
+     {
+      "kind": "badge",
+      "text": "RiskBadge r.risk_level"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge i.kind"
+     },
+     {
+      "kind": "region",
+      "text": "Time range"
+     },
+     {
+      "kind": "region",
+      "text": "Key figures"
+     },
+     {
+      "kind": "region",
+      "text": "Legend"
+     },
+     {
+      "kind": "region",
+      "text": "About system health"
+     },
+     {
+      "kind": "link",
+      "text": "/runs"
+     },
+     {
+      "kind": "link",
+      "text": "/incidents"
+     },
+     {
+      "kind": "link",
+      "text": "/approvals"
+     },
+     {
+      "kind": "link",
+      "text": "/verification"
+     },
+     {
+      "kind": "link",
+      "text": "/approvals/"
+     },
+     {
+      "kind": "link",
+      "text": "/actions/"
+     }
+    ]
+   },
+   {
+    "file": "components/charts/activity-chart.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Stacked area chart of actions per bucket by decision; the same numbers are in the table below"
+     }
+    ]
+   },
+   {
+    "file": "components/empty-state.tsx",
+    "items": []
+   },
+   {
+    "file": "components/kpi-tile.tsx",
+    "items": []
+   },
+   {
+    "file": "components/onboarding/checklist.tsx",
+    "items": [
+     {
+      "kind": "section",
+      "text": "Get started"
+     },
+     {
+      "kind": "test hook",
+      "text": "onboarding"
+     }
+    ]
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   },
+   {
+    "file": "components/timestamp.tsx",
+    "items": []
+   }
+  ]
+ },
+ {
+  "name": "Runs",
+  "route": "/runs",
+  "sources": [
+   {
+    "file": "app/runs/page.tsx",
+    "items": [
+     {
+      "kind": "column",
+      "text": "Run"
+     },
+     {
+      "kind": "column",
+      "text": "Agents"
+     },
+     {
+      "kind": "column",
+      "text": "Actions"
+     },
+     {
+      "kind": "column",
+      "text": "Statuses"
+     },
+     {
+      "kind": "column",
+      "text": "Delegated"
+     },
+     {
+      "kind": "column",
+      "text": "Last activity"
+     },
+     {
+      "kind": "section",
+      "text": "Runs"
+     },
+     {
+      "kind": "badge",
+      "text": "Badge k"
+     },
+     {
+      "kind": "region",
+      "text": "Runs"
+     },
+     {
+      "kind": "link",
+      "text": "/runs/"
+     }
+    ]
+   },
+   {
+    "file": "components/legacy.tsx",
+    "items": [
+     {
+      "kind": "badge",
+      "text": "RiskBadge value"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge value"
+     },
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   }
+  ]
+ },
+ {
+  "name": "Run detail",
+  "route": "/runs/[id]",
+  "sources": [
+   {
+    "file": "app/runs/[id]/page.tsx",
+    "items": [
+     {
+      "kind": "column",
+      "text": "Seq"
+     },
+     {
+      "kind": "column",
+      "text": "Event"
+     },
+     {
+      "kind": "column",
+      "text": "Agent / actor"
+     },
+     {
+      "kind": "column",
+      "text": "Tool"
+     },
+     {
+      "kind": "column",
+      "text": "Decision / status"
+     },
+     {
+      "kind": "column",
+      "text": "Risk"
+     },
+     {
+      "kind": "column",
+      "text": "Links"
+     },
+     {
+      "kind": "column",
+      "text": "Epoch / anchor"
+     },
+     {
+      "kind": "section",
+      "text": "Delegation tree"
+     },
+     {
+      "kind": "section",
+      "text": "Approvals"
+     },
+     {
+      "kind": "badge",
+      "text": "Badge d.max_risk"
+     },
+     {
+      "kind": "badge",
+      "text": "Badge REVOKED"
+     },
+     {
+      "kind": "badge",
+      "text": "Badge a.state"
+     },
+     {
+      "kind": "badge",
+      "text": "Badge e.decision"
+     },
+     {
+      "kind": "badge",
+      "text": "Badge String(e.risk.level)"
+     },
+     {
+      "kind": "badge",
+      "text": "Badge UNSEALED"
+     },
+     {
+      "kind": "badge",
+      "text": "Badge String(e.anchor.status)"
+     },
+     {
+      "kind": "region",
+      "text": "Delegations"
+     },
+     {
+      "kind": "region",
+      "text": "Timeline"
+     },
+     {
+      "kind": "link",
+      "text": "/runs/"
+     },
+     {
+      "kind": "link",
+      "text": "/approvals/"
+     },
+     {
+      "kind": "link",
+      "text": "/events/"
+     },
+     {
+      "kind": "link",
+      "text": "/actions/"
+     }
+    ]
+   },
+   {
+    "file": "components/legacy.tsx",
+    "items": [
+     {
+      "kind": "badge",
+      "text": "RiskBadge value"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge value"
+     },
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   },
+   {
+    "file": "components/github/pull-requests.tsx",
+    "items": [
+     {
+      "kind": "section",
+      "text": "Pull requests"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge checkKey(p.conclusion)"
+     },
+     {
+      "kind": "test hook",
+      "text": "run-prs"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Action detail",
+  "route": "/actions/[id]",
+  "sources": [
+   {
+    "file": "app/actions/[id]/page.tsx",
+    "items": [
+     {
+      "kind": "field",
+      "text": "Action id"
+     },
+     {
+      "kind": "field",
+      "text": "Status"
+     },
+     {
+      "kind": "field",
+      "text": "Decision"
+     },
+     {
+      "kind": "field",
+      "text": "Risk"
+     },
+     {
+      "kind": "field",
+      "text": "Tool"
+     },
+     {
+      "kind": "field",
+      "text": "Agent"
+     },
+     {
+      "kind": "field",
+      "text": "Environment"
+     },
+     {
+      "kind": "field",
+      "text": "Policy"
+     },
+     {
+      "kind": "field",
+      "text": "Policy reasons"
+     },
+     {
+      "kind": "field",
+      "text": "Created"
+     },
+     {
+      "kind": "field",
+      "text": "Last update"
+     },
+     {
+      "kind": "field",
+      "text": "Run"
+     },
+     {
+      "kind": "field",
+      "text": "Delegation"
+     },
+     {
+      "kind": "field",
+      "text": "Approvals"
+     },
+     {
+      "kind": "field",
+      "text": "Epochs"
+     },
+     {
+      "kind": "field",
+      "text": "Anchors"
+     },
+     {
+      "kind": "field",
+      "text": "Events"
+     },
+     {
+      "kind": "section",
+      "text": "Action"
+     },
+     {
+      "kind": "section",
+      "text": "Evidence timeline"
+     },
+     {
+      "kind": "section",
+      "text": "Overview"
+     },
+     {
+      "kind": "section",
+      "text": "Related"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge a.status"
+     },
+     {
+      "kind": "badge",
+      "text": "RiskBadge a.risk_level"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge a.decision"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge ap.state"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge x.status"
+     },
+     {
+      "kind": "id/hash",
+      "text": "action"
+     },
+     {
+      "kind": "id/hash",
+      "text": "run"
+     },
+     {
+      "kind": "id/hash",
+      "text": "delegation"
+     },
+     {
+      "kind": "id/hash",
+      "text": "approval"
+     },
+     {
+      "kind": "id/hash",
+      "text": "anchor transaction"
+     },
+     {
+      "kind": "region",
+      "text": "Action sections"
+     },
+     {
+      "kind": "link",
+      "text": "/policies"
+     },
+     {
+      "kind": "link",
+      "text": "/runs/"
+     },
+     {
+      "kind": "link",
+      "text": "/approvals/"
+     },
+     {
+      "kind": "link",
+      "text": "/epochs"
+     },
+     {
+      "kind": "link",
+      "text": "/evidence"
+     }
+    ]
+   },
+   {
+    "file": "components/empty-state.tsx",
+    "items": []
+   },
+   {
+    "file": "components/evidence/timeline.tsx",
+    "items": [
+     {
+      "kind": "badge",
+      "text": "RiskBadge n.risk_level"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge n.decision"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge n.status"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge UNANCHORED"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge n.anchor.status"
+     },
+     {
+      "kind": "region",
+      "text": "Evidence timeline"
+     },
+     {
+      "kind": "link",
+      "text": "/events/"
+     },
+     {
+      "kind": "link",
+      "text": "/epochs"
+     }
+    ]
+   },
+   {
+    "file": "components/hash-chip.tsx",
+    "items": []
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   },
+   {
+    "file": "components/timestamp.tsx",
+    "items": []
+   },
+   {
+    "file": "components/github/pull-requests.tsx",
+    "items": [
+     {
+      "kind": "section",
+      "text": "Pull requests"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge checkKey(p.conclusion)"
+     },
+     {
+      "kind": "test hook",
+      "text": "run-prs"
+     }
+    ]
+   },
+   {
+    "file": "components/lifecycle.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Lifecycle"
+     }
+    ]
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Approvals",
+  "route": "/approvals",
+  "sources": [
+   {
+    "file": "app/approvals/page.tsx",
+    "items": [
+     {
+      "kind": "field",
+      "text": "Agent"
+     },
+     {
+      "kind": "field",
+      "text": "Environment"
+     },
+     {
+      "kind": "field",
+      "text": "Policy"
+     },
+     {
+      "kind": "field",
+      "text": "Action"
+     },
+     {
+      "kind": "field",
+      "text": "Run"
+     },
+     {
+      "kind": "section",
+      "text": "Approvals"
+     },
+     {
+      "kind": "heading",
+      "text": "Why it needs approval"
+     },
+     {
+      "kind": "heading",
+      "text": "Target"
+     },
+     {
+      "kind": "heading",
+      "text": "Arguments (preview)"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge v.state"
+     },
+     {
+      "kind": "badge",
+      "text": "RiskBadge v.action.risk.level"
+     },
+     {
+      "kind": "id/hash",
+      "text": "action"
+     },
+     {
+      "kind": "id/hash",
+      "text": "run"
+     },
+     {
+      "kind": "link",
+      "text": "/actions/"
+     },
+     {
+      "kind": "link",
+      "text": "/runs/"
+     },
+     {
+      "kind": "link",
+      "text": "/approvals/"
+     }
+    ]
+   },
+   {
+    "file": "components/approvals-table.tsx",
+    "items": [
+     {
+      "kind": "column",
+      "text": "Risk"
+     },
+     {
+      "kind": "column",
+      "text": "Tool"
+     },
+     {
+      "kind": "column",
+      "text": "Agent"
+     },
+     {
+      "kind": "column",
+      "text": "Requested by"
+     },
+     {
+      "kind": "column",
+      "text": "Requested"
+     },
+     {
+      "kind": "column",
+      "text": "Expires in"
+     },
+     {
+      "kind": "column",
+      "text": "State"
+     },
+     {
+      "kind": "column",
+      "text": "Approvals"
+     },
+     {
+      "kind": "column",
+      "text": "Approval"
+     },
+     {
+      "kind": "section",
+      "text": "No approvals match"
+     },
+     {
+      "kind": "badge",
+      "text": "RiskBadge row.original.risk_level"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge row.original.state"
+     },
+     {
+      "kind": "id/hash",
+      "text": "approval"
+     },
+     {
+      "kind": "link",
+      "text": "/approvals/"
+     }
+    ]
+   },
+   {
+    "file": "components/expiry-countdown.tsx",
+    "items": []
+   },
+   {
+    "file": "components/data-table.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Choose visible columns"
+     },
+     {
+      "kind": "region",
+      "text": "Copy a link to this view"
+     },
+     {
+      "kind": "region",
+      "text": "Refresh now"
+     },
+     {
+      "kind": "region",
+      "text": "Quick filters"
+     },
+     {
+      "kind": "region",
+      "text": "Pagination"
+     },
+     {
+      "kind": "region",
+      "text": "Previous page"
+     },
+     {
+      "kind": "region",
+      "text": "Next page"
+     },
+     {
+      "kind": "test hook",
+      "text": "updated-ago"
+     }
+    ]
+   },
+   {
+    "file": "components/empty-state.tsx",
+    "items": []
+   },
+   {
+    "file": "components/hash-chip.tsx",
+    "items": []
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   },
+   {
+    "file": "components/timestamp.tsx",
+    "items": []
+   },
+   {
+    "file": "components/code-view.tsx",
+    "items": [
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/split-panel.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Details"
+     },
+     {
+      "kind": "region",
+      "text": "Resize details panel"
+     },
+     {
+      "kind": "region",
+      "text": "Close details"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Approval detail",
+  "route": "/approvals/[id]",
+  "sources": [
+   {
+    "file": "app/approvals/[id]/page.tsx",
+    "items": [
+     {
+      "kind": "field",
+      "text": "Tool"
+     },
+     {
+      "kind": "field",
+      "text": "Target"
+     },
+     {
+      "kind": "field",
+      "text": "Environment"
+     },
+     {
+      "kind": "field",
+      "text": "Agent"
+     },
+     {
+      "kind": "field",
+      "text": "Delegation"
+     },
+     {
+      "kind": "field",
+      "text": "Policy"
+     },
+     {
+      "kind": "field",
+      "text": "Approvals"
+     },
+     {
+      "kind": "field",
+      "text": "Action"
+     },
+     {
+      "kind": "section",
+      "text": "Approval"
+     },
+     {
+      "kind": "section",
+      "text": "Risk"
+     },
+     {
+      "kind": "section",
+      "text": "Exact arguments"
+     },
+     {
+      "kind": "section",
+      "text": "Decision"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge shownState"
+     },
+     {
+      "kind": "badge",
+      "text": "RiskBadge a.risk.level"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge a.policy.effect"
+     },
+     {
+      "kind": "id/hash",
+      "text": "action"
+     },
+     {
+      "kind": "id/hash",
+      "text": "run"
+     },
+     {
+      "kind": "region",
+      "text": "Decision"
+     },
+     {
+      "kind": "test hook",
+      "text": "countdown"
+     },
+     {
+      "kind": "test hook",
+      "text": "digest"
+     },
+     {
+      "kind": "test hook",
+      "text": "step-up-ok"
+     },
+     {
+      "kind": "test hook",
+      "text": "confirm-code"
+     },
+     {
+      "kind": "test hook",
+      "text": "expired-notice"
+     },
+     {
+      "kind": "link",
+      "text": "/approvals/"
+     },
+     {
+      "kind": "link",
+      "text": "/actions/"
+     },
+     {
+      "kind": "link",
+      "text": "/runs/"
+     }
+    ]
+   },
+   {
+    "file": "components/code-view.tsx",
+    "items": [
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/confirm-dialog.tsx",
+    "items": []
+   },
+   {
+    "file": "components/expiry-countdown.tsx",
+    "items": []
+   },
+   {
+    "file": "components/empty-state.tsx",
+    "items": []
+   },
+   {
+    "file": "components/hash-chip.tsx",
+    "items": []
+   },
+   {
+    "file": "components/legacy.tsx",
+    "items": [
+     {
+      "kind": "badge",
+      "text": "RiskBadge value"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge value"
+     },
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   },
+   {
+    "file": "components/timestamp.tsx",
+    "items": []
+   }
+  ]
+ },
+ {
+  "name": "Events (evidence explorer)",
+  "route": "/evidence",
+  "sources": [
+   {
+    "file": "app/evidence/page.tsx",
+    "items": [
+     {
+      "kind": "column",
+      "text": "Seq"
+     },
+     {
+      "kind": "column",
+      "text": "Type"
+     },
+     {
+      "kind": "column",
+      "text": "Event hash"
+     },
+     {
+      "kind": "column",
+      "text": "Header"
+     },
+     {
+      "kind": "column",
+      "text": "Bundle"
+     },
+     {
+      "kind": "section",
+      "text": "Evidence explorer"
+     },
+     {
+      "kind": "badge",
+      "text": "Badge e.type"
+     },
+     {
+      "kind": "region",
+      "text": "Filter"
+     },
+     {
+      "kind": "region",
+      "text": "Event headers"
+     },
+     {
+      "kind": "link",
+      "text": "/events/"
+     },
+     {
+      "kind": "link",
+      "text": "/api/bundles/"
+     }
+    ]
+   },
+   {
+    "file": "components/legacy.tsx",
+    "items": [
+     {
+      "kind": "badge",
+      "text": "RiskBadge value"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge value"
+     },
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   }
+  ]
+ },
+ {
+  "name": "Event detail",
+  "route": "/events/[id]",
+  "sources": [
+   {
+    "file": "app/events/[id]/page.tsx",
+    "items": [
+     {
+      "kind": "field",
+      "text": "Type"
+     },
+     {
+      "kind": "field",
+      "text": "Sequence"
+     },
+     {
+      "kind": "field",
+      "text": "Tenant"
+     },
+     {
+      "kind": "field",
+      "text": "Recorded"
+     },
+     {
+      "kind": "field",
+      "text": "Observed"
+     },
+     {
+      "kind": "field",
+      "text": "Actor"
+     },
+     {
+      "kind": "field",
+      "text": "Action"
+     },
+     {
+      "kind": "field",
+      "text": "Run"
+     },
+     {
+      "kind": "field",
+      "text": "Seq range"
+     },
+     {
+      "kind": "field",
+      "text": "Tree size"
+     },
+     {
+      "kind": "field",
+      "text": "Merkle root"
+     },
+     {
+      "kind": "field",
+      "text": "Epoch root"
+     },
+     {
+      "kind": "field",
+      "text": "Seal reason"
+     },
+     {
+      "kind": "section",
+      "text": "Event"
+     },
+     {
+      "kind": "section",
+      "text": "What happened"
+     },
+     {
+      "kind": "section",
+      "text": "Proof explorer"
+     },
+     {
+      "kind": "section",
+      "text": "Raw record"
+     },
+     {
+      "kind": "section",
+      "text": "Metadata"
+     },
+     {
+      "kind": "section",
+      "text": "Hash chain"
+     },
+     {
+      "kind": "section",
+      "text": "Payload"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge VERIFIED"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge TAMPERED"
+     },
+     {
+      "kind": "badge",
+      "text": "RiskBadge n.risk_level"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge UNANCHORED"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge n.anchor.status"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge INCOMPLETE"
+     },
+     {
+      "kind": "id/hash",
+      "text": "action"
+     },
+     {
+      "kind": "id/hash",
+      "text": "run"
+     },
+     {
+      "kind": "id/hash",
+      "text": "event hash"
+     },
+     {
+      "kind": "id/hash",
+      "text": "prev hash"
+     },
+     {
+      "kind": "id/hash",
+      "text": "payload digest"
+     },
+     {
+      "kind": "id/hash",
+      "text": "Merkle root"
+     },
+     {
+      "kind": "id/hash",
+      "text": "epoch root"
+     },
+     {
+      "kind": "region",
+      "text": "Chain checks"
+     },
+     {
+      "kind": "test hook",
+      "text": "event-plain"
+     },
+     {
+      "kind": "check",
+      "text": "hash"
+     },
+     {
+      "kind": "check",
+      "text": "link"
+     },
+     {
+      "kind": "check",
+      "text": "stored-copy"
+     },
+     {
+      "kind": "link",
+      "text": "/api/bundles/"
+     },
+     {
+      "kind": "link",
+      "text": "/actions/"
+     },
+     {
+      "kind": "link",
+      "text": "/runs/"
+     }
+    ]
+   },
+   {
+    "file": "components/code-view.tsx",
+    "items": [
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/empty-state.tsx",
+    "items": []
+   },
+   {
+    "file": "components/evidence/proof-explorer.tsx",
+    "items": [
+     {
+      "kind": "heading",
+      "text": "Inclusion path · epoch"
+     },
+     {
+      "kind": "heading",
+      "text": "Epoch roots → on-chain anchor"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge res.result"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge anchor.status"
+     },
+     {
+      "kind": "id/hash",
+      "text": "leaf hash = SHA-256(0x00 ‖ event hash)"
+     },
+     {
+      "kind": "id/hash",
+      "text": "computed Merkle root"
+     },
+     {
+      "kind": "id/hash",
+      "text": "stored Merkle root"
+     },
+     {
+      "kind": "id/hash",
+      "text": "contract"
+     },
+     {
+      "kind": "id/hash",
+      "text": "transaction"
+     },
+     {
+      "kind": "id/hash",
+      "text": "expected"
+     },
+     {
+      "kind": "id/hash",
+      "text": "computed"
+     },
+     {
+      "kind": "region",
+      "text": "Recomputed checks"
+     },
+     {
+      "kind": "test hook",
+      "text": "proof-explorer"
+     }
+    ]
+   },
+   {
+    "file": "components/hash-chip.tsx",
+    "items": []
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/timestamp.tsx",
+    "items": []
+   }
+  ]
+ },
+ {
+  "name": "Epochs & anchors",
+  "route": "/epochs",
+  "sources": [
+   {
+    "file": "app/epochs/page.tsx",
+    "items": [
+     {
+      "kind": "column",
+      "text": "Epoch"
+     },
+     {
+      "kind": "column",
+      "text": "Seq range"
+     },
+     {
+      "kind": "column",
+      "text": "Size"
+     },
+     {
+      "kind": "column",
+      "text": "Root"
+     },
+     {
+      "kind": "column",
+      "text": "Sealed"
+     },
+     {
+      "kind": "column",
+      "text": "Anchor"
+     },
+     {
+      "kind": "column",
+      "text": "Tx"
+     },
+     {
+      "kind": "column",
+      "text": "Times"
+     },
+     {
+      "kind": "section",
+      "text": "Epochs & anchors"
+     },
+     {
+      "kind": "badge",
+      "text": "Badge e.anchor_status"
+     },
+     {
+      "kind": "region",
+      "text": "Epochs"
+     }
+    ]
+   },
+   {
+    "file": "components/legacy.tsx",
+    "items": [
+     {
+      "kind": "badge",
+      "text": "RiskBadge value"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge value"
+     },
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   }
+  ]
+ },
+ {
+  "name": "Verification",
+  "route": "/verification",
+  "sources": [
+   {
+    "file": "app/verification/page.tsx",
+    "items": [
+     {
+      "kind": "column",
+      "text": "When"
+     },
+     {
+      "kind": "column",
+      "text": "Result"
+     },
+     {
+      "kind": "column",
+      "text": "Reason"
+     },
+     {
+      "kind": "column",
+      "text": "Range"
+     },
+     {
+      "kind": "column",
+      "text": "Trigger"
+     },
+     {
+      "kind": "column",
+      "text": "Alerts"
+     },
+     {
+      "kind": "column",
+      "text": "Evidence event"
+     },
+     {
+      "kind": "section",
+      "text": "Verification"
+     },
+     {
+      "kind": "section",
+      "text": "What the results mean"
+     },
+     {
+      "kind": "section",
+      "text": "Reports"
+     },
+     {
+      "kind": "section",
+      "text": "Latest report (as recorded)"
+     },
+     {
+      "kind": "badge",
+      "text": "Badge k"
+     },
+     {
+      "kind": "badge",
+      "text": "Badge r.result"
+     },
+     {
+      "kind": "region",
+      "text": "Verification reports"
+     }
+    ]
+   },
+   {
+    "file": "components/legacy.tsx",
+    "items": [
+     {
+      "kind": "badge",
+      "text": "RiskBadge value"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge value"
+     },
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   }
+  ]
+ },
+ {
+  "name": "Policies",
+  "route": "/policies",
+  "sources": [
+   {
+    "file": "app/policies/page.tsx",
+    "items": [
+     {
+      "kind": "section",
+      "text": "Policies"
+     },
+     {
+      "kind": "section",
+      "text": "Risk policies"
+     }
+    ]
+   },
+   {
+    "file": "components/legacy.tsx",
+    "items": [
+     {
+      "kind": "badge",
+      "text": "RiskBadge value"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge value"
+     },
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   }
+  ]
+ },
+ {
+  "name": "Incidents",
+  "route": "/incidents",
+  "sources": [
+   {
+    "file": "app/incidents/page.tsx",
+    "items": [
+     {
+      "kind": "column",
+      "text": "When"
+     },
+     {
+      "kind": "column",
+      "text": "Kind"
+     },
+     {
+      "kind": "column",
+      "text": "Action / run"
+     },
+     {
+      "kind": "column",
+      "text": "Tool"
+     },
+     {
+      "kind": "column",
+      "text": "Status / code"
+     },
+     {
+      "kind": "column",
+      "text": "Detail"
+     },
+     {
+      "kind": "section",
+      "text": "Incidents"
+     },
+     {
+      "kind": "section",
+      "text": "Reconcile (operator)"
+     },
+     {
+      "kind": "badge",
+      "text": "Badge i.status"
+     },
+     {
+      "kind": "region",
+      "text": "Incident kind"
+     },
+     {
+      "kind": "region",
+      "text": "Incidents"
+     },
+     {
+      "kind": "link",
+      "text": "/incidents"
+     },
+     {
+      "kind": "link",
+      "text": "/api/incidents/export"
+     },
+     {
+      "kind": "link",
+      "text": "/runs/"
+     }
+    ]
+   },
+   {
+    "file": "components/legacy.tsx",
+    "items": [
+     {
+      "kind": "badge",
+      "text": "RiskBadge value"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge value"
+     },
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   }
+  ]
+ },
+ {
+  "name": "Integrations",
+  "route": "/integrations",
+  "sources": [
+   {
+    "file": "app/integrations/page.tsx",
+    "items": [
+     {
+      "kind": "column",
+      "text": "Name"
+     },
+     {
+      "kind": "column",
+      "text": "Type"
+     },
+     {
+      "kind": "column",
+      "text": "Status"
+     },
+     {
+      "kind": "column",
+      "text": "Unclassified actions"
+     },
+     {
+      "kind": "column",
+      "text": "Policy version"
+     },
+     {
+      "kind": "column",
+      "text": "Added"
+     },
+     {
+      "kind": "section",
+      "text": "Integrations"
+     },
+     {
+      "kind": "section",
+      "text": "Installed"
+     },
+     {
+      "kind": "section",
+      "text": "No connectors yet"
+     },
+     {
+      "kind": "section",
+      "text": "No integration matches"
+     },
+     {
+      "kind": "heading",
+      "text": "Catalog"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge connectorStatusKey(c.status)"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge READ_ONLY"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge tier"
+     },
+     {
+      "kind": "region",
+      "text": "Categories"
+     },
+     {
+      "kind": "test hook",
+      "text": "installed"
+     },
+     {
+      "kind": "test hook",
+      "text": "unclassified-count"
+     },
+     {
+      "kind": "link",
+      "text": "/integrations/"
+     },
+     {
+      "kind": "link",
+      "text": "/integrations/new"
+     }
+    ]
+   },
+   {
+    "file": "components/empty-state.tsx",
+    "items": []
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   },
+   {
+    "file": "components/timestamp.tsx",
+    "items": []
+   }
+  ]
+ },
+ {
+  "name": "Integration detail",
+  "route": "/integrations/[id]",
+  "sources": [
+   {
+    "file": "app/integrations/[id]/page.tsx",
+    "items": [
+     {
+      "kind": "section",
+      "text": "Integration"
+     },
+     {
+      "kind": "section",
+      "text": "Actions and classification"
+     },
+     {
+      "kind": "section",
+      "text": "No actions yet"
+     },
+     {
+      "kind": "section",
+      "text": "GitHub App"
+     },
+     {
+      "kind": "section",
+      "text": "Set up developer machines"
+     },
+     {
+      "kind": "section",
+      "text": "Configuration"
+     },
+     {
+      "kind": "section",
+      "text": "Evidence"
+     },
+     {
+      "kind": "section",
+      "text": "No events"
+     },
+     {
+      "kind": "section",
+      "text": "Usage"
+     },
+     {
+      "kind": "section",
+      "text": "Health"
+     },
+     {
+      "kind": "section",
+      "text": "Danger zone"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge connectorStatusKey(c.status)"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge h.ok"
+     },
+     {
+      "kind": "region",
+      "text": "Connector status"
+     },
+     {
+      "kind": "test hook",
+      "text": "policy-version"
+     },
+     {
+      "kind": "test hook",
+      "text": "connector-events"
+     },
+     {
+      "kind": "test hook",
+      "text": "health-history"
+     },
+     {
+      "kind": "link",
+      "text": "/events/"
+     }
+    ]
+   },
+   {
+    "file": "components/connectors/classify-table.tsx",
+    "items": [
+     {
+      "kind": "column",
+      "text": "Action"
+     },
+     {
+      "kind": "column",
+      "text": "Side effect"
+     },
+     {
+      "kind": "column",
+      "text": "Suggested"
+     },
+     {
+      "kind": "column",
+      "text": "Current"
+     },
+     {
+      "kind": "column",
+      "text": "Risk"
+     },
+     {
+      "kind": "column",
+      "text": "Approval"
+     },
+     {
+      "kind": "column",
+      "text": "Approver role"
+     },
+     {
+      "kind": "column",
+      "text": "Allowed agents"
+     },
+     {
+      "kind": "badge",
+      "text": "RiskBadge a.suggested_risk"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge c"
+     },
+     {
+      "kind": "badge",
+      "text": "RiskBadge c.risk"
+     },
+     {
+      "kind": "test hook",
+      "text": "classify-table"
+     },
+     {
+      "kind": "test hook",
+      "text": "classify-form"
+     }
+    ]
+   },
+   {
+    "file": "components/legacy.tsx",
+    "items": [
+     {
+      "kind": "badge",
+      "text": "RiskBadge value"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge value"
+     },
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   },
+   {
+    "file": "components/connectors/config-view.tsx",
+    "items": [
+     {
+      "kind": "field",
+      "text": "Configuration"
+     },
+     {
+      "kind": "test hook",
+      "text": "config-view"
+     },
+     {
+      "kind": "test hook",
+      "text": "credentials-view"
+     }
+    ]
+   },
+   {
+    "file": "components/code-view.tsx",
+    "items": [
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/connectors/config-form.tsx",
+    "items": [
+     {
+      "kind": "test hook",
+      "text": "connector-form"
+     },
+     {
+      "kind": "test hook",
+      "text": "json-error"
+     }
+    ]
+   },
+   {
+    "file": "components/connectors/github-panel.tsx",
+    "items": [
+     {
+      "kind": "heading",
+      "text": "1. Register the GitHub App"
+     },
+     {
+      "kind": "heading",
+      "text": "2. Install on repositories"
+     },
+     {
+      "kind": "test hook",
+      "text": "github-panel"
+     }
+    ]
+   },
+   {
+    "file": "components/github/github-status.tsx",
+    "items": [
+     {
+      "kind": "field",
+      "text": "Installations"
+     },
+     {
+      "kind": "field",
+      "text": "Repositories"
+     },
+     {
+      "kind": "field",
+      "text": "Event delivery"
+     },
+     {
+      "kind": "field",
+      "text": "Webhook URL"
+     },
+     {
+      "kind": "field",
+      "text": "Webhook health"
+     },
+     {
+      "kind": "section",
+      "text": "GitHub status"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge checkKey(p.conclusion)"
+     },
+     {
+      "kind": "test hook",
+      "text": "github-status"
+     },
+     {
+      "kind": "link",
+      "text": "/runs/"
+     }
+    ]
+   },
+   {
+    "file": "components/github/pull-requests.tsx",
+    "items": [
+     {
+      "kind": "section",
+      "text": "Pull requests"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge checkKey(p.conclusion)"
+     },
+     {
+      "kind": "test hook",
+      "text": "run-prs"
+     }
+    ]
+   },
+   {
+    "file": "components/connectors/rotate-dialog.tsx",
+    "items": [
+     {
+      "kind": "section",
+      "text": "Rotate credentials"
+     },
+     {
+      "kind": "test hook",
+      "text": "rotate-dialog"
+     }
+    ]
+   },
+   {
+    "file": "components/connectors/setup-panel.tsx",
+    "items": [
+     {
+      "kind": "field",
+      "text": "MCP URL"
+     },
+     {
+      "kind": "field",
+      "text": "Device enrollment"
+     },
+     {
+      "kind": "field",
+      "text": "Hook adapter"
+     },
+     {
+      "kind": "heading",
+      "text": "Enforcement tier"
+     },
+     {
+      "kind": "heading",
+      "text": "On each developer machine"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge tier"
+     },
+     {
+      "kind": "region",
+      "text": "setup commands"
+     },
+     {
+      "kind": "test hook",
+      "text": "setup-panel"
+     },
+     {
+      "kind": "link",
+      "text": "/enroll"
+     }
+    ]
+   },
+   {
+    "file": "components/copy-button.tsx",
+    "items": []
+   },
+   {
+    "file": "components/confirm-dialog.tsx",
+    "items": []
+   },
+   {
+    "file": "components/empty-state.tsx",
+    "items": []
+   },
+   {
+    "file": "components/step-up.tsx",
+    "items": [
+     {
+      "kind": "test hook",
+      "text": "step-up-ok"
+     },
+     {
+      "kind": "test hook",
+      "text": "step-up-form"
+     }
+    ]
+   },
+   {
+    "file": "components/timestamp.tsx",
+    "items": []
+   }
+  ]
+ },
+ {
+  "name": "Add integration",
+  "route": "/integrations/new",
+  "sources": [
+   {
+    "file": "app/integrations/new/page.tsx",
+    "items": [
+     {
+      "kind": "section",
+      "text": "Add integration"
+     },
+     {
+      "kind": "section",
+      "text": "Set up developer machines"
+     },
+     {
+      "kind": "section",
+      "text": "Track it as an integration (optional)"
+     },
+     {
+      "kind": "section",
+      "text": "Configure"
+     },
+     {
+      "kind": "section",
+      "text": "Test connection"
+     },
+     {
+      "kind": "section",
+      "text": "Classify actions"
+     },
+     {
+      "kind": "section",
+      "text": "Review"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge connectorStatusKey(c.status)"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge lastHealth.ok"
+     },
+     {
+      "kind": "badge",
+      "text": "RiskBadge a.classification.risk"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge a.classification"
+     },
+     {
+      "kind": "test hook",
+      "text": "last-health"
+     },
+     {
+      "kind": "test hook",
+      "text": "policy-version"
+     },
+     {
+      "kind": "link",
+      "text": "/integrations"
+     },
+     {
+      "kind": "link",
+      "text": "/integrations/"
+     }
+    ]
+   },
+   {
+    "file": "components/connectors/classify-table.tsx",
+    "items": [
+     {
+      "kind": "column",
+      "text": "Action"
+     },
+     {
+      "kind": "column",
+      "text": "Side effect"
+     },
+     {
+      "kind": "column",
+      "text": "Suggested"
+     },
+     {
+      "kind": "column",
+      "text": "Current"
+     },
+     {
+      "kind": "column",
+      "text": "Risk"
+     },
+     {
+      "kind": "column",
+      "text": "Approval"
+     },
+     {
+      "kind": "column",
+      "text": "Approver role"
+     },
+     {
+      "kind": "column",
+      "text": "Allowed agents"
+     },
+     {
+      "kind": "badge",
+      "text": "RiskBadge a.suggested_risk"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge c"
+     },
+     {
+      "kind": "badge",
+      "text": "RiskBadge c.risk"
+     },
+     {
+      "kind": "test hook",
+      "text": "classify-table"
+     },
+     {
+      "kind": "test hook",
+      "text": "classify-form"
+     }
+    ]
+   },
+   {
+    "file": "components/legacy.tsx",
+    "items": [
+     {
+      "kind": "badge",
+      "text": "RiskBadge value"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge value"
+     },
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   },
+   {
+    "file": "components/connectors/config-view.tsx",
+    "items": [
+     {
+      "kind": "field",
+      "text": "Configuration"
+     },
+     {
+      "kind": "test hook",
+      "text": "config-view"
+     },
+     {
+      "kind": "test hook",
+      "text": "credentials-view"
+     }
+    ]
+   },
+   {
+    "file": "components/code-view.tsx",
+    "items": [
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/connectors/config-form.tsx",
+    "items": [
+     {
+      "kind": "test hook",
+      "text": "connector-form"
+     },
+     {
+      "kind": "test hook",
+      "text": "json-error"
+     }
+    ]
+   },
+   {
+    "file": "components/connectors/github-panel.tsx",
+    "items": [
+     {
+      "kind": "heading",
+      "text": "1. Register the GitHub App"
+     },
+     {
+      "kind": "heading",
+      "text": "2. Install on repositories"
+     },
+     {
+      "kind": "test hook",
+      "text": "github-panel"
+     }
+    ]
+   },
+   {
+    "file": "components/connectors/setup-panel.tsx",
+    "items": [
+     {
+      "kind": "field",
+      "text": "MCP URL"
+     },
+     {
+      "kind": "field",
+      "text": "Device enrollment"
+     },
+     {
+      "kind": "field",
+      "text": "Hook adapter"
+     },
+     {
+      "kind": "heading",
+      "text": "Enforcement tier"
+     },
+     {
+      "kind": "heading",
+      "text": "On each developer machine"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge tier"
+     },
+     {
+      "kind": "region",
+      "text": "setup commands"
+     },
+     {
+      "kind": "test hook",
+      "text": "setup-panel"
+     },
+     {
+      "kind": "link",
+      "text": "/enroll"
+     }
+    ]
+   },
+   {
+    "file": "components/copy-button.tsx",
+    "items": []
+   },
+   {
+    "file": "components/connectors/stepper.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Progress"
+     }
+    ]
+   },
+   {
+    "file": "components/empty-state.tsx",
+    "items": []
+   },
+   {
+    "file": "components/step-up.tsx",
+    "items": [
+     {
+      "kind": "test hook",
+      "text": "step-up-ok"
+     },
+     {
+      "kind": "test hook",
+      "text": "step-up-form"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Repositories",
+  "route": "/repos",
+  "sources": [
+   {
+    "file": "app/repos/page.tsx",
+    "items": [
+     {
+      "kind": "section",
+      "text": "Repositories"
+     },
+     {
+      "kind": "section",
+      "text": "No repositories yet"
+     },
+     {
+      "kind": "heading",
+      "text": "Coding agents set up here"
+     },
+     {
+      "kind": "heading",
+      "text": "Loosening proposals"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge tierKey(a.tier)!"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge PROPOSAL_PENDING"
+     },
+     {
+      "kind": "test hook",
+      "text": "proposal"
+     }
+    ]
+   },
+   {
+    "file": "components/code-view.tsx",
+    "items": [
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/confirm-dialog.tsx",
+    "items": []
+   },
+   {
+    "file": "components/empty-state.tsx",
+    "items": []
+   },
+   {
+    "file": "components/legacy.tsx",
+    "items": [
+     {
+      "kind": "badge",
+      "text": "RiskBadge value"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge value"
+     },
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   },
+   {
+    "file": "components/step-up.tsx",
+    "items": [
+     {
+      "kind": "test hook",
+      "text": "step-up-ok"
+     },
+     {
+      "kind": "test hook",
+      "text": "step-up-form"
+     }
+    ]
+   },
+   {
+    "file": "components/timestamp.tsx",
+    "items": []
+   }
+  ]
+ },
+ {
+  "name": "People",
+  "route": "/people",
+  "sources": [
+   {
+    "file": "app/people/page.tsx",
+    "items": [
+     {
+      "kind": "column",
+      "text": "Username"
+     },
+     {
+      "kind": "column",
+      "text": "Roles"
+     },
+     {
+      "kind": "column",
+      "text": "Status"
+     },
+     {
+      "kind": "section",
+      "text": "People"
+     },
+     {
+      "kind": "section",
+      "text": "Invite a person"
+     },
+     {
+      "kind": "section",
+      "text": "Members"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge h.status"
+     },
+     {
+      "kind": "test hook",
+      "text": "people"
+     }
+    ]
+   },
+   {
+    "file": "components/empty-state.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/people/invite-form.tsx",
+    "items": [
+     {
+      "kind": "test hook",
+      "text": "invited"
+     },
+     {
+      "kind": "test hook",
+      "text": "temporary-password"
+     }
+    ]
+   },
+   {
+    "file": "components/copy-button.tsx",
+    "items": []
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   },
+   {
+    "file": "components/step-up.tsx",
+    "items": [
+     {
+      "kind": "test hook",
+      "text": "step-up-ok"
+     },
+     {
+      "kind": "test hook",
+      "text": "step-up-form"
+     }
+    ]
+   },
+   {
+    "file": "components/legacy.tsx",
+    "items": [
+     {
+      "kind": "badge",
+      "text": "RiskBadge value"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge value"
+     },
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   }
+  ]
+ },
+ {
+  "name": "Enroll a device",
+  "route": "/enroll",
+  "sources": [
+   {
+    "file": "app/enroll/page.tsx",
+    "items": [
+     {
+      "kind": "field",
+      "text": "Code"
+     },
+     {
+      "kind": "field",
+      "text": "Agent"
+     },
+     {
+      "kind": "field",
+      "text": "Device label"
+     },
+     {
+      "kind": "field",
+      "text": "Requested"
+     },
+     {
+      "kind": "field",
+      "text": "Developer"
+     },
+     {
+      "kind": "section",
+      "text": "Enroll a device"
+     },
+     {
+      "kind": "section",
+      "text": "Device code"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge `ENROLL_${req.status.toUpperCase()"
+     },
+     {
+      "kind": "test hook",
+      "text": "device-request"
+     }
+    ]
+   },
+   {
+    "file": "components/empty-state.tsx",
+    "items": []
+   },
+   {
+    "file": "components/legacy.tsx",
+    "items": [
+     {
+      "kind": "badge",
+      "text": "RiskBadge value"
+     },
+     {
+      "kind": "badge",
+      "text": "StatusBadge value"
+     },
+     {
+      "kind": "test hook",
+      "text": "safe-text"
+     },
+     {
+      "kind": "test hook",
+      "text": "truncated"
+     }
+    ]
+   },
+   {
+    "file": "components/notice.tsx",
+    "items": []
+   },
+   {
+    "file": "components/page-header.tsx",
+    "items": [
+     {
+      "kind": "region",
+      "text": "Breadcrumb"
+     }
+    ]
+   },
+   {
+    "file": "components/status-badge.tsx",
+    "items": []
+   },
+   {
+    "file": "components/timestamp.tsx",
+    "items": []
+   }
+  ]
+ }
+]

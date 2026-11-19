@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 
 import { ErrorState } from "@/components/empty-state";
 import { CsrfField } from "@/components/legacy";
+import { PlainLine } from "@/components/humanize/plain";
+import { Technical } from "@/components/humanize/technical";
 import { Notice } from "@/components/notice";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
@@ -12,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { USER_CODE_RE, normalizeUserCode, type DeviceRequest } from "@/lib/connectors";
+import { agentKindLabel } from "@/src/humanize";
 import { getJson, me } from "@/lib/gateway";
 import { prefs } from "@/lib/prefs";
 import { csrfToken, sessionToken } from "@/lib/session";
@@ -41,6 +44,12 @@ export default async function Enroll({ searchParams }: { searchParams: Promise<R
       <PageHeader title="Enroll a device" help="enroll" crumbs={[{ label: "Setup" }, { label: "Enroll a device" }]}
         description="Approve the code agw login printed in your terminal. The device then acts on your behalf, as you." />
       {text ? <Notice kind={kind ?? "info"}>{text}</Notice> : null}
+      <PlainLine>
+        <span className="block font-medium">Connect a developer's computer in three steps:</span>
+        <span className="block">1. On that computer, run <code className="font-mono">agw login</code> in a terminal. It shows a short code.</span>
+        <span className="block">2. Type that code below and press Look up.</span>
+        <span className="block">3. Approve it - but only if you started it yourself just now. The computer will then act as you.</span>
+      </PlainLine>
       <Card className="mb-4">
         <CardHeader title="Device code" />
         <CardBody>
@@ -66,6 +75,8 @@ export default async function Enroll({ searchParams }: { searchParams: Promise<R
           <CardHeader title={<span className="inline-flex items-center gap-2"><Laptop aria-hidden="true" className="size-4" />{req.label}</span>}
             action={<StatusBadge value={`ENROLL_${req.status.toUpperCase()}`} />} />
           <CardBody className="space-y-4 text-dense">
+            <p className="text-body text-gray-12" data-testid="device-sentence">{agentKindLabel(req.agent_kind)} on &quot;{req.label}&quot; wants to act as you ({who.username}). Approve only if you just ran agw login on that computer.</p>
+            <Technical view={p.view} hint="code, agent kind and request time">
             <dl className="grid grid-cols-[9rem_1fr] gap-y-2">
               <dt className="text-gray-11">Code</dt><dd className="font-mono">{req.user_code}</dd>
               <dt className="text-gray-11">Agent</dt><dd className="font-mono">{req.agent_kind}</dd>
@@ -73,6 +84,7 @@ export default async function Enroll({ searchParams }: { searchParams: Promise<R
               <dt className="text-gray-11">Requested</dt><dd><Timestamp iso={req.created_at} tz={p.tz} /></dd>
               <dt className="text-gray-11">Developer</dt><dd>{who.username} <span className="text-gray-11">(you, if you approve)</span></dd>
             </dl>
+            </Technical>
             {req.status === "pending" ? (
               <form method="post" action={`/api/device/${req.user_code}/decision`} className="flex flex-wrap gap-2">
                 <CsrfField csrf={csrf} />

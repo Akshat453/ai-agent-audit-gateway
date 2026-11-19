@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { EmptyState, ErrorState } from "@/components/empty-state";
+import { PlainLine } from "@/components/humanize/plain";
+import { Technical } from "@/components/humanize/technical";
 import { Notice } from "@/components/notice";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
@@ -17,6 +19,7 @@ import {
   type CatalogType, type Category, type ConnectorSummary,
 } from "@/lib/connectors";
 import { prefs } from "@/lib/prefs";
+import { connectorWords, plainStatus } from "@/src/humanize";
 
 export const metadata: Metadata = { title: "Integrations" };
 
@@ -31,7 +34,7 @@ export default async function Integrations({ searchParams }: { searchParams: Pro
     return (
       <div className="mx-auto max-w-7xl">
         <PageHeader title="Integrations" help="integrations" crumbs={[{ label: "Setup" }, { label: "Integrations" }]} />
-        <ErrorState what={list.response.status === 403 ? "Your role cannot view integrations (admin, auditor or security)." : "The gateway did not return the integration catalog."}
+        <ErrorState what={list.response.status === 403 ? "Your role cannot view integrations. Ask an admin for the admin, auditor or security role." : "AgentGuard could not load the integrations. Try again in a moment."}
           requestId={list.response.headers.get("x-request-id")} retryHref="/integrations" />
       </div>
     );
@@ -70,6 +73,18 @@ export default async function Integrations({ searchParams }: { searchParams: Pro
       {sp.error === "github" ? <Notice kind="bad">GitHub did not complete the App registration or installation (the link expired or was already used). Start again from the GitHub connector.</Notice>
         : msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
 
+      <PlainLine>Integrations connect AgentGuard to the tools your agents use. Every action an integration offers is blocked until an admin decides whether it is allowed, needs approval, or stays blocked.</PlainLine>
+      {p.view === "simple" && installed.length ? (
+        <ul className="mb-4 divide-y divide-gray-4 rounded-md border border-gray-6 bg-gray-1 text-dense" aria-label="Installed integrations in plain English" data-testid="connector-sentences">
+          {installed.map((c) => (
+            <li key={c.connector_id ?? c.slug} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
+              {c.connector_id ? <a href={`/integrations/${c.connector_id}`} className="font-medium">{connectorWords(c)}</a> : <span>{connectorWords(c)}</span>}
+              <span className="text-caption text-gray-11">{c.unclassified_actions ? `${c.unclassified_actions} action(s) blocked until an admin sets rules` : "all actions have rules"}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <Technical view={p.view} label="Technical details: installed connectors table">
       <Card className="mb-6">
         <CardHeader title="Installed" description={`${installed.length} connector${installed.length === 1 ? "" : "s"} in this tenant`} />
         {installed.length === 0 ? (
@@ -109,8 +124,9 @@ export default async function Integrations({ searchParams }: { searchParams: Pro
           </div>
         )}
       </Card>
+      </Technical>
 
-      <section aria-labelledby="catalog-title">
+      <section aria-labelledby="catalog-title" className="mt-6">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 id="catalog-title" className="text-section font-semibold">Catalog</h2>
@@ -152,6 +168,7 @@ export default async function Integrations({ searchParams }: { searchParams: Pro
                           {n ? <span className="rounded-sm bg-gray-3 px-1.5 text-caption text-gray-12">{n} installed</span> : null}
                         </div>
                         <p className="mt-1 text-caption text-gray-11">{t.description}</p>
+                        {tier ? <p className="mt-1 text-caption text-gray-12" data-testid="tier-words">{plainStatus(tier)}.</p> : null}
                         <p className="mt-2 text-caption text-gray-11">
                           {t.category === "agent_client" ? (t.setup.tier_reason ?? "") : t.dynamic_actions ? "Actions discovered when connected" : t.actions.length ? `${t.actions.length} action${t.actions.length === 1 ? "" : "s"}: ${t.actions.map((a) => a.name).join(", ")}` : "No tool actions"}
                         </p>

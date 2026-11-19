@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { ErrorState } from "@/components/empty-state";
+import { PhraseView } from "@/components/humanize/phrase";
+import { IntactBadge, PlainLine, PlainSteps, PlainStory } from "@/components/humanize/plain";
+import { Technical } from "@/components/humanize/technical";
 import { EvidenceTimeline } from "@/components/evidence/timeline";
 import { PullRequestsCard } from "@/components/github/pull-requests";
 import { HashChip } from "@/components/hash-chip";
@@ -14,6 +17,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EMPTY, UUID_RE, middle } from "@/lib/format";
 import { gateway } from "@/lib/gateway";
 import { prefs } from "@/lib/prefs";
+import { ruleBook } from "@/lib/rulebook";
+import { actionStory, agentName, phraseOf, plainSteps } from "@/src/humanize";
 
 export const metadata: Metadata = { title: "Action" };
 
@@ -22,15 +27,16 @@ export default async function ActionDetail({ params, searchParams }: { params: P
   const sp = await searchParams;
   if (!UUID_RE.test(id)) notFound();
   const gw = await gateway();
-  const [{ data: a, response }, p] = await Promise.all([
+  const [{ data: a, response }, p, book] = await Promise.all([
     gw.GET("/v1/dashboard/actions/{action_id}", { params: { path: { action_id: id } } }),
     prefs(),
+    ruleBook(),
   ]);
   if (!a) {
     return (
       <div className="mx-auto max-w-6xl">
         <PageHeader title="Action" crumbs={[{ label: "Operations" }, { label: "Runs", href: "/runs" }, { label: middle(id) }]} help="action" />
-        <ErrorState what={response.status === 404 ? "This action does not exist in your tenant." : "The gateway did not return this action."}
+        <ErrorState what={response.status === 404 ? "This action does not exist in your organization. Check the link, or find it from its session under Runs." : "AgentGuard could not load this action. Try again in a moment."}
           requestId={response.headers.get("x-request-id")} retryHref={`/actions/${id}`} />
       </div>
     );
@@ -40,6 +46,13 @@ export default async function ActionDetail({ params, searchParams }: { params: P
   const broken = a.events.filter((e) => !e.hash_ok || e.link_ok === false || e.stored_copy_ok === false).length;
   const tab = sp.tab && ["overview", "evidence", "related"].includes(sp.tab) ? sp.tab : "evidence";
   const reasons = [...new Set(a.events.flatMap((e) => e.reasons))];
+  const story = actionStory(a, book, p.tz);
+  const phrase = phraseOf(a);
+  const tone = a.status === "DENIED" || a.status === "FAILED" ? "bad" : a.status === "PENDING_APPROVAL" || a.status === "OUTCOME_UNKNOWN" ? "warn" : "ok";
+  const headline = (
+    <>{story.headline.lead}: {story.headline.actor} {story.headline.verb} <PhraseView phrase={phrase} />{story.headline.where}.</>
+  );
+  const steps = plainSteps(a).map((st) => ({ ...st, at: st.at ? <Timestamp iso={st.at} tz={p.tz} compact className="text-gray-11" /> : undefined }));
 
   return (
     <div className="mx-auto max-w-[1280px]">
@@ -47,11 +60,18 @@ export default async function ActionDetail({ params, searchParams }: { params: P
         title={<span className="font-mono">{a.tool.id}<span className="text-gray-11">@{a.tool.version ?? "?"}</span></span>}
         help="action"
         crumbs={[{ label: "Operations" }, { label: "Runs", href: "/runs" }, { label: `Run ${middle(a.run_id, 6, 4)}`, href: `/runs/${a.run_id}` }, { label: `Action ${middle(a.action_id, 6, 4)}` }]}
-        description={`Requested by ${a.agent.name} in ${a.environment}${a.delegation ? `, delegated by ${a.delegation.issuer ?? "another agent"}` : ""}.`}
+        description={`Requested by ${p.view === "simple" ? agentName(a.agent.name) : a.agent.name} in ${a.environment}${a.delegation ? `, delegated by ${a.delegation.issuer ?? "another agent"}` : ""}.`}
         meta={<><StatusBadge value={a.status} /><RiskBadge level={a.risk_level} /><span className="text-caption text-gray-11">decision</span><StatusBadge value={a.decision} /></>}
       />
 
+      {p.view === "simple" ? (
+        <PlainStory headline={headline} tone={tone} happened={story.happened} why={story.why} who={story.who} canDo={story.canDo}>
+          <IntactBadge intact={story.intact} />
+          <PlainSteps steps={steps} />
+        </PlainStory>
+      ) : <PlainLine>{headline}</PlainLine>}
       <PullRequestsCard runId={a.run_id} />
+      <Technical view={p.view}>
       <Card className="mb-4">
         <CardBody><LifecycleStepper events={a.events} status={a.status} decision={a.decision} tz={p.tz} /></CardBody>
       </Card>
@@ -81,6 +101,16 @@ export default async function ActionDetail({ params, searchParams }: { params: P
                 <dt className="text-gray-11">Risk</dt><dd><RiskBadge level={a.risk_level} /></dd>
                 <dt className="text-gray-11">Tool</dt><dd><code className="font-mono">{a.tool.id}@{a.tool.version ?? "?"}</code></dd>
                 <dt className="text-gray-11">Agent</dt><dd>{a.agent.name}</dd>
+                {a.coding ? (<>
+                  <dt className="text-gray-11">Action type</dt><dd><code className="font-mono">{a.coding.action_type}</code></dd>
+                  <dt className="text-gray-11">Target (reported by the agent)</dt>
+                  <dd>{a.coding.target ? <code className="break-all font-mono text-caption">{JSON.stringify(a.coding.target)}</code> : <span className="text-gray-11">not recorded for this action</span>}</dd>
+                  <dt className="text-gray-11">Change size</dt><dd>{a.coding.diff ? `${a.coding.diff.files} file(s), +${a.coding.diff.added} / -${a.coding.diff.removed} lines` : EMPTY}</dd>
+                </>) : null}
+                {a.session ? (<>
+                  <dt className="text-gray-11">Session</dt>
+                  <dd>{a.session.agent_kind} {a.session.agent_version ?? ""} · developer {a.session.developer ?? EMPTY} · device {a.session.device ?? EMPTY} · repo {a.session.repo ?? EMPTY}{a.session.issue_number ? ` · issue #${a.session.issue_number}` : ""}</dd>
+                </>) : null}
                 <dt className="text-gray-11">Environment</dt><dd>{a.environment}</dd>
                 <dt className="text-gray-11">Policy</dt><dd>{a.policy.id} v{a.policy.version} <a href="/policies" className="ml-1 text-caption">view policies</a></dd>
                 <dt className="text-gray-11">Policy reasons</dt><dd>{reasons.length ? <ul className="list-disc pl-4">{reasons.map((r) => <li key={r}>{r}</li>)}</ul> : <span className="text-gray-11">{EMPTY}</span>}</dd>
@@ -125,6 +155,7 @@ export default async function ActionDetail({ params, searchParams }: { params: P
           </Card>
         </TabsContent>
       </Tabs>
+      </Technical>
     </div>
   );
 }

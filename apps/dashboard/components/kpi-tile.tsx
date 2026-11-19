@@ -21,8 +21,8 @@ export function Sparkline({ values, label }: { values: number[]; label: string }
 
 /** KPI tile: value, delta vs previous period, sparkline, link (§5 Overview). `goodWhen` says
  *  which direction is good so the delta is colored by meaning, not by sign. */
-export function KpiTile({ label, value, sub, delta, goodWhen = "up", spark, href, linkLabel, tone }: {
-  label: string; value: ReactNode; sub?: ReactNode; delta?: number | null; goodWhen?: "up" | "down" | "neutral";
+export function KpiTile({ label, value, sub, delta, goodWhen = "up", spark, href, linkLabel, tone, explain }: {
+  label: string; value: ReactNode; sub?: ReactNode; delta?: number | null; goodWhen?: "up" | "down" | "neutral"; explain?: string;
   spark?: number[]; href: string; linkLabel: string; tone?: "ok" | "warn" | "bad";
 }) {
   let deltaEl: ReactNode = null;
@@ -54,6 +54,7 @@ export function KpiTile({ label, value, sub, delta, goodWhen = "up", spark, href
         <div className="min-w-0">
           <div className="text-kpi font-semibold tabular tracking-tight">{value}</div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">{deltaEl}{sub ? <span className="text-caption text-gray-11">{sub}</span> : null}</div>
+          {explain ? <p className="mt-1.5 text-caption text-gray-11" data-testid="kpi-explain">{explain}</p> : null}
         </div>
         {spark ? <Sparkline values={spark} label={`${label} trend`} /> : null}
       </div>

@@ -7,6 +7,10 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Countdown } from "@/components/expiry-countdown";
 import { ErrorState } from "@/components/empty-state";
 import { HashChip } from "@/components/hash-chip";
+import { PhraseView } from "@/components/humanize/phrase";
+import { Term } from "@/components/humanize/term";
+import { PlainLine, PlainStory } from "@/components/humanize/plain";
+import { Technical } from "@/components/humanize/technical";
 import { CsrfField } from "@/components/legacy";
 import { Notice } from "@/components/notice";
 import { PageHeader } from "@/components/page-header";
@@ -20,7 +24,9 @@ import type { ApprovalView } from "@/lib/approval";
 import { UUID_RE, middle } from "@/lib/format";
 import { gateway, getJson, me } from "@/lib/gateway";
 import { prefs } from "@/lib/prefs";
+import { ruleBook } from "@/lib/rulebook";
 import { csrfToken } from "@/lib/session";
+import { RISK_MEANING, actorLabel, agentKindLabel, agentName, phraseOf, riskWord, ruleReasons, spanWords, type ActionLike } from "@/src/humanize";
 
 export const metadata: Metadata = { title: "Approval" };
 
@@ -74,6 +80,35 @@ export default async function Approval({ params, searchParams }: { params: Promi
   const nextPending = (next.data?.rows ?? []).find((r) => r.approval_id !== v.approval_id);
   const shownState = expired && v.state === "PENDING" ? "EXPIRED" : v.state;
   const target = a.target_rendered;
+  // ADR-0039: the plain request. Coding approvals add the target and session from the action.
+  const [{ data: detail }, book] = await Promise.all([
+    gw.GET("/v1/dashboard/actions/{action_id}", { params: { path: { action_id: a.action_id } } }),
+    ruleBook(),
+  ]);
+  const who_roles_text = who.roles.join(", ");
+  const like = { tool: a.tool, agent: a.agent, coding: detail?.coding ?? null, session: detail?.session ?? null } as Pick<ActionLike, "tool" | "agent" | "coding" | "session">;
+  const phrase = phraseOf(like);
+  const actor = actorLabel(like);
+  const where = `${detail?.session?.repo ? ` in ${detail.session.repo}` : ""}${detail?.session?.issue_number ? ` for issue #${detail.session.issue_number}` : ""}`;
+  const verbWord = pending ? "wants to" : "asked to";
+  const headline = <>{actor} {verbWord} <PhraseView phrase={phrase} />{where}.</>;
+  const reasons = ruleReasons(book, [...a.policy.rules, ...a.risk.rules]);
+  const why = [
+    ...(reasons.length ? reasons.map((r) => `${r.why} (rule ${r.id})`) : [...a.risk.reasons, ...a.policy.reasons]),
+    `Risk: ${riskWord(a.risk.level)} - ${RISK_MEANING[a.risk.level] ?? "unknown impact"}.`,
+  ];
+  const whoRows: [string, string][] = detail?.session
+    ? [["Developer", detail.session.developer ?? "—"], ["Agent", agentKindLabel(detail.session.agent_kind, detail.session.agent_version)], ["Device", detail.session.device ?? "—"], ["Repository", detail.session.repo ?? "—"]]
+    : [["Agent", agentName(a.agent.name)], ["Environment", a.environment]];
+  const happened = [
+    pending ? `Waiting for ${v.required_approvals === 2 ? "two different people" : "one person"} to decide. ${secondsLeft > 0 ? `Expires in ${spanWords(secondsLeft)}.` : ""}` : `This request is ${shownState.toLowerCase()}.`,
+    ...v.decisions.map((d) => `${d.approver}: ${d.decision.toLowerCase()}.`),
+    "Approving lets exactly this one action run once. Any change to it needs a new approval.",
+  ];
+  const canDoList = pending && canDecide
+    ? [{ label: "Approve or reject it with the buttons on this page." }, { label: "Open the whole session", href: `/runs/${a.run_id}` }]
+    : pending ? [{ label: `Your role (${who_roles_text})` + " can view but not decide. Ask an approver." }, { label: "Open the whole session", href: `/runs/${a.run_id}` }]
+      : [{ label: "Nothing to do here.", }, { label: "Open the action", href: `/actions/${a.action_id}` }];
 
   return (
     <div className="mx-auto max-w-[1280px]">
@@ -98,6 +133,11 @@ export default async function Approval({ params, searchParams }: { params: Promi
 
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <div className="min-w-0 space-y-4">
+          {p.view === "simple" ? (
+            <PlainStory headline={headline} tone={pending ? "warn" : "neutral"} happened={happened} why={why} who={whoRows} canDo={canDoList} />
+          ) : <PlainLine>{headline}</PlainLine>}
+          <Technical view={p.view}>
+          <div className="space-y-4">
           <Card>
             <CardHeader title={pending ? "You are approving" : "This approval covered"} description="One exact action. Any change to tool, version, arguments, target or policy invalidates the approval." />
             <CardBody>
@@ -131,6 +171,8 @@ export default async function Approval({ params, searchParams }: { params: Promi
             <CardHeader title="Exact arguments" description="Canonical JSON, escaped. This is what the digest binds." />
             <CardBody><CodeView text={a.args_rendered} max={4000} label="arguments" /></CardBody>
           </Card>
+          </div>
+          </Technical>
         </div>
 
         {/* decision column */}
@@ -144,7 +186,7 @@ export default async function Approval({ params, searchParams }: { params: Promi
                 <div className="mt-0.5 text-caption text-gray-11"><Timestamp iso={v.expires_at} tz={p.tz} /></div>
               </div>
               <div>
-                <div className="mb-1 text-caption font-medium text-gray-11">Action digest</div>
+                <div className="mb-1 text-caption font-medium text-gray-11"><Term term="digest">Action digest</Term></div>
                 <code className="block break-all font-mono text-caption text-gray-12" data-testid="digest">{v.action_digest}</code>
               </div>
 
@@ -187,6 +229,7 @@ export default async function Approval({ params, searchParams }: { params: Promi
                       reason={{ label: "Reason (recorded, signed)", name: "reason", required: false, placeholder: "Optional" }}
                       trigger={<Button variant="approve" size="lg" className="w-full"><Check />Approve exactly this action</Button>}
                     >
+                      <p className="text-body text-gray-12" data-testid="dialog-sentence">You are approving: {headline} Risk: {riskWord(a.risk.level)}.</p>
                       <ul className="space-y-1.5 rounded-md border border-gray-6 bg-gray-2 p-3 text-dense">
                         <li><span className="text-gray-11">Run</span> <code className="font-mono">{a.tool.id}@{a.tool.version}</code> <span className="text-gray-11">as</span> {a.agent.name} <span className="text-gray-11">in</span> {a.environment}</li>
                         <li className="break-all"><span className="text-gray-11">Target</span> <code className="font-mono text-caption">{target.length > 240 ? `${target.slice(0, 240)}… [TRUNCATED]` : target}</code></li>
@@ -207,7 +250,9 @@ export default async function Approval({ params, searchParams }: { params: Promi
                       submitValue="REJECT"
                       reason={{ label: "Reason (recorded, signed)", name: "reason", required: true, placeholder: "Why is this not acceptable?" }}
                       trigger={<Button variant="danger-outline" className="w-full"><X />Reject</Button>}
-                    />
+                    >
+                      <p className="text-body text-gray-12">You are rejecting: {headline}</p>
+                    </ConfirmDialog>
                   </div>
                 </>
               ) : null}

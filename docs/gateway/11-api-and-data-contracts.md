@@ -241,6 +241,27 @@ Behaviour:
 
 The compose `ui` profile enables it. Its `ui-provision` service registers each new tenant's anchoring recorder on the local Anvil contract. `AGW_UI_SEED_DEMO=0` starts the stack without the demo tenant. Dashboard: `/signup`, linked from `/login` when enabled.
 
+### 5.12 Plain-English console additions (read-only, ADR-0039)
+- `GET /v1/dashboard/rule-descriptions` (any signed-in human):
+  - `{rules: {id: {name, why}}, patterns: {"PREFIX*": {name, why}}, policies: [{policy_id, versions}]}`;
+  - `{suffix}` in a pattern's `why` is the matched rest of the id.
+- `GET /v1/dashboard/actions/{id}` adds:
+  - `coding` (`action_type`, `target` = redacted paths / command / argv / url / query / mcp tool, or `null` if not recorded, `diff` = `{files, added, removed}`, `session_id`);
+  - `session` (`agent_kind`, `agent_version`, `developer`, `device`, `repo`, `repo_url`, `issue_number`, `status`, `started_at`, `ended_at`);
+  - `approvals[].decisions` (`approver` username, `decision`, `decided_at`);
+  - `events[].rules`.
+- `GET /v1/dashboard/runs` adds `session` and `decisions` (counts per decision).
+- `GET /v1/dashboard/runs/{id}` adds `session`, `coding` (per action id) and `people` (approver id → username).
+- `GET /v1/dashboard/approvals` rows add `action_type`, `target` (one line), `agent_kind` and `issue_number`.
+- **Never returned:** file contents or diffs (counts only), or secret values (replaced by `[REDACTED]` before storage).
+
+### 5.13 Repository scope (read-only, ADR-0040)
+- **Optional `repo_id` (UUID)** on `GET /v1/dashboard/runs`, `/approvals`, `/events`, `/incidents`, `/activity` and `/overview`: only runs whose coding session was started in that repository.
+- **Tenant-scoped:** another tenant's id matches nothing.
+- **Incidents:** monitor alerts are tenant-wide and stay.
+- **`GET /v1/dashboard/repo-choices`** (any signed-in human): `[{repo_id, name, sessions}]`.
+- **Run detail:** `events[].rules` lists the matched rule ids from the sealed record.
+
 ## 6. Database contracts
 
 Exact Phase 1 tables: [14-phase-1-handoff.md §3](14-phase-1-handoff.md). Later additions:

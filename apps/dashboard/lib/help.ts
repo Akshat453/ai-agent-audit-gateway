@@ -6,6 +6,8 @@ export type HelpTopic = {
   points: string[];
   statuses?: string[];
   risks?: boolean;
+  /** Glossary words used on the page (ADR-0039), explained in the drawer. */
+  terms?: string[];
 };
 
 export const HELP: Record<string, HelpTopic> = {
@@ -18,6 +20,7 @@ export const HELP: Record<string, HelpTopic> = {
       "“Oldest waiting” is the age of the oldest item that has not moved to the next stage. A few minutes is normal; hours means the worker or anchoring needs attention.",
     ],
     statuses: ["ALLOW", "DENY", "REQUIRE_APPROVAL", "VERIFIED", "UNANCHORED"],
+    terms: ["allow", "ask", "block", "evidence", "anchored"],
   },
   approvals: {
     title: "Approvals",
@@ -30,6 +33,7 @@ export const HELP: Record<string, HelpTopic> = {
     ],
     statuses: ["PENDING", "APPROVED", "CONSUMED", "REJECTED", "EXPIRED", "INVALIDATED"],
     risks: true,
+    terms: ["approval", "four-eyes", "step-up", "digest", "nonce"],
   },
   action: {
     title: "Action detail",
@@ -40,6 +44,7 @@ export const HELP: Record<string, HelpTopic> = {
       "Arguments and results are never shown here; they are encrypted and need a disclosure grant.",
     ],
     statuses: ["COMPLETED", "FAILED", "OUTCOME_UNKNOWN", "DENIED", "SEALED", "FINALIZED"],
+    terms: ["action", "hash", "prev hash", "epoch", "anchored"],
   },
   event: {
     title: "Event detail",
@@ -50,6 +55,7 @@ export const HELP: Record<string, HelpTopic> = {
       "Payloads are encrypted; an admin can grant an auditor a disclosure for specific events.",
     ],
     statuses: ["VERIFIED", "TAMPERED", "INVALID_PROOF", "UNTRUSTED_ANCHOR", "INCLUDED", "FINALIZED"],
+    terms: ["event", "hash", "proof", "Merkle root", "payload"],
   },
   integrations: {
     title: "Integrations",
@@ -62,6 +68,7 @@ export const HELP: Record<string, HelpTopic> = {
     ],
     statuses: ["CONNECTED", "NEEDS_ATTENTION", "DISABLED", "UNCLASSIFIED", "TIER_ENFORCED", "TIER_HOOKED", "TIER_ADVISORY", "TIER_MCP_ONLY"],
     risks: true,
+    terms: ["connector", "tier", "Tier 1", "Tier 2"],
   },
   repos: {
     title: "Repositories",
@@ -71,6 +78,7 @@ export const HELP: Record<string, HelpTopic> = {
       "Loosening (allow paths or commands, removing a tightening) is ignored and becomes a proposal. An admin with a recent step-up approves or rejects it.",
     ],
     statuses: ["PROPOSAL_PENDING"],
+    terms: ["overlay", "proposal"],
   },
   people: {
     title: "People",
@@ -80,6 +88,7 @@ export const HELP: Record<string, HelpTopic> = {
       "Roles: approver decides approvals; admin configures; auditor and security investigate; ledger_lead and maintainer approve routed coding actions.",
     ],
     statuses: ["ACTIVE", "PERSON_DISABLED"],
+    terms: ["approval", "step-up"],
   },
   enroll: {
     title: "Enroll a device",
@@ -89,6 +98,64 @@ export const HELP: Record<string, HelpTopic> = {
       "Codes expire after a few minutes and work once.",
     ],
     statuses: ["ENROLL_PENDING", "ENROLL_APPROVED", "ENROLL_ISSUED", "ENROLL_DENIED", "ENROLL_EXPIRED"],
+    terms: ["device", "developer"],
+  },
+  runs: {
+    title: "Runs",
+    summary: "Each run is one working session of an agent. For coding agents it is one Claude Code (or Codex, Cursor...) session on one repository, usually for one issue.",
+    points: [
+      "Simple view shows one sentence per session: who ran it, where, and how many actions were allowed, blocked or needed approval.",
+      "Open a session to read its story: every request in order, with what AgentGuard decided.",
+    ],
+    statuses: ["COMPLETED", "DENIED", "PENDING_APPROVAL"],
+    terms: ["run", "session", "action"],
+  },
+  run: {
+    title: "Session",
+    summary: "One agent session told as a story: each thing the agent asked to do, what AgentGuard decided, who approved, and the result.",
+    points: [
+      "Arrows show what happened to each request: allowed, blocked, needed approval, approved by someone, done.",
+      "Paths and commands are shown as the agent reported them. File contents are never shown.",
+      "Technical details hold the full event table with sequence numbers, hashes and anchors.",
+    ],
+    terms: ["session", "action", "evidence", "epoch"],
+  },
+  events: {
+    title: "Events",
+    summary: "The tamper-evident log itself. Every record is fingerprinted and chained to the one before it, so changing any record breaks the chain.",
+    points: [
+      "Each line is one record in plain words; the technical table shows the exact sealed header.",
+      "Contents (arguments, results) are encrypted and need a disclosure grant.",
+    ],
+    terms: ["event", "hash", "prev hash", "A2S", "A2H", "SYS", "payload"],
+  },
+  epochs: {
+    title: "Epochs & anchors",
+    summary: "Records are locked in batches (epochs). Each batch's fingerprint is written to a blockchain so history cannot be quietly rewritten.",
+    points: ["Locked -> Sent -> Included -> Permanent is the life of a batch.", "A batch that stays un-sent for hours means anchoring needs attention."],
+    statuses: ["SEALED", "SUBMITTED", "INCLUDED", "FINALIZED"],
+    terms: ["epoch", "Merkle root", "anchored", "finalized"],
+  },
+  verification: {
+    title: "Verification",
+    summary: "AgentGuard re-checks every fingerprint, chain link and batch on a schedule, the same way an outside auditor would.",
+    points: ["\"Nothing was changed\" means every record still matches what was saved.", "A changed record is a security incident: do not edit the database; tell your security team."],
+    statuses: ["VERIFIED", "TAMPERED", "INCOMPLETE", "UNANCHORED"],
+    terms: ["verification", "tampered", "hash"],
+  },
+  policies: {
+    title: "Policies",
+    summary: "The rules AgentGuard applies to every agent request: allowed on its own, needs a person, or always blocked.",
+    points: ["Rules are never edited in place; each change is a new version and every decision records which version it used.", "Each rule id in a decision has a one-line meaning listed here."],
+    statuses: ["ALLOW", "REQUIRE_APPROVAL", "DENY"],
+    terms: ["policy", "rule", "policy version", "overlay"],
+  },
+  incidents: {
+    title: "Incidents",
+    summary: "Things that were blocked, failed, are unclear, or looked like a security problem - each with what to do.",
+    points: ["Most blocks need no action: AgentGuard stopped something it should.", "A result nobody can confirm is never retried automatically; an admin records what really happened."],
+    statuses: ["DENIED", "FAILED", "OUTCOME_UNKNOWN"],
+    terms: ["block", "action"],
   },
   default: {
     title: "This page",

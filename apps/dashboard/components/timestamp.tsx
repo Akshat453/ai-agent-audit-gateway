@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 
 import { Tooltip } from "@/components/ui/overlay";
-import { EMPTY, exact, relative } from "@/lib/format";
+import { EMPTY } from "@/lib/format";
+import { ago, longTime } from "@/src/humanize";
 
-/** Relative time ("3 min ago") with the exact time on hover. The server renders the exact UTC
- *  time first (no hydration mismatch); the browser switches to relative after mount. */
-export function Timestamp({ iso, tz = "utc", className }: { iso: string | null | undefined; tz?: "utc" | "local"; className?: string }) {
+/** "18 Nov 2026, 11:18:15 PM IST · 2 h ago" with the exact UTC ISO time on hover (ADR-0039).
+ *  The server renders the UTC time first (it cannot know the viewer's zone, and there must be
+ *  no hydration mismatch); the browser switches to the chosen zone after mount. */
+export function Timestamp({ iso, tz = "local", className, compact = false }: { iso: string | null | undefined; tz?: "utc" | "local"; className?: string; compact?: boolean }) {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
     setNow(Date.now());
@@ -15,11 +17,12 @@ export function Timestamp({ iso, tz = "utc", className }: { iso: string | null |
     return () => clearInterval(id);
   }, []);
   if (!iso) return <span className="text-gray-11">{EMPTY}</span>;
-  const full = exact(iso, tz);
+  const exactUtc = new Date(iso).toISOString();
+  const shown = now === null ? longTime(iso, "utc") : compact ? ago(iso, now) : `${longTime(iso, tz)} · ${ago(iso, now)}`;
   return (
-    <Tooltip content={`${full}${tz === "local" ? "" : " (UTC)"}`}>
+    <Tooltip content={`${exactUtc} (UTC)`}>
       <time dateTime={iso} tabIndex={0} className={className ?? "whitespace-nowrap text-gray-11"}>
-        {now === null ? exact(iso, "utc") : relative(iso, now)}
+        {shown}
       </time>
     </Tooltip>
   );

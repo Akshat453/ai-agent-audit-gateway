@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 
 import { toast } from "@/components/ui/toast";
 
-export type ShellPrefs = { theme: "light" | "dark"; density: "comfortable" | "compact"; tz: "utc" | "local"; nav: "expanded" | "collapsed" };
+export type ShellPrefs = { theme: "light" | "dark"; density: "comfortable" | "compact"; tz: "utc" | "local"; nav: "expanded" | "collapsed"; view: "simple" | "technical"; repo: string };
 
 type Ctx = {
   csrf: string;
@@ -51,7 +51,7 @@ export function ShellProvider({ csrf, initialPrefs, children }: { csrf: string; 
       toast("Preference not saved", { tone: "bad", description: "Reload the page and try again." });
       return;
     }
-    if (key === "tz") router.refresh(); // server-rendered times use it
+    if (key === "tz" || key === "view" || key === "repo") router.refresh(); // server-rendered pages use them
   }, [csrf, prefs, router]);
 
   const value = useMemo<Ctx>(() => ({

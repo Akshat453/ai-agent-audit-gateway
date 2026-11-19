@@ -849,6 +849,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/dashboard/repo-choices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Repo Choices
+         * @description Names of this tenant's repositories for the console's repository switcher (ADR-0040).
+         *     Names only (no overlay, no proposals): any signed-in human may filter by repository.
+         */
+        get: operations["repo_choices_v1_dashboard_repo_choices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/dashboard/rule-descriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Rule Descriptions
+         * @description Plain-English names for every rule id (ADR-0039). Display only; static per release.
+         */
+        get: operations["rule_descriptions_v1_dashboard_rule_descriptions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/dashboard/runs": {
         parameters: {
             query?: never;
@@ -1440,6 +1481,7 @@ export interface components {
             agent: components["schemas"]["Ref"];
             /** Approvals */
             approvals: components["schemas"]["ApprovalRef"][];
+            coding?: components["schemas"]["CodingView"] | null;
             /** Created At */
             created_at: string | null;
             /** Decision */
@@ -1456,6 +1498,7 @@ export interface components {
             risk_level: string;
             /** Run Id */
             run_id: string;
+            session?: components["schemas"]["CodingSession"] | null;
             /** Status */
             status: string;
             tool: components["schemas"]["ToolRef"];
@@ -1530,6 +1573,11 @@ export interface components {
         ApprovalRef: {
             /** Approval Id */
             approval_id: string;
+            /**
+             * Decisions
+             * @default []
+             */
+            decisions: components["schemas"]["DecisionRef"][];
             /** Expires At */
             expires_at: string | null;
             /** Requested At */
@@ -1543,7 +1591,11 @@ export interface components {
         ApprovalRow: {
             /** Action Id */
             action_id: string;
+            /** Action Type */
+            action_type?: string | null;
             agent: components["schemas"]["Ref"];
+            /** Agent Kind */
+            agent_kind?: string | null;
             /** Approval Id */
             approval_id: string;
             /** Decisions */
@@ -1556,6 +1608,8 @@ export interface components {
             environment: string;
             /** Expires At */
             expires_at: string | null;
+            /** Issue Number */
+            issue_number?: number | null;
             /** Requested At */
             requested_at: string | null;
             /** Required Approvals */
@@ -1566,12 +1620,73 @@ export interface components {
             run_id: string;
             /** State */
             state: string;
+            /** Target */
+            target?: string | null;
             tool: components["schemas"]["ToolRef"];
         };
         /** AuditorKeyRequest */
         AuditorKeyRequest: {
             /** Public Key */
             public_key: string;
+        };
+        /** CodingSession */
+        CodingSession: {
+            /** Agent Kind */
+            agent_kind: string;
+            /** Agent Version */
+            agent_version: string | null;
+            /** Developer */
+            developer: string | null;
+            /** Device */
+            device: string | null;
+            /** Ended At */
+            ended_at: string | null;
+            /** Issue Number */
+            issue_number: number | null;
+            /** Repo */
+            repo: string | null;
+            /** Repo Url */
+            repo_url: string | null;
+            /** Session Id */
+            session_id: string;
+            /** Started At */
+            started_at: string | null;
+            /** Status */
+            status: string;
+        };
+        /** CodingTarget */
+        CodingTarget: {
+            /**
+             * Argv
+             * @default []
+             */
+            argv: string[];
+            /** Command */
+            command?: string | null;
+            /** Mcp Server */
+            mcp_server?: string | null;
+            /** Mcp Tool */
+            mcp_tool?: string | null;
+            /** Native Tool */
+            native_tool?: string | null;
+            /**
+             * Paths
+             * @default []
+             */
+            paths: string[];
+            /** Query */
+            query?: string | null;
+            /** Url */
+            url?: string | null;
+        };
+        /** CodingView */
+        CodingView: {
+            /** Action Type */
+            action_type: string;
+            diff: components["schemas"]["DiffCounts"] | null;
+            /** Session Id */
+            session_id: string;
+            target: components["schemas"]["CodingTarget"] | null;
         };
         /** DashboardConfig */
         DashboardConfig: {
@@ -1598,6 +1713,15 @@ export interface components {
             count: number;
             /** Day */
             day: string;
+        };
+        /** DecisionRef */
+        DecisionRef: {
+            /** Approver */
+            approver: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decision */
+            decision: string;
         };
         /** DecisionRequest */
         DecisionRequest: {
@@ -1655,6 +1779,15 @@ export interface components {
             depth: number | null;
             /** Issuer */
             issuer: string | null;
+        };
+        /** DiffCounts */
+        DiffCounts: {
+            /** Added */
+            added: number;
+            /** Files */
+            files: number;
+            /** Removed */
+            removed: number;
         };
         /** EpochRow */
         EpochRow: {
@@ -1763,6 +1896,11 @@ export interface components {
             reasons: string[];
             /** Risk Level */
             risk_level: string | null;
+            /**
+             * Rules
+             * @default []
+             */
+            rules: string[];
             /** Seq */
             seq: number;
             /** Status */
@@ -1968,6 +2106,15 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** RepoChoice */
+        RepoChoice: {
+            /** Name */
+            name: string;
+            /** Repo Id */
+            repo_id: string;
+            /** Sessions */
+            sessions: number;
+        };
         /** ReportSummary */
         ReportSummary: {
             /** Alerts */
@@ -2008,18 +2155,55 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** RuleDescription */
+        RuleDescription: {
+            /** Name */
+            name: string;
+            /** Why */
+            why: string;
+        };
+        /** RuleDescriptions */
+        RuleDescriptions: {
+            /** Patterns */
+            patterns: {
+                [key: string]: components["schemas"]["RuleDescription"];
+            };
+            /** Policies */
+            policies: {
+                [key: string]: unknown;
+            }[];
+            /** Rules */
+            rules: {
+                [key: string]: components["schemas"]["RuleDescription"];
+            };
+        };
         /** RunDetail */
         RunDetail: {
             /** Approvals */
             approvals: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Coding
+             * @default {}
+             */
+            coding: {
+                [key: string]: components["schemas"]["CodingView"];
+            };
             /** Delegations */
             delegations: components["schemas"]["DelegationNode"][];
             /** Events */
             events: components["schemas"]["TimelineEvent"][];
+            /**
+             * People
+             * @default {}
+             */
+            people: {
+                [key: string]: string;
+            };
             /** Run Id */
             run_id: string;
+            session?: components["schemas"]["CodingSession"] | null;
         };
         /** RunSummary */
         RunSummary: {
@@ -2027,6 +2211,13 @@ export interface components {
             actions: number;
             /** Agents */
             agents: string[];
+            /**
+             * Decisions
+             * @default {}
+             */
+            decisions: {
+                [key: string]: number;
+            };
             /** Delegated */
             delegated: boolean;
             /** First At */
@@ -2035,6 +2226,7 @@ export interface components {
             last_at: string | null;
             /** Run Id */
             run_id: string;
+            session?: components["schemas"]["CodingSession"] | null;
             /** Statuses */
             statuses: {
                 [key: string]: number;
@@ -2131,6 +2323,11 @@ export interface components {
             risk: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Rules
+             * @default []
+             */
+            rules: string[];
             /** Seq */
             seq: number;
             /** Status */
@@ -3511,6 +3708,7 @@ export interface operations {
         parameters: {
             query?: {
                 range?: "24h" | "7d" | "30d";
+                repo_id?: string | null;
             };
             header?: {
                 authorization?: string | null;
@@ -3583,6 +3781,7 @@ export interface operations {
                 order?: "asc" | "desc";
                 limit?: number;
                 offset?: number;
+                repo_id?: string | null;
             };
             header?: {
                 authorization?: string | null;
@@ -3686,6 +3885,7 @@ export interface operations {
                 from_seq?: number | null;
                 to_seq?: number | null;
                 limit?: number;
+                repo_id?: string | null;
             };
             header?: {
                 authorization?: string | null;
@@ -3819,6 +4019,7 @@ export interface operations {
             query?: {
                 kind?: ("denied" | "outcome_unknown" | "failed" | "security" | "alerts")[] | null;
                 limit?: number;
+                repo_id?: string | null;
             };
             header?: {
                 authorization?: string | null;
@@ -3888,6 +4089,7 @@ export interface operations {
         parameters: {
             query?: {
                 days?: number;
+                repo_id?: string | null;
             };
             header?: {
                 authorization?: string | null;
@@ -3948,10 +4150,73 @@ export interface operations {
             };
         };
     };
+    repo_choices_v1_dashboard_repo_choices_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoChoice"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rule_descriptions_v1_dashboard_rule_descriptions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleDescriptions"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     runs_v1_dashboard_runs_get: {
         parameters: {
             query?: {
                 limit?: number;
+                repo_id?: string | null;
             };
             header?: {
                 authorization?: string | null;

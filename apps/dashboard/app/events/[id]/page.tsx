@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 
 import { CodeView } from "@/components/code-view";
 import { ErrorState } from "@/components/empty-state";
+import { IntactBadge } from "@/components/humanize/plain";
+import { Technical } from "@/components/humanize/technical";
 import { ProofExplorer } from "@/components/evidence/proof-explorer";
 import { HashChip } from "@/components/hash-chip";
 import { Notice } from "@/components/notice";
@@ -11,11 +13,12 @@ import { PageHeader } from "@/components/page-header";
 import { RiskBadge, StatusBadge } from "@/components/status-badge";
 import { Timestamp } from "@/components/timestamp";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { explainHeader } from "@/lib/explain";
+import { eventLabel, explainHeader, intactness } from "@/src/humanize";
 import { EMPTY, UUID_RE, middle } from "@/lib/format";
 import { gateway, getJson, me } from "@/lib/gateway";
 import type { Bundle } from "@/lib/merkle";
 import { prefs } from "@/lib/prefs";
+import { ruleBook } from "@/lib/rulebook";
 
 export const metadata: Metadata = { title: "Event" };
 
@@ -23,16 +26,17 @@ export default async function EventDetail({ params }: { params: Promise<{ id: st
   const { id } = await params;
   if (!UUID_RE.test(id)) notFound();
   const gw = await gateway();
-  const [{ data: d, response }, who, p] = await Promise.all([
+  const [{ data: d, response }, who, p, book] = await Promise.all([
     gw.GET("/v1/dashboard/events/{event_id}", { params: { path: { event_id: id } } }),
     me(),
     prefs(),
+    ruleBook(),
   ]);
   if (!d) {
     return (
       <div className="mx-auto max-w-6xl">
         <PageHeader title="Event" crumbs={[{ label: "Evidence" }, { label: "Events", href: "/evidence" }, { label: middle(id) }]} help="event" />
-        <ErrorState what={response.status === 404 ? "This event does not exist in your tenant." : "The gateway did not return this event."}
+        <ErrorState what={response.status === 404 ? "This log record does not exist in your organization. Check the link or browse Events." : "AgentGuard could not load this log record. Try again in a moment."}
           requestId={response.headers.get("x-request-id")} retryHref={`/events/${id}`} />
       </div>
     );
@@ -47,12 +51,13 @@ export default async function EventDetail({ params }: { params: Promise<{ id: st
   const actor = (header.actor ?? {}) as { id?: string; kind?: string };
   const payload = header.payload as { len?: number; ref?: string; digest?: string } | undefined;
   const epoch = d.epoch as Record<string, unknown> | null;
-  const plain = explainHeader(header);
+  const plain = explainHeader(header, book, { tz: p.tz });
+  const intact = intactness([n]);
 
   return (
     <div className="mx-auto max-w-[1280px]">
       <PageHeader
-        title={<span className="font-mono">{n.type}</span>}
+        title={p.view === "simple" ? eventLabel(n.type) : <span className="font-mono">{n.type}</span>}
         help="event"
         crumbs={[{ label: "Evidence" }, { label: "Events", href: "/evidence" }, { label: `#${n.seq}` }]}
         description={`Event #${n.seq} in tenant ${d.tenant}'s hash chain.`}
@@ -69,16 +74,28 @@ export default async function EventDetail({ params }: { params: Promise<{ id: st
         ) : null}
       />
 
+      <Card className="mb-4" data-testid="plain-story">
+        <CardHeader title="What happened" description="This record in plain words. The raw record is in the technical details." />
+        <CardBody className="space-y-3 text-dense">
+          <p className="font-medium text-gray-12" data-testid="event-plain">{plain.headline}</p>
+          {p.view === "simple" ? (
+            <ul className="list-disc space-y-1 pl-5 text-gray-11">
+              {plain.details.map((line, i) => <li key={i}>{line}</li>)}
+            </ul>
+          ) : null}
+          <IntactBadge intact={intact} />
+          {d.action_id ? <p><a href={`/actions/${d.action_id}`}>See every step of this action</a>{d.run_id ? <> · <a href={`/runs/${d.run_id}`}>See the whole agent session</a></> : null}</p> : null}
+        </CardBody>
+      </Card>
+      <Technical view={p.view}>
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
         <div className="min-w-0 space-y-4">
           <Card>
-            <CardHeader title="What happened" description="This record in plain words. The raw record is below." />
+            <CardHeader title="Plain-English details" />
             <CardBody className="text-dense">
-              <p className="font-medium text-gray-12" data-testid="event-plain">{plain.headline}</p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-gray-11">
+              <ul className="list-disc space-y-1 pl-5 text-gray-11">
                 {plain.details.map((line, i) => <li key={i}>{line}</li>)}
               </ul>
-              {d.action_id ? <p className="mt-3"><a href={`/actions/${d.action_id}`}>See every step of this action</a>{d.run_id ? <> · <a href={`/runs/${d.run_id}`}>See the whole agent session</a></> : null}</p> : null}
             </CardBody>
           </Card>
           <Card>
@@ -161,6 +178,7 @@ export default async function EventDetail({ params }: { params: Promise<{ id: st
           ) : null}
         </aside>
       </div>
+      </Technical>
     </div>
   );
 }

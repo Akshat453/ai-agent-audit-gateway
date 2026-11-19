@@ -1,0 +1,189 @@
+# Plain-English descriptions of the gateway's non-coding rule ids (ADR-0039):
+# the default authorization policy, the risk policy's mandatory rules, system checks, per-level
+# defaults, connector classification and the GitHub submit assessment.
+#
+# Companion file: the policy documents themselves are immutable and hashed (policies table,
+# risk policy digest), so descriptions live next to them and never affect a decision.
+# Coverage is enforced by tests/unit/test_rule_descriptions.py.
+
+# ------------------------------------------------------------------ default policy (v1, v2)
+[rules."allow-low-read"]
+name = "Low-risk read"
+why = "Reading low-risk data is allowed without a human."
+
+[rules."allow-low"]
+name = "Low risk"
+why = "Low-risk actions are allowed without a human."
+
+[rules."allow-medium"]
+name = "Medium risk"
+why = "Medium-risk actions are allowed and recorded."
+
+[rules."allow-medium-ticket"]
+name = "Create a ticket"
+why = "Creating a ticket is allowed up to medium risk."
+
+[rules."approve-high"]
+name = "High risk needs approval"
+why = "High-risk actions need a person to approve them first."
+
+[rules."deny-critical"]
+name = "Critical is blocked"
+why = "Critical-risk actions are blocked."
+
+[rules."deny-delete-record"]
+name = "No record deletes"
+why = "Deleting records is never allowed."
+
+[rules."iam-change-exception"]
+name = "Access change exception"
+why = "Access-rights changes outside production may run after approval by an admin."
+
+[rules."default-deny"]
+name = "Not allowed by any rule"
+why = "No rule allows this, so it is blocked by default."
+
+# ------------------------------------------------------------------- per-level defaults
+[rules."CAP-CRITICAL-DENY"]
+name = "Critical is blocked"
+why = "Critical actions are blocked unless a specific exception allows them."
+
+[rules."CAP-CRITICAL-EXCEPTION"]
+name = "Critical exception"
+why = "A specific exception lets this critical action run after approval."
+
+[rules."CAP-HIGH-APPROVAL"]
+name = "High risk needs approval"
+why = "High-risk actions always need a person to approve them."
+
+[rules."LVL-MEDIUM-APPROVAL"]
+name = "Medium risk needs approval"
+why = "This tool requires approval even at medium risk."
+
+# ----------------------------------------------------------------------- system checks
+[rules."SYS-AGENT-DISABLED"]
+name = "Agent disabled"
+why = "This agent has been switched off."
+
+[rules."SYS-ARGS-INVALID"]
+name = "Bad request"
+why = "The request's arguments were invalid."
+
+[rules."SYS-TOOL-UNKNOWN"]
+name = "Unknown tool"
+why = "The agent asked for a tool that does not exist."
+
+[rules."SYS-SCOPE-MISSING"]
+name = "Missing permission"
+why = "The agent lacks the permission this tool needs."
+
+[rules."SYS-ENV-FORBIDDEN"]
+name = "Wrong environment"
+why = "This tool may not run in this environment."
+
+[rules."SYS-DELEGATION"]
+name = "Bad hand-over"
+why = "The agent's delegated permissions are invalid."
+
+[rules."SYS-DELEGATION-RISK"]
+name = "Beyond delegated limit"
+why = "The action is riskier than the delegated agent is allowed."
+
+[rules."SYS-DELEGATION-SCOPE"]
+name = "Beyond delegated scope"
+why = "The delegated agent was not given this permission."
+
+[rules."SYS-DELEGATION-TOOL"]
+name = "Tool not delegated"
+why = "The delegated agent was not given this tool."
+
+# ------------------------------------------------------------ risk policy mandatory rules
+[rules."MR-DEEP-DELEGATION"]
+name = "Long hand-over chain"
+why = "The action came through a long chain of agents handing over permissions."
+
+[rules."MR-DELETE-PROD"]
+name = "Delete in production"
+why = "Deleting data in production."
+
+[rules."MR-EXTERNAL-TRANSFER"]
+name = "Data leaves the company"
+why = "The action sends data to an outside party."
+
+[rules."MR-MISSING-META"]
+name = "Unknown tool details"
+why = "The tool's risk details are missing, so it is treated as risky."
+
+[rules."MR-NO-SCOPE"]
+name = "No permission declared"
+why = "The tool declares no permission, so it is treated as risky."
+
+[rules."MR-PII-EXTERNAL-BULK"]
+name = "Bulk personal data out"
+why = "Many people's personal data would leave the company."
+
+[rules."MR-PRIVILEGE"]
+name = "Access rights"
+why = "The action changes who can access what."
+
+[rules."MR-RESTRICTED-WRITE"]
+name = "Restricted data"
+why = "The action writes restricted data."
+
+[rules."MR-UNTRUSTED-SENSITIVE"]
+name = "Untrusted input, sensitive data"
+why = "Untrusted input could steer an action on sensitive data."
+
+[rules."MR-UNTRUSTED-WRITE"]
+name = "Untrusted input writes"
+why = "Untrusted input could steer a write."
+
+# ------------------------------------------------------------------ connectors (C2, C3)
+[rules."CX-APPROVAL-ALWAYS"]
+name = "Always ask"
+why = "An admin set this integration action to always need approval."
+
+[rules."CX-CRITICAL-EXCEPTION"]
+name = "Critical, approvable"
+why = "A critical finding in the submitted change may run only after the right reviewer approves."
+
+[patterns."cx:*"]
+name = "Integration rules"
+why = "The classification an admin set for the {suffix} integration."
+
+# ------------------------------------------------------------- GitHub submit assessment
+[rules."GH-BRANCH-NAME"]
+name = "Bad branch name"
+why = "The branch name does not follow the fix/MR-<issue>-<topic> pattern."
+
+[rules."GH-BRANCH-PROTECTED"]
+name = "Protected branch"
+why = "Agents may not push to a protected branch such as main."
+
+[rules."GH-BRANCH-ISSUE-MISMATCH"]
+name = "Branch does not match issue"
+why = "The branch name names a different issue than the one being fixed."
+
+[rules."GH-PATH_NOT_ALLOWED"]
+name = "Forbidden path"
+why = "The change touches a path that may never be pushed (for example .git)."
+
+[rules."GH-SYMLINK_ESCAPES_REPO"]
+name = "Escaping link"
+why = "The change adds a link pointing outside the repository."
+
+[rules."GH-SUBMODULE_NOT_ALLOWED"]
+name = "Submodule"
+why = "The change adds a git submodule, which pulls in another repository."
+
+[rules."GH-PATCH_DOES_NOT_APPLY"]
+name = "Change does not apply"
+why = "The change could not be applied on top of the current code."
+
+[rules."GH-REPO_NOT_ALLOWED"]
+name = "Repository not allowed"
+why = "This repository is not on the integration's list."
+
+[patterns."GH-*"]
+name = "GitHub refused the change"
+why = "The change could not be submitted to GitHub ({suffix})."

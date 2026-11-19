@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV ?= uv
 COV_PKGS := */agw_gateway/policies/*,*/agw_gateway/auth/*,*/agw_gateway/tools/*,*/agw_gateway/execution/*,*/agw_gateway/approvals/*,*/agw_gateway/humans/*,*/agw_gateway/anchoring/*,*/agw_worker/anchoring/*,*/agw_gateway/privacy/*,*/agw_gateway/keys/*,*/agw_gateway/delegation/*,*/agw_gateway/auth/*,*/agw_sdk/*,*/agw_langgraph/*,*/agw_mcp/*
 
-.PHONY: start stop rebuild c2-mutations c3-mutations coding-policy coding-cli coding-mutations device-key up down migrate test lint demo sync vectors verify-isolated bench tamper risk-eval seal-compare dev-keys approval-attacks approval-mutations contracts-test contracts-check contracts-gas contracts-slither anchor-deploy-anvil anchor-gas anchor-mutations dev-kek privacy-mutations containment injection-corpus delegation-mutations dev-delegation-key integration-latency dashboard-api dashboard-check dashboard-e2e ui-up ui-screenshots monitoring-mutations rq1 rq2 rq3 rq4 rq5 rq6 rq7 experiments plots hardening hardening-ci
+.PHONY: dashboard-unit console-inventory start stop rebuild c2-mutations c3-mutations coding-policy coding-cli coding-mutations device-key up down migrate test lint demo sync vectors verify-isolated bench tamper risk-eval seal-compare dev-keys approval-attacks approval-mutations contracts-test contracts-check contracts-gas contracts-slither anchor-deploy-anvil anchor-gas anchor-mutations dev-kek privacy-mutations containment injection-corpus delegation-mutations dev-delegation-key integration-latency dashboard-api dashboard-check dashboard-e2e ui-up ui-screenshots monitoring-mutations rq1 rq2 rq3 rq4 rq5 rq6 rq7 experiments plots hardening hardening-ci
 
 .env:
 	cp .env.example .env
@@ -154,6 +154,13 @@ dashboard-check: sync
 	cd apps/dashboard && npx openapi-typescript openapi.json -o $(DRIFT)/schema.d.ts >/dev/null
 	diff -q $(DRIFT)/schema.d.ts apps/dashboard/lib/api/schema.d.ts
 	cd apps/dashboard && npm run typecheck
+	cd apps/dashboard && npm run test:unit
+
+# Plain-English console (ADR-0039): vocabulary unit tests + the field inventory from the code.
+dashboard-unit:
+	cd apps/dashboard && npm run test:unit
+console-inventory:
+	cd apps/dashboard && node scripts/inventory.mjs
 
 # Playwright against a real gateway + seeded tenant + the production dashboard build.
 dashboard-e2e: .env sync

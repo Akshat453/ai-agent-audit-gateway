@@ -34,6 +34,7 @@ from agw_gateway.approvals.service import ApprovalConfig, ApprovalService, NewAp
 from agw_gateway.auth.models import AuthenticatedAgent
 from agw_gateway.coding import CODING_TOOL_PREFIX, CODING_TOOL_VERSION
 from agw_gateway.coding.digest import coding_action_digest, normalized_targets, repo_digest
+from agw_gateway.coding.display import diff_summary, display_target
 from agw_gateway.coding.globs import PathInvalid, normalize_path
 from agw_gateway.coding.model import AgentKind, CodingAction
 from agw_gateway.coding.policy import ENGINE_VERSION, CodingDecision, CodingPolicy
@@ -417,6 +418,7 @@ class CodingService:
                     ),
                 )
             )
+            summary = diff_summary(req.diff)
             conn.execute(
                 insert(t.coding_actions).values(
                     action_id=action_id,
@@ -425,6 +427,11 @@ class CodingService:
                     action_type=action.action_type,
                     action_digest=digest,
                     correlation=req.correlation_id,
+                    # ADR-0039: what the console may show (redacted, sealed; counts only).
+                    target_sealed=self._seal_target(agent.tenant_id, action_id, action),
+                    diff_files=summary.files if summary else None,
+                    diff_added=summary.added if summary else None,
+                    diff_removed=summary.removed if summary else None,
                 )
             )
             approval_map = approval.insert(conn, agent.tenant_id, action_id) if approval else None
@@ -455,6 +462,14 @@ class CodingService:
         body = self._view(action_id, decision, digest=digest)
         body["decision"] = decision.effect
         return body
+
+    def _seal_target(self, tenant: str, action_id: UUID, action: CodingAction) -> bytes | None:
+        """The redacted targets for the console, or None without a KEK (nothing is shown)."""
+        if self._cipher is None:
+            return None
+        return self._cipher.seal_json(
+            ops_context(tenant, "coding_target", action_id.bytes), display_target(action)
+        )
 
     def _seal(self, tenant: str, action_id: UUID, action: CodingAction, diff: str | None) -> bytes:
         if self._cipher is None:

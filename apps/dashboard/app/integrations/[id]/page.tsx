@@ -12,6 +12,8 @@ import { SetupPanel } from "@/components/connectors/setup-panel";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmptyState, ErrorState } from "@/components/empty-state";
 import { CsrfField } from "@/components/legacy";
+import { PlainStory } from "@/components/humanize/plain";
+import { Technical } from "@/components/humanize/technical";
 import { Notice } from "@/components/notice";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
@@ -25,6 +27,7 @@ import { CATEGORY_LABEL, connectorStatusKey, type CatalogType, type ConnectorDet
 import { UUID_RE, count } from "@/lib/format";
 import { getJson } from "@/lib/gateway";
 import { prefs } from "@/lib/prefs";
+import { connectorWords } from "@/src/humanize";
 
 export const metadata: Metadata = { title: "Integration" };
 
@@ -52,6 +55,21 @@ export default async function Integration({ params, searchParams }: { params: Pr
   const isAgent = c.category === "agent_client";
   const credFields = CREDENTIAL_FIELDS[c.type_id] ?? [];
   const origin = await dashboardOrigin();
+  const lastCheck = c.health[0]?.checked_at ?? null;
+  const cfg = c.config as Record<string, unknown>;
+  const setup: { label: string; done: boolean }[] = c.type_id === "github"
+    ? [
+      { label: "Register the GitHub App (the GitHub App card below)", done: Boolean(cfg.app_slug) },
+      { label: "Install it on your repositories", done: Array.isArray(cfg.installation_ids) && cfg.installation_ids.length > 0 },
+      { label: "List the repositories AgentGuard may use (Technical details, then Configuration)", done: Array.isArray(cfg.repos) && cfg.repos.length > 0 },
+      { label: "Test the connection", done: c.status === "connected" },
+      { label: "Decide which actions are allowed, need approval, or stay blocked", done: c.unclassified_actions === 0 },
+    ]
+    : [
+      { label: "Fill in the configuration", done: true },
+      { label: "Test the connection", done: c.status === "connected" },
+      { label: "Decide which actions are allowed, need approval, or stay blocked", done: c.unclassified_actions === 0 },
+    ];
 
   return (
     <div className="mx-auto max-w-[1280px]">
@@ -84,6 +102,16 @@ export default async function Integration({ params, searchParams }: { params: Pr
           {sp.fields ? <> Fields: <code className="font-mono">{fieldsOf(sp.fields).join(", ")}</code></> : null}
         </Notice>
       ) : null}
+      <PlainStory headline={connectorWords(c, lastCheck, Date.now())} tone={c.status === "connected" ? "ok" : c.status === "disabled" ? "neutral" : "warn"}
+        happened={[type?.description ?? "An integration with another product.", `It offers ${c.actions.length} action${c.actions.length === 1 ? "" : "s"}; ${c.unclassified_actions ? `${c.unclassified_actions} are blocked until an admin sets rules` : "all have rules"}.`]}
+        canDo={isAdmin ? [{ label: "Follow the setup steps below." }, { label: "Use Test connection (top right) after any change." }] : [{ label: "Only an admin can change this integration." }]}>
+        <section aria-label="Setup steps">
+          <h2 className="mb-1.5 text-caption font-semibold uppercase tracking-wide text-gray-11">Setup steps</h2>
+          <ol className="list-decimal space-y-1 pl-5 text-dense" data-testid="setup-steps">
+            {setup.map((st) => <li key={st.label} className={st.done ? "text-gray-12" : "text-gray-11"}>{st.label} {st.done ? <span className="text-ok-11">- done</span> : <span className="font-medium text-warn-12">- to do</span>}</li>)}
+          </ol>
+        </section>
+      </PlainStory>
       {isAdmin ? <StepUpCard csrf={csrf} next={here} remaining={stepUpRemaining} windowSeconds={stepUpWindow} what="change this connector" /> : null}
       {disabled ? <Notice kind="warn">This connector is disabled: every one of its actions is denied.</Notice> : null}
 
@@ -101,6 +129,7 @@ export default async function Integration({ params, searchParams }: { params: Pr
                   <span className="ml-2 text-caption text-gray-11">Applies the type&apos;s suggested risk and approval rules to every unclassified action (a new policy version).</span>
                 </form>
               ) : null}
+              <p className="px-4 pt-3 text-dense text-gray-11">Each row is one thing agents can do through this integration. <strong className="text-gray-12">Auto</strong>: allowed without asking (still recorded). <strong className="text-gray-12">Always ask</strong>: a person approves each time. <strong className="text-gray-12">Deny</strong>: always blocked.</p>
               {c.actions.length ? (
                 <ClassifyTable connectorId={id} actions={c.actions} editable={isAdmin} csrf={csrf} next={here} />
               ) : <EmptyState title="No actions yet">{type?.dynamic_actions ? "Test the connection to discover this server's tools. They arrive unclassified." : "This connector has no actions."}</EmptyState>}
@@ -125,6 +154,8 @@ export default async function Integration({ params, searchParams }: { params: Pr
             </Card>
           ) : null}
 
+          <Technical view={p.view} hint="configuration, the evidence of every change, raw settings">
+          <div className="space-y-4">
           <Card>
             <CardHeader title="Configuration" description="Secrets are write-only and never shown."
               action={isAdmin && credFields.length ? <RotateDialog connectorId={id} typeId={c.type_id} fields={credFields} csrf={csrf} version={c.credentials.version} /> : null} />
@@ -156,6 +187,8 @@ export default async function Integration({ params, searchParams }: { params: Pr
               </ul>
             ) : <EmptyState title="No events">Changes to this connector are recorded here.</EmptyState>}
           </Card>
+          </div>
+          </Technical>
         </div>
 
         <aside className="space-y-4" aria-label="Connector status">

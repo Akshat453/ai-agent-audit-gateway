@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { ShellProvider, useShell, type ShellPrefs } from "@/components/shell/context";
+import { RepoSwitcher, type RepoChoice } from "@/components/humanize/repo-switcher";
 import { HelpDrawer } from "@/components/shell/help";
 import { LogoMark } from "@/components/shell/logo";
 import { NAV_ICONS } from "@/components/shell/nav-icons";
@@ -46,6 +47,7 @@ type Props = {
   health: ShellHealth;
   csrf: string;
   prefs: ShellPrefs;
+  repos?: RepoChoice[];
   children: ReactNode;
 };
 
@@ -60,7 +62,7 @@ export function AppShell(props: Props) {
   );
 }
 
-function Frame({ user, nav, pendingApprovals, alerts24h, health, children }: Props) {
+function Frame({ user, nav, pendingApprovals, alerts24h, health, repos = [], children }: Props) {
   const shell = useShell();
   const router = useRouter();
   const pathname = usePathname();
@@ -111,6 +113,7 @@ function Frame({ user, nav, pendingApprovals, alerts24h, health, children }: Pro
         <span className="hidden items-center gap-1.5 rounded-full border border-gray-6 bg-gray-2 px-2 py-0.5 text-caption text-gray-11 md:inline-flex" title="Tenant">
           <span className="size-1.5 rounded-full bg-brand-9" aria-hidden="true" />tenant <span className="font-medium text-gray-12">{user.tenant}</span>
         </span>
+        <RepoSwitcher choices={repos} />
         {user.env !== "prod" ? (
           <span className="rounded-sm border border-warn-7 bg-warn-3 px-1.5 py-px text-[11px] font-semibold uppercase tracking-wide text-warn-12" data-testid="env-badge">
             {user.env}
@@ -153,6 +156,11 @@ function Frame({ user, nav, pendingApprovals, alerts24h, health, children }: Pro
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuLabel>View</DropdownMenuLabel>
+              <DropdownMenuRadioGroup value={shell.prefs.view} onValueChange={(v) => void shell.setPref("view", v as ShellPrefs["view"])}>
+                <DropdownMenuRadioItem value="simple">Simple view (plain English)</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="technical">Technical view</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
               <DropdownMenuLabel>Density</DropdownMenuLabel>
               <DropdownMenuRadioGroup value={shell.prefs.density} onValueChange={(v) => void shell.setPref("density", v as ShellPrefs["density"])}>
                 <DropdownMenuRadioItem value="comfortable">Comfortable</DropdownMenuRadioItem>
@@ -160,8 +168,8 @@ function Frame({ user, nav, pendingApprovals, alerts24h, health, children }: Pro
               </DropdownMenuRadioGroup>
               <DropdownMenuLabel>Times shown in</DropdownMenuLabel>
               <DropdownMenuRadioGroup value={shell.prefs.tz} onValueChange={(v) => void shell.setPref("tz", v as ShellPrefs["tz"])}>
-                <DropdownMenuRadioItem value="utc">UTC</DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="local">Local time</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="utc">UTC</DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => shell.setShortcutsOpen(true)}><Keyboard />Keyboard shortcuts<Kbd className="ml-auto">?</Kbd></DropdownMenuItem>

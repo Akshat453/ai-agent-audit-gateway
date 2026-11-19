@@ -18,6 +18,16 @@
       "title": "Approvals",
       "type": "array"
      },
+     "coding": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/CodingView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "created_at": {
       "anyOf": [
        {
@@ -75,6 +85,16 @@
      "run_id": {
       "title": "Run Id",
       "type": "string"
+     },
+     "session": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/CodingSession"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "status": {
       "title": "Status",
@@ -338,6 +358,14 @@
       "title": "Approval Id",
       "type": "string"
      },
+     "decisions": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/DecisionRef"
+      },
+      "title": "Decisions",
+      "type": "array"
+     },
      "expires_at": {
       "anyOf": [
        {
@@ -386,8 +414,30 @@
       "title": "Action Id",
       "type": "string"
      },
+     "action_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Action Type"
+     },
      "agent": {
       "$ref": "#/components/schemas/Ref"
+     },
+     "agent_kind": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Agent Kind"
      },
      "approval_id": {
       "title": "Approval Id",
@@ -434,6 +484,17 @@
       ],
       "title": "Expires At"
      },
+     "issue_number": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Issue Number"
+     },
      "requested_at": {
       "anyOf": [
        {
@@ -460,6 +521,17 @@
      "state": {
       "title": "State",
       "type": "string"
+     },
+     "target": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Target"
      },
      "tool": {
       "$ref": "#/components/schemas/ToolRef"
@@ -497,6 +569,256 @@
      "public_key"
     ],
     "title": "AuditorKeyRequest",
+    "type": "object"
+   },
+   "CodingSession": {
+    "additionalProperties": false,
+    "properties": {
+     "agent_kind": {
+      "title": "Agent Kind",
+      "type": "string"
+     },
+     "agent_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Agent Version"
+     },
+     "developer": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Developer"
+     },
+     "device": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device"
+     },
+     "ended_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ended At"
+     },
+     "issue_number": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Issue Number"
+     },
+     "repo": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Repo"
+     },
+     "repo_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Repo Url"
+     },
+     "session_id": {
+      "title": "Session Id",
+      "type": "string"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "session_id",
+     "agent_kind",
+     "agent_version",
+     "developer",
+     "device",
+     "repo",
+     "repo_url",
+     "issue_number",
+     "status",
+     "started_at",
+     "ended_at"
+    ],
+    "title": "CodingSession",
+    "type": "object"
+   },
+   "CodingTarget": {
+    "additionalProperties": false,
+    "properties": {
+     "argv": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Argv",
+      "type": "array"
+     },
+     "command": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Command"
+     },
+     "mcp_server": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mcp Server"
+     },
+     "mcp_tool": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mcp Tool"
+     },
+     "native_tool": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Native Tool"
+     },
+     "paths": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Paths",
+      "type": "array"
+     },
+     "query": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Query"
+     },
+     "url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Url"
+     }
+    },
+    "title": "CodingTarget",
+    "type": "object"
+   },
+   "CodingView": {
+    "additionalProperties": false,
+    "properties": {
+     "action_type": {
+      "title": "Action Type",
+      "type": "string"
+     },
+     "diff": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DiffCounts"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "session_id": {
+      "title": "Session Id",
+      "type": "string"
+     },
+     "target": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/CodingTarget"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "action_type",
+     "target",
+     "diff",
+     "session_id"
+    ],
+    "title": "CodingView",
     "type": "object"
    },
    "DashboardConfig": {
@@ -592,6 +914,37 @@
      "count"
     ],
     "title": "DayCount",
+    "type": "object"
+   },
+   "DecisionRef": {
+    "additionalProperties": false,
+    "properties": {
+     "approver": {
+      "title": "Approver",
+      "type": "string"
+     },
+     "decided_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Decided At"
+     },
+     "decision": {
+      "title": "Decision",
+      "type": "string"
+     }
+    },
+    "required": [
+     "approver",
+     "decision",
+     "decided_at"
+    ],
+    "title": "DecisionRef",
     "type": "object"
    },
    "DecisionRequest": {
@@ -772,6 +1125,30 @@
      "issuer"
     ],
     "title": "DelegationRef",
+    "type": "object"
+   },
+   "DiffCounts": {
+    "additionalProperties": false,
+    "properties": {
+     "added": {
+      "title": "Added",
+      "type": "integer"
+     },
+     "files": {
+      "title": "Files",
+      "type": "integer"
+     },
+     "removed": {
+      "title": "Removed",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "files",
+     "added",
+     "removed"
+    ],
+    "title": "DiffCounts",
     "type": "object"
    },
    "EpochRow": {
@@ -1170,6 +1547,14 @@
        }
       ],
       "title": "Risk Level"
+     },
+     "rules": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Rules",
+      "type": "array"
      },
      "seq": {
       "title": "Seq",
@@ -1830,6 +2215,30 @@
     "title": "Ref",
     "type": "object"
    },
+   "RepoChoice": {
+    "additionalProperties": false,
+    "properties": {
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "repo_id": {
+      "title": "Repo Id",
+      "type": "string"
+     },
+     "sessions": {
+      "title": "Sessions",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "repo_id",
+     "name",
+     "sessions"
+    ],
+    "title": "RepoChoice",
+    "type": "object"
+   },
    "ReportSummary": {
     "additionalProperties": false,
     "properties": {
@@ -1978,6 +2387,59 @@
     "title": "RiskPolicyVersion",
     "type": "object"
    },
+   "RuleDescription": {
+    "additionalProperties": false,
+    "properties": {
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "why": {
+      "title": "Why",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "why"
+    ],
+    "title": "RuleDescription",
+    "type": "object"
+   },
+   "RuleDescriptions": {
+    "additionalProperties": false,
+    "properties": {
+     "patterns": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/RuleDescription"
+      },
+      "title": "Patterns",
+      "type": "object"
+     },
+     "policies": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Policies",
+      "type": "array"
+     },
+     "rules": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/RuleDescription"
+      },
+      "title": "Rules",
+      "type": "object"
+     }
+    },
+    "required": [
+     "rules",
+     "patterns",
+     "policies"
+    ],
+    "title": "RuleDescriptions",
+    "type": "object"
+   },
    "RunDetail": {
     "additionalProperties": false,
     "properties": {
@@ -1988,6 +2450,14 @@
       },
       "title": "Approvals",
       "type": "array"
+     },
+     "coding": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/CodingView"
+      },
+      "default": {},
+      "title": "Coding",
+      "type": "object"
      },
      "delegations": {
       "items": {
@@ -2003,9 +2473,27 @@
       "title": "Events",
       "type": "array"
      },
+     "people": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "default": {},
+      "title": "People",
+      "type": "object"
+     },
      "run_id": {
       "title": "Run Id",
       "type": "string"
+     },
+     "session": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/CodingSession"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "required": [
@@ -2030,6 +2518,14 @@
       },
       "title": "Agents",
       "type": "array"
+     },
+     "decisions": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "default": {},
+      "title": "Decisions",
+      "type": "object"
      },
      "delegated": {
       "title": "Delegated",
@@ -2060,6 +2556,16 @@
      "run_id": {
       "title": "Run Id",
       "type": "string"
+     },
+     "session": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/CodingSession"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "statuses": {
       "additionalProperties": {
@@ -2369,6 +2875,14 @@
        }
       ],
       "title": "Risk"
+     },
+     "rules": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Rules",
+      "type": "array"
      },
      "seq": {
       "title": "Seq",
@@ -4757,6 +5271,23 @@
       }
      },
      {
+      "in": "query",
+      "name": "repo_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Repo Id"
+      }
+     },
+     {
       "in": "header",
       "name": "authorization",
       "required": false,
@@ -4979,6 +5510,23 @@
        "minimum": 0,
        "title": "Offset",
        "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "repo_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Repo Id"
       }
      },
      {
@@ -5250,6 +5798,23 @@
       }
      },
      {
+      "in": "query",
+      "name": "repo_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Repo Id"
+      }
+     },
+     {
       "in": "header",
       "name": "authorization",
       "required": false,
@@ -5499,6 +6064,23 @@
       }
      },
      {
+      "in": "query",
+      "name": "repo_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Repo Id"
+      }
+     },
+     {
       "in": "header",
       "name": "authorization",
       "required": false,
@@ -5648,6 +6230,23 @@
       }
      },
      {
+      "in": "query",
+      "name": "repo_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Repo Id"
+      }
+     },
+     {
       "in": "header",
       "name": "authorization",
       "required": false,
@@ -5735,6 +6334,104 @@
     "summary": "Policies"
    }
   },
+  "/v1/dashboard/repo-choices": {
+   "get": {
+    "description": "Names of this tenant's repositories for the console's repository switcher (ADR-0040).\nNames only (no overlay, no proposals): any signed-in human may filter by repository.",
+    "operationId": "repo_choices_v1_dashboard_repo_choices_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/RepoChoice"
+         },
+         "title": "Response Repo Choices V1 Dashboard Repo Choices Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Repo Choices"
+   }
+  },
+  "/v1/dashboard/rule-descriptions": {
+   "get": {
+    "description": "Plain-English names for every rule id (ADR-0039). Display only; static per release.",
+    "operationId": "rule_descriptions_v1_dashboard_rule_descriptions_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "authorization",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RuleDescriptions"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Rule Descriptions"
+   }
+  },
   "/v1/dashboard/runs": {
    "get": {
     "operationId": "runs_v1_dashboard_runs_get",
@@ -5749,6 +6446,23 @@
        "minimum": 1,
        "title": "Limit",
        "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "repo_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Repo Id"
       }
      },
      {

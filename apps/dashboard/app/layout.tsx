@@ -37,9 +37,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   let shell: ReactNode = null;
   if (token) {
     const gw = gatewayFor(token);
+    const repos = ((await gw.GET("/v1/dashboard/repo-choices")).data ?? []) as { repo_id: string; name: string; sessions: number }[];
+    const scoped = repos.find((r) => r.repo_id === p.repo)?.repo_id; // ADR-0040
     const [session, pending, alerts, health] = await Promise.all([
       gw.GET("/v1/dashboard/session"),
-      gw.GET("/v1/dashboard/approvals", { params: { query: { state: "PENDING", limit: 1 } } }),
+      gw.GET("/v1/dashboard/approvals", { params: { query: { state: "PENDING", limit: 1, ...(scoped ? { repo_id: scoped } : {}) } } }),
       gw.GET("/v1/dashboard/alerts", { params: { query: { limit: 100 } } }),
       gw.GET("/v1/dashboard/health"),
     ]);
@@ -55,6 +57,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           health={worst(health.data ?? [])}
           csrf={csrfFor(token)}
           prefs={p}
+          repos={repos}
         >
           {children}
         </AppShell>

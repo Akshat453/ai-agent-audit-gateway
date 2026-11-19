@@ -1,19 +1,67 @@
 import { notFound } from "next/navigation";
 
+import { AgentText } from "@/components/humanize/agent-text";
+import { PlainLine, PlainStory } from "@/components/humanize/plain";
+import { Technical } from "@/components/humanize/technical";
 import { Badge, Card, Page, short } from "@/components/legacy";
 import { PullRequestsCard } from "@/components/github/pull-requests";
+import { Timestamp } from "@/components/timestamp";
+import { cn } from "@/lib/cn";
 import { gateway } from "@/lib/gateway";
+import { prefs } from "@/lib/prefs";
+import { ruleBook } from "@/lib/rulebook";
+import { agentKindLabel, agentName, clock, runStory, sessionTitle, type CodingLike } from "@/src/humanize";
 
 const INDENT = ["ml-0", "ml-6", "ml-12", "ml-18"];
+const TONE = { ok: "text-ok-11", bad: "text-bad-11", warn: "text-warn-11", info: "text-info-11" } as const;
 
 export default async function Run({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^[0-9a-fA-F-]{36}$/.test(id)) notFound();
-  const { data } = await (await gateway()).GET("/v1/dashboard/runs/{run_id}", { params: { path: { run_id: id } } });
+  const [{ data }, p, book] = await Promise.all([(await gateway()).GET("/v1/dashboard/runs/{run_id}", { params: { path: { run_id: id } } }), prefs(), ruleBook()]);
   if (!data) notFound();
+  const s = data.session ?? null;
+  const first = data.events[0]?.occurred_at ?? null;
+  const title = sessionTitle(s, first, p.tz);
+  const coding = data.coding as Record<string, CodingLike>;
+  const story = runStory(data.events, coding, data.people ?? {}, book);
+  const actions = new Set(data.events.map((e) => e.action_id).filter(Boolean)).size;
+  const agents = [...new Set(data.events.map((e) => e.agent).filter((x): x is string => !!x))].map(agentName);
+  const who: [string, string][] = s
+    ? ([["Developer", s.developer ?? "—"], ["Agent", agentKindLabel(s.agent_kind, s.agent_version)], ["Device", s.device ?? "—"], ["Repository", s.repo ?? "—"], ["Issue", s.issue_number ? `#${s.issue_number}` : "—"]] as [string, string][])
+    : [["Agents", agents.join(", ") || "—"]];
+  const storyView = (
+          <section aria-label="Session story">
+      <h2 className="mb-2 text-caption font-semibold uppercase tracking-wide text-gray-11">Story</h2>
+      <ol className="space-y-2 text-dense" data-testid="run-story">
+        {story.map((l, i) => (
+          <li key={`${l.actionId ?? "e"}-${i}`} className="flex flex-wrap items-baseline gap-x-2">
+            <span className="w-20 shrink-0 tabular text-gray-11">{clock(l.at, p.tz)}</span>
+            <span>
+              {l.actionId ? <a href={`/actions/${l.actionId}`} className="text-gray-12">{l.object ? <>{l.verb} <AgentText value={l.object} /></> : l.verb}</a> : l.verb}
+              {l.steps.map((st, k) => <span key={k} className={cn("ml-1", TONE[st.tone])}>→ {st.text}</span>)}
+              {l.why ? <span className="block text-caption text-gray-11" data-testid="story-why">Why: {l.why}</span> : null}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+  const summary = `${title}: ${actions} action${actions === 1 ? "" : "s"}${s?.status ? `, session ${s.status}` : ""}.`;
   return (
-    <Page title={`Run ${short(id, 13)}`} lead="Lifecycle events in recording order (seq). Payloads (args, results) are never shown here.">
+    <Page title={p.view === "simple" ? title : `Run ${short(id, 13)}`} help="run" lead={p.view === "simple" ? "Everything the agent asked to do in this session, in order, and what AgentGuard decided." : "Lifecycle events in recording order (seq). Payloads (args, results) are never shown here."}>
+      {p.view === "simple" ? (
+        <PlainStory headline={summary} who={who} canDo={[{ label: "See open approvals", href: "/approvals" }, { label: "Run an integrity check", href: "/verification" }]}>
+{storyView}
+        </PlainStory>
+      ) : (
+        <>
+          <PlainLine>{summary}</PlainLine>
+          <div className="mb-4 rounded-md border border-gray-6 bg-gray-1 p-4">{storyView}</div>
+        </>
+      )}
       <PullRequestsCard runId={id} />
+      <Technical view={p.view}>
       {data.delegations.length ? (
         <Card title="Delegation tree">
           <ul className="space-y-1 text-sm" aria-label="Delegations">
@@ -74,6 +122,9 @@ export default async function Run({ params }: { params: Promise<{ id: string }> 
           ))}
         </tbody>
       </table>
+      {s ? <p className="mt-2 text-caption text-gray-11">Session {s.session_id} · {s.agent_kind} {s.agent_version ?? ""} · started <Timestamp iso={s.started_at} tz={p.tz} /></p> : null}
+      </Technical>
     </Page>
   );
 }
+
