@@ -10,7 +10,8 @@ dashboard API (ADR-0031 §2), shaped for the new views.
     GET /v1/dashboard/health              gateway / database / worker / anchoring / monitor
     GET /v1/dashboard/search?q=           command palette: UUID or hash-prefix lookup
 
-Nothing here writes. ``hash_ok`` / ``link_ok`` are convenience recomputations for the UI; the
+Nothing here writes. ``hash_ok`` / ``link_ok`` / ``stored_copy_ok`` are convenience
+recomputations for the UI (shown values are decoded from the sealed bytes, ADR-0038); the
 independent verifier (agw-verify with pinned trust roots) stays authoritative.
 """
 
@@ -28,6 +29,7 @@ from agw_gateway.api.dashboard_routes import _anchor_view, _iso, _state
 from agw_gateway.crypto.canonical import event_hash
 from agw_gateway.db import tables as t
 from agw_gateway.evidence.bundle import epoch_record
+from agw_gateway.evidence.sealed import header_for_display, stored_copy_ok
 from agw_gateway.execution.errors import Forbidden, NotFound
 
 router = APIRouter(prefix="/v1")
@@ -345,6 +347,8 @@ class EvidenceNode(_Out):
     prev_hash: str
     hash_ok: bool  # sha256(TAG(AGW/event/v1) || stored canonical bytes) == stored event_hash
     link_ok: bool | None  # prev_hash == stored hash of seq-1 (None: seq-1 not visible)
+    # the readable copy (body) and the indexed columns equal the sealed record (ADR-0038)
+    stored_copy_ok: bool
     epoch_no: int | None
     anchor: AnchorRef | None
     decision: str | None
@@ -388,7 +392,9 @@ def _nodes(conn: Connection, request: Request, tenant: str, rows: list[Any]) -> 
     state = _state(request)
     out = []
     for r in rows:
-        seq, body = int(r.seq), r.body
+        seq = int(r.seq)
+        canonical = bytes(r.canonical_bytes)
+        body = header_for_display(canonical)  # shown values come from the SEALED record
         prev = str(body.get("prev") or "")
         expected = ZERO if seq == 0 else prev_hashes.get(seq - 1)
         epoch_no = epoch_of.get(seq)
@@ -405,6 +411,15 @@ def _nodes(conn: Connection, request: Request, tenant: str, rows: list[Any]) -> 
                 prev_hash=prev,
                 hash_ok=event_hash(bytes(r.canonical_bytes)) == bytes(r.event_hash),
                 link_ok=None if expected is None else prev == expected,
+                stored_copy_ok=stored_copy_ok(
+                    canonical,
+                    r.body,
+                    tenant_id=tenant,
+                    seq=seq,
+                    event_type=r.event_type,
+                    action_id=r.action_id,
+                    run_id=r.run_id,
+                ),
                 epoch_no=epoch_no,
                 anchor=AnchorRef(**view) if view is not None else None,
                 decision=policy.get("effect"),
@@ -551,7 +566,7 @@ def event_detail(request: Request, human: Human, event_id: UUID) -> EventDetail:
         tenant=tenant,
         action_id=str(row.action_id) if row.action_id else None,
         run_id=str(row.run_id) if row.run_id else None,
-        header=row.body,
+        header=header_for_display(bytes(row.canonical_bytes)),
         canonical_header=bytes(row.canonical_bytes).hex(),
         epoch=epoch_record(epoch) if epoch is not None else None,
     )

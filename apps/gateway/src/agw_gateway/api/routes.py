@@ -23,6 +23,7 @@ from agw_gateway.evidence.bundle import (
     epoch_record,
     get_epoch,
 )
+from agw_gateway.evidence.sealed import header_for_display
 from agw_gateway.execution.errors import EventNotSealedYet, NotFound, PayloadTooLarge
 from agw_gateway.keys import KeyUnavailable
 from agw_gateway.timing import timed
@@ -120,7 +121,7 @@ def _action_view(state: GatewayState, agent: AuthenticatedAgent, action_id: UUID
         if row is None:
             raise NotFound
         evaluated = conn.execute(
-            select(t.evidence_events.c.body)
+            select(t.evidence_events.c.canonical_bytes)
             .where(
                 t.evidence_events.c.action_id == action_id,
                 t.evidence_events.c.event_type == "POLICY_EVALUATED",
@@ -136,7 +137,8 @@ def _action_view(state: GatewayState, agent: AuthenticatedAgent, action_id: UUID
                 t.approvals.c.required_approvals,
             ).where(t.approvals.c.action_id == action_id)
         ).one_or_none()
-    policy = (evaluated or {}).get("policy", {})
+    sealed = header_for_display(bytes(evaluated)) if evaluated is not None else {}
+    policy = sealed.get("policy", {})  # from the sealed record (ADR-0038)
     view: dict[str, Any] = {
         "action_id": str(row.action_id),
         "run_id": str(row.run_id),
@@ -193,7 +195,7 @@ def run_timeline(request: Request, agent: Agent, run_id: UUID) -> dict[str, Any]
                 t.evidence_events.c.event_type,
                 t.evidence_events.c.occurred_at,
                 t.evidence_events.c.action_id,
-                t.evidence_events.c.body,
+                t.evidence_events.c.canonical_bytes,
                 t.evidence_events.c.risk_level,
             )
             .where(
@@ -224,7 +226,7 @@ def run_timeline(request: Request, agent: Agent, run_id: UUID) -> dict[str, Any]
         )
     events = []
     for r in rows:
-        body = r.body
+        body = header_for_display(bytes(r.canonical_bytes))
         item: dict[str, Any] = {
             "seq": r.seq,
             "event_id": str(r.event_id),
@@ -327,7 +329,7 @@ def list_events(
                 ev.c.event_type,
                 ev.c.occurred_at,
                 ev.c.event_hash,
-                ev.c.body,
+                ev.c.canonical_bytes,
             )
             .where(*conds)
             .order_by(ev.c.seq)
@@ -342,7 +344,8 @@ def list_events(
                 "type": r.event_type,
                 "occurred_at": _iso(r.occurred_at),
                 "event_hash": bytes(r.event_hash).hex(),
-                "header": r.body,  # derived projection of the canonical header (05 §7)
+                # JSON view decoded from the canonical (hashed) bytes, never the stored copy
+                "header": header_for_display(bytes(r.canonical_bytes)),
             }
             for r in page
         ],

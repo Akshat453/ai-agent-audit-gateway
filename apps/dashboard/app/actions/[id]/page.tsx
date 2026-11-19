@@ -37,7 +37,7 @@ export default async function ActionDetail({ params, searchParams }: { params: P
   }
   const epochs = [...new Set(a.events.map((e) => e.epoch_no).filter((n): n is number => n !== null && n !== undefined))];
   const anchors = a.events.map((e) => e.anchor).filter((x) => x);
-  const broken = a.events.filter((e) => !e.hash_ok || e.link_ok === false).length;
+  const broken = a.events.filter((e) => !e.hash_ok || e.link_ok === false || e.stored_copy_ok === false).length;
   const tab = sp.tab && ["overview", "evidence", "related"].includes(sp.tab) ? sp.tab : "evidence";
   const reasons = [...new Set(a.events.flatMap((e) => e.reasons))];
 

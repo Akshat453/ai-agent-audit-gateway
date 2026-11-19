@@ -55,7 +55,7 @@ export default async function EventDetail({ params }: { params: Promise<{ id: st
         crumbs={[{ label: "Evidence" }, { label: "Events", href: "/evidence" }, { label: `#${n.seq}` }]}
         description={`Event #${n.seq} in tenant ${d.tenant}'s hash chain.`}
         meta={<>
-          {n.hash_ok && n.link_ok !== false ? <StatusBadge value="VERIFIED" /> : <StatusBadge value="TAMPERED" />}
+          {n.hash_ok && n.link_ok !== false && n.stored_copy_ok !== false ? <StatusBadge value="VERIFIED" /> : <StatusBadge value="TAMPERED" />}
           {n.risk_level ? <RiskBadge level={n.risk_level} /> : null}
           {n.epoch_no !== null && n.epoch_no !== undefined ? <span className="inline-flex items-center gap-1 text-caption text-gray-11"><Lock className="size-3" aria-hidden="true" />epoch {n.epoch_no}</span> : <StatusBadge value="UNANCHORED" />}
           {n.anchor ? <StatusBadge value={n.anchor.status} /> : null}
@@ -120,6 +120,7 @@ export default async function EventDetail({ params }: { params: Promise<{ id: st
                   {n.link_ok === null || n.link_ok === undefined ? <StatusBadge value="INCOMPLETE" size="sm" /> : n.link_ok ? <StatusBadge value="VERIFIED" size="sm" /> : <StatusBadge value="TAMPERED" size="sm" />}
                   <span>prev matches the stored hash of #{n.seq - 1}</span>
                 </li>
+                <li className="flex items-center gap-2" data-check="stored-copy" data-ok={String(n.stored_copy_ok)}>{n.stored_copy_ok !== false ? <StatusBadge value="VERIFIED" size="sm" /> : <StatusBadge value="TAMPERED" size="sm" />}<span>readable copy and columns match the sealed record</span></li>
               </ul>
             </CardBody>
           </Card>

@@ -37,6 +37,7 @@ from agw_gateway.api.approval_routes import Human
 from agw_gateway.api.state import GatewayState
 from agw_gateway.db import tables as t
 from agw_gateway.evidence.bundle import EventNotFound, EventNotSealed, build_bundle
+from agw_gateway.evidence.sealed import header_for_display
 from agw_gateway.execution.errors import EventNotSealedYet, NotFound, RoleRequired
 from agw_gateway.humans import AuthenticatedHuman
 from agw_gateway.ids import uuid7
@@ -540,7 +541,7 @@ def run_detail(request: Request, human: Human, run_id: UUID) -> RunDetail:
         ).all()
     events = []
     for r in rows:
-        b = r.body
+        b = header_for_display(bytes(r.canonical_bytes))  # sealed record, ADR-0038
         epoch_no = next(
             (int(e.epoch_no) for e in epochs if e.first_seq <= r.seq <= e.last_seq), None
         )
@@ -634,7 +635,7 @@ def events(
                 ev.c.event_type,
                 ev.c.occurred_at,
                 ev.c.event_hash,
-                ev.c.body,
+                ev.c.canonical_bytes,
             )
             .where(*conds)
             .order_by(ev.c.seq.desc())
@@ -649,7 +650,7 @@ def events(
                 type=r.event_type,
                 occurred_at=_iso(r.occurred_at),
                 event_hash=bytes(r.event_hash).hex(),
-                header=r.body,
+                header=header_for_display(bytes(r.canonical_bytes)),
             )
             for r in page
         ],
@@ -785,7 +786,7 @@ def _incidents(conn: Connection, tenant: str, kinds: list[str], limit: int) -> l
         elif kind == "security":
             ev = t.evidence_events
             for r in conn.execute(
-                select(ev.c.occurred_at, ev.c.body, ev.c.event_id)
+                select(ev.c.occurred_at, ev.c.canonical_bytes, ev.c.event_id)
                 .where(ev.c.tenant_id == tenant, ev.c.event_type == "SECURITY_VIOLATION")
                 .order_by(ev.c.seq.desc())
                 .limit(limit)
@@ -798,11 +799,13 @@ def _incidents(conn: Connection, tenant: str, kinds: list[str], limit: int) -> l
                         run_id=None,
                         tool=None,
                         status=None,
-                        code=r.body.get("violation", {}).get("kind"),
+                        code=(h := header_for_display(bytes(r.canonical_bytes)))
+                        .get("violation", {})
+                        .get("kind"),
                         detail={
                             "event_id": str(r.event_id),
-                            "actor": r.body.get("actor", {}),
-                            "claimed": r.body.get("violation", {}).get("claimed"),
+                            "actor": h.get("actor", {}),
+                            "claimed": h.get("violation", {}).get("claimed"),
                         },
                         reconcilable=False,
                     )

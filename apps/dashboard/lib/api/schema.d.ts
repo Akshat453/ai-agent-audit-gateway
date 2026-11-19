@@ -1767,6 +1767,8 @@ export interface components {
             seq: number;
             /** Status */
             status: string | null;
+            /** Stored Copy Ok */
+            stored_copy_ok: boolean;
             /** Type */
             type: string;
         };

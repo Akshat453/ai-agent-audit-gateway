@@ -41,6 +41,7 @@ from agw_gateway.db import tables as t
 from agw_gateway.evidence import EvidenceWriter, NewEvent
 from agw_gateway.evidence.bundle import export_epochs
 from agw_gateway.evidence.export import export_chain
+from agw_gateway.evidence.sealed import stored_copy_ok
 from agw_gateway.ids import uuid7
 from agw_gateway.logs import log
 from agw_gateway.tracing import span
@@ -72,10 +73,48 @@ _SEVERITY: Final = (
     "VERIFIED",
 )
 CRITICAL_KINDS: Final = frozenset({"VERIFICATION_FAILED", "ANCHOR_ROOT_MISMATCH", "SEQUENCE_GAP"})
+MAX_LISTED_SEQS: Final = 20
 
 
 def report_digest(report: dict[str, Any]) -> bytes:
     return hashlib.sha256(_PREFIX + encode(profile_value(report))).digest()
+
+
+def _stored_copies(conn: Any, tenant: str, from_seq: int) -> dict[str, Any]:
+    """Compare every event's ``body`` / indexed columns with its sealed canonical bytes."""
+    ev = t.evidence_events
+    bad: list[int] = []
+    checked = 0
+    rows = conn.execution_options(stream_results=True, yield_per=2000).execute(
+        select(
+            ev.c.seq,
+            ev.c.event_type,
+            ev.c.action_id,
+            ev.c.run_id,
+            ev.c.body,
+            ev.c.canonical_bytes,
+        )
+        .where(ev.c.tenant_id == tenant, ev.c.seq >= from_seq)
+        .order_by(ev.c.seq)
+    )
+    for r in rows:
+        checked += 1
+        if not stored_copy_ok(
+            bytes(r.canonical_bytes),
+            r.body,
+            tenant_id=tenant,
+            seq=int(r.seq),
+            event_type=r.event_type,
+            action_id=r.action_id,
+            run_id=r.run_id,
+        ):
+            bad.append(int(r.seq))
+    return {
+        "result": "TAMPERED" if bad else "VERIFIED",
+        "events_checked": checked,
+        "mismatched": len(bad),
+        "mismatched_seqs": bad[:MAX_LISTED_SEQS],
+    }
 
 
 def _worst(results: list[str]) -> str:
@@ -201,6 +240,7 @@ class Monitor:
                 epochs_buf = io.StringIO()
                 export_epochs(conn, tenant, epochs_buf)
                 ops = self._operational(conn, tenant)
+                stored = _stored_copies(conn, tenant, from_seq)
                 anchor_rows = conn.execute(
                     select(t.anchors.c.epoch_no, t.anchors.c.root, t.anchors.c.status).where(
                         t.anchors.c.tenant_id == tenant
@@ -254,6 +294,20 @@ class Monitor:
         if chain.missing_ranges and from_seq == 0:
             alerts.append(
                 _alert("SEQUENCE_GAP", "critical", ranges=[list(r) for r in chain.missing_ranges])
+            )
+        # (1b) the readable copy and indexed columns must equal the sealed record (ADR-0038):
+        # the verifier only sees the hashed bytes, but the screens and queries use the copy.
+        report["stored_copy"] = stored
+        results.append(stored["result"])
+        if stored["result"] == "TAMPERED":
+            alerts.append(
+                _alert(
+                    "VERIFICATION_FAILED",
+                    "critical",
+                    check="stored_copy",
+                    reason="STORED_COPY_MISMATCH",
+                    first_bad_seq=stored["mismatched_seqs"][0],
+                )
             )
         whole = from_seq == 0
         ep = verify_epochs(epoch_lines, event_lines=chain_lines if whole else None)

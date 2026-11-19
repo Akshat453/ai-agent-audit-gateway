@@ -23,6 +23,7 @@ from agw_gateway.api.routes import Agent, _iso
 from agw_gateway.api.state import GatewayState
 from agw_gateway.db import tables as t
 from agw_gateway.delegation.service import DelegationRequest
+from agw_gateway.evidence.sealed import header_for_display
 from agw_gateway.execution.errors import NotFound, RequestInvalid
 
 router = APIRouter(prefix="/v1")
@@ -148,7 +149,7 @@ def delegation_timeline(request: Request, agent: Agent, delegation_id: UUID) -> 
                 ev.c.agent_id,
                 ev.c.run_id,
                 ev.c.event_hash,
-                ev.c.body,
+                ev.c.canonical_bytes,
             )
             .where(
                 ev.c.tenant_id == agent.tenant_id,
@@ -169,12 +170,13 @@ def delegation_timeline(request: Request, agent: Agent, delegation_id: UUID) -> 
             "run_id": str(r.run_id) if r.run_id else None,
             "action_id": str(r.action_id) if r.action_id else None,
         }
+        body = header_for_display(bytes(r.canonical_bytes))  # sealed record, ADR-0038
         for key in ("delegation", "refs", "tool", "outcome"):
-            if key in r.body:
-                item[key] = r.body[key]
-        if "policy" in r.body:
-            item["decision"] = r.body["policy"]["effect"]
-            item["reasons"] = r.body["policy"]["reasons"]
+            if key in body:
+                item[key] = body[key]
+        if "policy" in body:
+            item["decision"] = body["policy"]["effect"]
+            item["reasons"] = body["policy"]["reasons"]
         events.append(item)
     return {
         "delegation_id": str(delegation_id),

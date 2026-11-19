@@ -9,7 +9,7 @@ import { middle } from "@/lib/format";
 
 export type EvidenceNode = {
   seq: number; event_id: string; type: string; occurred_at?: string | null; risk_level?: string | null;
-  event_hash: string; prev_hash: string; hash_ok: boolean; link_ok?: boolean | null;
+  event_hash: string; prev_hash: string; hash_ok: boolean; link_ok?: boolean | null; stored_copy_ok?: boolean;
   epoch_no?: number | null; anchor?: { status: string; tx_hash?: string | null; block_number?: number | null; explorer_url?: string | null } | null;
   decision?: string | null; status?: string | null; reasons: string[];
 };
@@ -22,19 +22,19 @@ export type EvidenceNode = {
  */
 export function EvidenceTimeline({ nodes, tz }: { nodes: EvidenceNode[]; tz: "utc" | "local" }) {
   if (!nodes.length) return <p className="text-dense text-gray-11">No evidence events recorded for this action yet.</p>;
-  const firstBroken = nodes.find((n) => !n.hash_ok || n.link_ok === false);
+  const firstBroken = nodes.find((n) => !n.hash_ok || n.link_ok === false || n.stored_copy_ok === false);
   return (
     <div>
       {firstBroken ? (
         <div role="alert" className="mb-4 flex items-start gap-2 rounded-md border border-bad-7 bg-bad-3 px-3 py-2 text-dense text-bad-12">
           <Unlink aria-hidden="true" className="mt-0.5 size-4 text-bad-11" />
-          <span>First broken link at event #{firstBroken.seq}: {!firstBroken.hash_ok ? "its stored header no longer hashes to its stored event hash" : "its prev hash does not match the stored hash of the event before it"}. Run verification and treat this as an incident.</span>
+          <span>First broken link at event #{firstBroken.seq}: {!firstBroken.hash_ok ? "its stored header no longer hashes to its stored event hash" : firstBroken.stored_copy_ok === false ? "its readable copy was changed and no longer matches the sealed record" : "its prev hash does not match the stored hash of the event before it"}. Run verification and treat this as an incident.</span>
         </div>
       ) : null}
       <ol aria-label="Evidence timeline" className="relative">
         {nodes.map((n, i) => {
           const next = nodes[i + 1];
-          const broken = !n.hash_ok || n.link_ok === false;
+          const broken = !n.hash_ok || n.link_ok === false || n.stored_copy_ok === false;
           const nextBroken = next ? !next.hash_ok || next.link_ok === false || !n.hash_ok : false;
           const gap = next ? next.seq - n.seq - 1 : 0;
           return (
@@ -64,6 +64,7 @@ export function EvidenceTimeline({ nodes, tz }: { nodes: EvidenceNode[]; tz: "ut
                     <span className="inline-flex items-center gap-1"><Anchor aria-hidden="true" className="size-3" /><StatusBadge value={n.anchor.status} size="sm" /></span>
                   ) : null}
                   {!n.hash_ok ? <span className="font-medium text-bad-11">stored header does not match its hash</span> : null}
+                  {n.hash_ok && n.stored_copy_ok === false ? <span className="font-medium text-bad-11">readable copy was changed</span> : null}
                 </div>
                 {n.reasons.length ? <p className="mt-1 text-caption text-gray-11">{n.reasons.join(" · ")}</p> : null}
               </div>

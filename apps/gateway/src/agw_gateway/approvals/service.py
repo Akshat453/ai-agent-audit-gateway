@@ -59,6 +59,7 @@ from agw_gateway.crypto.canonical import args_digest
 from agw_gateway.db import tables as t
 from agw_gateway.evidence import EvidenceWriter, NewEvent
 from agw_gateway.evidence.records import policy_evaluated_fields
+from agw_gateway.evidence.sealed import header_for_display
 from agw_gateway.evidence.writer import GATEWAY_ACTOR_ID
 from agw_gateway.execution.errors import (
     ApprovalAlreadyDecided,
@@ -315,8 +316,8 @@ class ApprovalService:
                 .join(t.agents, t.agents.c.agent_id == t.actions.c.agent_id)
                 .where(t.actions.c.action_id == ap.action_id)
             ).one()
-            evaluated = conn.execute(
-                select(t.evidence_events.c.body)
+            evaluated_bytes = conn.execute(
+                select(t.evidence_events.c.canonical_bytes)
                 .where(
                     t.evidence_events.c.action_id == ap.action_id,
                     t.evidence_events.c.event_type == "POLICY_EVALUATED",
@@ -351,6 +352,8 @@ class ApprovalService:
                 tf = spec.meta.target_field or ""
                 if target is not None and spec.classes.arg(tf) == "secret":
                     target = self._minimizer.marker(mconn, action.tenant_id, target)
+        # What the approver sees comes from the SEALED record, not the stored copy (ADR-0038).
+        evaluated = header_for_display(bytes(evaluated_bytes))
         risk = evaluated.get("risk", {})
         policy = evaluated.get("policy", {})
         return {

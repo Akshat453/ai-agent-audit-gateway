@@ -1186,6 +1186,10 @@
       ],
       "title": "Status"
      },
+     "stored_copy_ok": {
+      "title": "Stored Copy Ok",
+      "type": "boolean"
+     },
      "type": {
       "title": "Type",
       "type": "string"
@@ -1201,6 +1205,7 @@
      "prev_hash",
      "hash_ok",
      "link_ok",
+     "stored_copy_ok",
      "epoch_no",
      "anchor",
      "decision",
