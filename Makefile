@@ -14,8 +14,16 @@ sync:
 up: .env
 	docker compose up -d --wait
 
+# DELETES every AgentGuard container AND data volume (database, local chain, files). Asks first;
+# scripts/CI skip the question with `make down CONFIRM=yes`. To pause and keep data: make stop.
 down:
-	docker compose down -v
+	@if [ "$(CONFIRM)" != "yes" ]; then \
+	  echo "make down DELETES all AgentGuard data: the database (accounts, runs, approvals, evidence),"; \
+	  echo "the local blockchain and stored files. It cannot be undone. To pause and keep data: make stop"; \
+	  printf "Type DELETE to continue: "; read ans || ans=""; \
+	  if [ "$$ans" != "DELETE" ]; then echo "Cancelled. Nothing was deleted."; exit 1; fi; \
+	fi
+	docker compose --profile ui --profile monitoring down -v
 
 migrate: .env sync
 	set -a; . ./.env; set +a; cd apps/gateway && $(UV) run alembic upgrade head

@@ -174,7 +174,7 @@ Pytest markers: `unit`, `property`, `integration`, `e2e`, `slow`. `make test` ru
 | `make test` | 1 | ruff + mypy + pytest (non-slow) with coverage gates |
 | `make lint` | 1 | `ruff check`, `ruff format --check`, `mypy`, `lint-imports` |
 | `make demo` | 1 | seed demo tenant/agent/tools/policy, run `examples/single-agent` scripted agent |
-| `make down` | 1 | `docker compose down -v` |
+| `make down` | 1 | asks you to type DELETE, then `docker compose --profile ui --profile monitoring down -v` (CI: `make down CONFIRM=yes`) |
 | `make vectors` | 3 | regenerate test vectors into a temp dir and **diff** against the frozen ones (never overwrite) |
 | `make contracts` | 6 | `forge build && forge test` |
 

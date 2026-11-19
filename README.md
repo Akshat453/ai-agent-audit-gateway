@@ -13,5 +13,5 @@ make up        # Postgres 16 via docker compose (creates .env from .env.example 
 make migrate   # alembic upgrade head as agw_migrator
 make test      # ruff + mypy + import-linter + pytest (Testcontainers) with coverage gate
 make demo      # seed demo tenant/agents, start gateway, run the scripted agent
-make down      # stop and remove the stack
+make down      # DELETES all data (asks first; CONFIRM=yes to skip). Pause instead: make stop
 ```

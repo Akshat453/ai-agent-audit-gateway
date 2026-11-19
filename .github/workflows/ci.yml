@@ -99,7 +99,7 @@ jobs:
       - if: always()
         run: docker compose logs --no-color --tail=200
       - if: always()
-        run: make down
+        run: make down CONFIRM=yes
 
   # Phase 9.5 (ADR-0033): the dashboard against a real gateway + seeded tenant, production
   # build: auth, approvals (dialogs, CRITICAL step-up), CSRF/XSS, console behaviour, CSP
@@ -125,7 +125,7 @@ jobs:
           path: apps/dashboard/e2e/.results
           retention-days: 7
       - if: always()
-        run: make down
+        run: make down CONFIRM=yes
 
   dependency-and-code-audit:
     runs-on: ubuntu-latest
