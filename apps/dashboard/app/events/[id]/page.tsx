@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/page-header";
 import { RiskBadge, StatusBadge } from "@/components/status-badge";
 import { Timestamp } from "@/components/timestamp";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { explainHeader } from "@/lib/explain";
 import { EMPTY, UUID_RE, middle } from "@/lib/format";
 import { gateway, getJson, me } from "@/lib/gateway";
 import type { Bundle } from "@/lib/merkle";
@@ -46,6 +47,7 @@ export default async function EventDetail({ params }: { params: Promise<{ id: st
   const actor = (header.actor ?? {}) as { id?: string; kind?: string };
   const payload = header.payload as { len?: number; ref?: string; digest?: string } | undefined;
   const epoch = d.epoch as Record<string, unknown> | null;
+  const plain = explainHeader(header);
 
   return (
     <div className="mx-auto max-w-[1280px]">
@@ -70,6 +72,16 @@ export default async function EventDetail({ params }: { params: Promise<{ id: st
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
         <div className="min-w-0 space-y-4">
           <Card>
+            <CardHeader title="What happened" description="This record in plain words. The raw record is below." />
+            <CardBody className="text-dense">
+              <p className="font-medium text-gray-12" data-testid="event-plain">{plain.headline}</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-gray-11">
+                {plain.details.map((line, i) => <li key={i}>{line}</li>)}
+              </ul>
+              {d.action_id ? <p className="mt-3"><a href={`/actions/${d.action_id}`}>See every step of this action</a>{d.run_id ? <> · <a href={`/runs/${d.run_id}`}>See the whole agent session</a></> : null}</p> : null}
+            </CardBody>
+          </Card>
+          <Card>
             <CardHeader title="Proof explorer" description="Leaf → Merkle root → epoch root → later epochs → on-chain anchor, recomputed in your browser from public hashes." />
             <CardBody>
               {n.epoch_no === null || n.epoch_no === undefined ? (
@@ -88,7 +100,7 @@ export default async function EventDetail({ params }: { params: Promise<{ id: st
           </Card>
 
           <Card>
-            <CardHeader title="Header" description="The JSON projection of the canonical (hashed) header. Structural metadata only; no payload." />
+            <CardHeader title="Raw record" description="Exactly what was sealed (the JSON view of the hashed header). Structural metadata only; the request contents are encrypted in the payload." />
             <CardBody><CodeView text={JSON.stringify(header, null, 2)} max={6000} label="event header" /></CardBody>
           </Card>
         </div>

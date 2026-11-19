@@ -29,3 +29,13 @@ COMMIT;
 ```
 - **Event page:** the badge shows TAMPERED, the third check line fails, and the decision still shows the sealed value.
 - **Overview:** within about 60 s it turns red, and the monitor report has `stored_copy.result = TAMPERED`.
+
+## Also in this phase: plain-English log view
+- `apps/dashboard/lib/explain.ts` turns a sealed record into a sentence plus details:
+  - who did it and what kind of action it was (shell command, file change, push, PR …);
+  - the decision, the policy's reasons, the rules that matched, and the risk;
+  - when it happened.
+- **Event page:** a "What happened" card above the "Raw record" (renamed from "Header"), with links to the action and the session.
+- **Action timeline:** each step has a one-line explanation.
+- Display only. The command text and file contents stay encrypted in the payload (privacy design, ADR-0029), so the explanation names the kind of action, not its exact arguments.
+- Test: `e2e/console.spec.ts` › "plain-English explanations".

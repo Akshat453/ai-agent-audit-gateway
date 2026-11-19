@@ -5,6 +5,7 @@ import { RiskBadge, StatusBadge } from "@/components/status-badge";
 import { Timestamp } from "@/components/timestamp";
 import { Tooltip } from "@/components/ui/overlay";
 import { cn } from "@/lib/cn";
+import { explainNode } from "@/lib/explain";
 import { middle } from "@/lib/format";
 
 export type EvidenceNode = {
@@ -20,7 +21,7 @@ export type EvidenceNode = {
  * this event's stored hash; red dashed = the link (or the record's own hash) no longer matches,
  * with the reason. Interleaved events of other actions are summarised on the connector.
  */
-export function EvidenceTimeline({ nodes, tz }: { nodes: EvidenceNode[]; tz: "utc" | "local" }) {
+export function EvidenceTimeline({ nodes, tz, toolId }: { nodes: EvidenceNode[]; tz: "utc" | "local"; toolId?: string | null }) {
   if (!nodes.length) return <p className="text-dense text-gray-11">No evidence events recorded for this action yet.</p>;
   const firstBroken = nodes.find((n) => !n.hash_ok || n.link_ok === false || n.stored_copy_ok === false);
   return (
@@ -51,6 +52,7 @@ export function EvidenceTimeline({ nodes, tz }: { nodes: EvidenceNode[]; tz: "ut
                   {n.status ? <StatusBadge value={n.status} size="sm" /> : null}
                   <span className="ml-auto"><Timestamp iso={n.occurred_at} tz={tz} className="text-caption text-gray-11" /></span>
                 </div>
+                <p className="mt-1 text-dense text-gray-12" data-testid={`node-plain-${n.seq}`}>{explainNode(n, toolId)}</p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-gray-11">
                   <span className="inline-flex items-center gap-1">hash <HashChip value={n.event_hash} label={`event #${n.seq} hash`} /></span>
                   {n.epoch_no !== null && n.epoch_no !== undefined ? (

@@ -66,7 +66,7 @@ export default async function ActionDetail({ params, searchParams }: { params: P
         <TabsContent value="evidence">
           <Card>
             <CardHeader title="Evidence timeline" description="Each lifecycle event, its hash, and the hash the next event commits to. Arguments and results are never shown." />
-            <CardBody><EvidenceTimeline nodes={a.events} tz={p.tz} /></CardBody>
+            <CardBody><EvidenceTimeline nodes={a.events} tz={p.tz} toolId={a.tool.id} /></CardBody>
           </Card>
         </TabsContent>
 

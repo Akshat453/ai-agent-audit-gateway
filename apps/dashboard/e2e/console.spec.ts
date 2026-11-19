@@ -135,3 +135,16 @@ test("CSP: per-request nonce, no unsafe-inline / unsafe-eval, no external origin
     expect(html, path).not.toMatch(/<[a-z]+[^>]*\sstyle="/); // no server-rendered style attributes
   }
 });
+
+test("plain-English explanations: action timeline steps and the event page", async ({ page }) => {
+  const problems = watch(page);
+  await login(page, "alice");
+  await page.goto(`/actions/${fx.keyboard_action}`);
+  const first = page.locator('[data-testid^="node-plain-"]').first();
+  await expect(first).toContainText(/asked to/);
+  const ev = await page.locator('ol[aria-label="Evidence timeline"] a[href^="/events/"]').first().getAttribute("href");
+  await page.goto(ev ?? "/");
+  await expect(page.getByTestId("event-plain")).toContainText(/The AI agent asked to/);
+  await expect(page.getByRole("heading", { name: "Raw record" })).toBeVisible();
+  expect(problems).toEqual([]);
+});

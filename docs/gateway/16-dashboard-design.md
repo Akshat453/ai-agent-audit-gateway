@@ -212,6 +212,7 @@ Approval: send_email@1.0.0 (?)   [PENDING] [HIGH] requested 8 min ago
    - **Interleaved events:** events of other actions between two nodes are counted on the connector.
    - **Source of the checks:** `hash_ok` and `link_ok` come from the gateway, which recomputes them from the stored bytes.
    - **Readable copy (ADR-0038):** `stored_copy_ok` says whether the `body` copy and the indexed columns still equal the sealed record; the values shown are always decoded from the sealed bytes, never from `body`.
+   - **Plain English:** the event page opens with a "What happened" card and every timeline step has a one-line sentence (`lib/explain.ts`); the raw sealed record stays below it.
 2. **Proof explorer** (`components/evidence/proof-explorer.tsx`, `lib/merkle.ts`):
    - **Path:** leaf, then each sibling (left or right) up to the Merkle root, then the epoch root, then later epochs (each committing to its predecessor), then the anchor (chain, contract, tx, block, finality).
    - **Ticks:** every step is recomputed in the browser with Web Crypto from public values only, and gets a pass or fail tick.
